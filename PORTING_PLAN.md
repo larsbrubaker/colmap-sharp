@@ -57,8 +57,7 @@ Estimators implement `IEstimator<TX,TY,TModel>` (+ `ILocalEstimator` for LO-RANS
 `LoRansac.Estimate` hides (does not override) `Ransac.Estimate`: call it on the LoRansac type.
 Open estimators: `two_view_geometry`'s `EstimateRigTwoViewGeometries` (+ its `Nominal` test;
 `generalized_pose` is now on main), `alignment`,
-`global_positioning`,
-`gravity_refinement`, `view_graph_calibration`.
+`global_positioning_test.cc` Nominal and MultiCameraRig (need ReconstructionNear from alignment).
 
 ### Phase 7 — Nonlinear least-squares solver (Ceres replacement)
 Done: Jet/autodiff, losses, manifolds, Problem, LM trust region, DENSE_QR,

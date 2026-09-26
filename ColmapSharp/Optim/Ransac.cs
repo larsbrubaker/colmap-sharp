@@ -352,7 +352,7 @@ public class Ransac<TEstimator, TX, TY, TModel, TSupportMeasurer, TSupport, TSam
 	/// </summary>
 	protected static void CheckNumThreads(int numThreads, string message)
 	{
-		int effectiveNumThreads = GetEffectiveNumThreads(numThreads);
+		int effectiveNumThreads = Threading.GetEffectiveNumThreads(numThreads);
 		if (typeof(TSampler) != typeof(RandomSampler))
 		{
 			Check.Eq(effectiveNumThreads, 1, message);
@@ -382,26 +382,6 @@ public class Ransac<TEstimator, TX, TY, TModel, TSupportMeasurer, TSupport, TSam
 		}
 
 		return inlierMask;
-	}
-
-	/// <summary>
-	/// Port of colmap::GetEffectiveNumThreads (util/threading.cc): a non-positive count means
-	/// all hardware threads, and the result is at least 1.
-	/// </summary>
-	private static int GetEffectiveNumThreads(int numThreads)
-	{
-		int numEffectiveThreads = numThreads;
-		if (numThreads <= 0)
-		{
-			numEffectiveThreads = Environment.ProcessorCount;
-		}
-
-		if (numEffectiveThreads <= 0)
-		{
-			numEffectiveThreads = 1;
-		}
-
-		return numEffectiveThreads;
 	}
 }
 

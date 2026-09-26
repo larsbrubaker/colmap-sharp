@@ -1098,6 +1098,36 @@ cameras are either co-centered (panoramic) or centimeters apart.
 **Evidence.** `GeneralizedPoseEstimationTests` (generalized_pose_test.cc 1:1), whose
 EstimateGeneralizedRelativePose_Nominal covers panoramic and non-panoramic rigs, passes.
 
+## 47. Gravity refinement visits error-prone frames and their neighbor pairs in id order
+
+**What.** `GravityRefiner.RefineGravity` (Estimators/GravityRefinement.cs) walks the
+error-prone frames, each frame's neighbor pairs and the image adjacency sets in ascending id
+order. COLMAP walks absl `FlatHashSet`s, whose order is unspecified.
+
+**Why.** CLAUDE.md requires deterministic iteration. The order reaches the result because
+an accepted frame's refined gravity is written into the shared pose prior, which later frames
+read as a neighbor gravity; the neighbor order also sets the residual order of each small
+solve. There is no order to match: COLMAP's is a property of absl's hash seed.
+
+**Evidence.** `GravityRefinementTests` (gravity_refinement_test.cc 1:1) pass at COLMAP's
+1e-2 degree tolerance with 30% gravity outliers.
+
+## 48. Global positioning keeps frame centers and cameras-in-rig in id order
+
+**What.** `GlobalPositioner` (Estimators/GlobalPositioning.cs) keeps its frame centers,
+cameras-in-rig and points sorted by id, where COLMAP uses `NodeHashMap`s. The order decides
+which frame receives which random initial center (drawn in frame-id order here) and the
+element order within the Schur ordering groups.
+
+**Why.** CLAUDE.md requires deterministic iteration. With a fixed seed COLMAP's own random
+starts depend on its hash order, so they cannot be reproduced; the solve converges to the
+same positions up to the gauge.
+
+**Evidence.** `GlobalPositioningTests`: `RefineSensorFromRigFalsePreservesRig` (1:1) passes,
+and the C#-only Nominal/MultiCameraRig alignment checks meet COLMAP's bounds (0.1 degree,
+0.5 projection-center error after a similarity alignment). The 1:1 Nominal and
+MultiCameraRig cases wait for `ReconstructionNear` (estimators/alignment).
+
 ## 50. ObservationManager iterates its image pairs in insertion order and prints its graph
 
 **What differs.** COLMAP's `ObservationManager` (sfm/observation_manager.cc) keeps the
