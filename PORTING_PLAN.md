@@ -101,7 +101,7 @@ MatterCAD (esp. wasm32) must cap `max_image_size` accordingly.
 End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us.
 
 ### Phase 11 — Pipeline controllers
-`controllers/pairing` + `matcher_cache` (branch pending merge), `feature_extraction`,
+`feature_extraction`,
 `feature_matching(_utils)`, `image_reader`, `undistorters`,
 `automatic_reconstruction` (minus CGAL/GPU branches), cancellation + progress surface.
 Skipped (retrieval out of scope): `pairing_test.cc` VocabTreePairGenerator.Nominal,

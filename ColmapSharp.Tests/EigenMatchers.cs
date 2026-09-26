@@ -7,7 +7,8 @@
 // Geometry/Rigid3dTests.cs, Sim3dTests.cs, GpsTests.cs, BboxTests.cs, Scene/FrameTests.cs, and
 // the pose, essential/homography matrix, triangulation and normalization tests; the VectorXd overload
 // serves Optim/SparseCholeskyTests.cs and LeastAbsoluteDeviationsTests.cs; the MatrixXd
-// overload Estimators/CostFunctions/TinyManifoldTests.cs and QuaternionUtilsTests.cs).
+// overload Estimators/CostFunctions/TinyManifoldTests.cs and QuaternionUtilsTests.cs; the float
+// RowMajorMatrix overload Controllers/PairingTests.cs).
 //
 // Semantics, as in COLMAP: if rhs is zero (Eigen's isZero(), every coefficient within
 // dummy_precision = 1e-12 of 0), lhs matches when lhs.norm() <= tol, because isApprox is
@@ -123,6 +124,40 @@ internal static class EigenMatchers
 		}
 
 		return lhs.IsApprox(rhs, tol);
+	}
+
+	/// <summary>
+	/// EigenMatrixNear(rhs, tol) for a float Eigen::RowMajorMatrixXf (first user:
+	/// Controllers/PairingTests.cs). The default tol is Eigen's float dummy_precision, 1e-5,
+	/// which is also the isZero() precision; the arithmetic is float like Eigen's. A shape
+	/// mismatch never matches.
+	/// </summary>
+	public static bool EigenMatrixNear(RowMajorMatrix<float> lhs, RowMajorMatrix<float> rhs, float tol = 1e-5f)
+	{
+		if (lhs.Rows != rhs.Rows || lhs.Cols != rhs.Cols)
+		{
+			return false;
+		}
+
+		float lhsSquaredNorm = 0;
+		float rhsSquaredNorm = 0;
+		float diffSquaredNorm = 0;
+		bool rhsIsZero = true;
+		for (int i = 0; i < lhs.Data.Length; ++i)
+		{
+			lhsSquaredNorm += lhs.Data[i] * lhs.Data[i];
+			rhsSquaredNorm += rhs.Data[i] * rhs.Data[i];
+			float diff = lhs.Data[i] - rhs.Data[i];
+			diffSquaredNorm += diff * diff;
+			rhsIsZero &= Math.Abs(rhs.Data[i]) <= 1e-5f;
+		}
+
+		if (rhsIsZero)
+		{
+			return MathF.Sqrt(lhsSquaredNorm) <= tol;
+		}
+
+		return diffSquaredNorm <= tol * tol * Math.Min(lhsSquaredNorm, rhsSquaredNorm);
 	}
 
 	// Eigen's isZero() with the default precision: every |coefficient| <= 1e-12 * 1.

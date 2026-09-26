@@ -1203,6 +1203,30 @@ COLMAP's order carries no meaning and varies run to run.
 **Evidence.** `IncrementalTriangulatorTests` (incremental_triangulator_test.cc 1:1) pass;
 their counts do not depend on the order on the noise-free synthetic scenes.
 
+## 52. SpatialPairGenerator ranks neighbors by coordinate-difference distances, not faiss's
+
+**What differs.** COLMAP's `SpatialPairGenerator` (controllers/pairing.cc) finds each
+image's nearest position priors with faiss's brute-force `IndexFlatL2`, on float positions
+centered on their mean. The port (`Controllers/SpatialPairGenerator.cs`) runs a managed
+brute-force search over the same float positions, ranking by the float squared distance
+summed from coordinate differences, ties by the smaller index. faiss does the same for fewer
+than 20 query positions (`distance_compute_blas_threshold`), but from 20 on it computes
+`||x||^2 + ||y||^2 - 2 x.y` with a BLAS matrix product, whose rounding differs, so for
+larger datasets two neighbors at (nearly) equal distance can come out in the other order,
+and a neighbor right at `max_distance` can fall on the other side of the cut-off. COLMAP
+also runs the search on `num_threads` OpenMP threads; the port has no such option. The
+mean position subtracted before the float cast is summed sequentially per column, while
+Eigen's `colwise().mean()` may accumulate in vectorized blocks (e.g. four partial sums), so
+the double mean can differ by an ulp, which can move a float position by one ulp.
+
+**Why.** faiss is native code (docs/LICENSE_AUDIT.md). The difference form is also the more
+accurate one: the BLAS form cancels catastrophically for nearby points, which is exactly
+what spatial matching looks at. The set of pairs only changes at exact ties or at the
+distance cut-off.
+
+**Evidence.** `PairingTests` (the SpatialPairGenerator cases of pairing_test.cc, all with
+fewer than 20 positions) pass with COLMAP's expected pair order.
+
 ## 53. Problem.GetParameterBlocks lists blocks in insertion order
 
 **What differs.** Ceres' `Problem::GetParameterBlocks` walks the problem's `std::map` keyed by
