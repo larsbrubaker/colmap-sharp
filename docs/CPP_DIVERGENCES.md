@@ -1281,3 +1281,44 @@ every keypoint pairs with a pycolmap keypoint within the FMA drift of entry 41, 
 by index. With `max_num_features = 20` both give 26 keypoints; the first 25 pair up and the
 26th differs (`CSharpOnly_KnownDivergences`). The five covariant rows of
 `SiftTests.SiftCpuExtraction_Nominal` (sift_test.cc 1:1) pass.
+
+## 58. IncrementalMapper searches for the initial pair sequentially
+
+**What differs.** COLMAP's `IncrementalMapperImpl::FindInitialImagePair`
+(sfm/incremental_mapper_impl.cc) starts one thread-pool task per seed image; each task walks
+its second images, claims every pair in the shared `init_image_pairs` set under a mutex, and
+sets a shared `stop` flag when it finds a good pair. The caller returns the first successful
+result in seed order. With more than one thread, a later seed's task can claim a pair (or be
+stopped) before an earlier seed's task reaches it, so which pairs are tried, which are marked
+as tried, and therefore which pair is returned depend on thread timing. The port
+(`Sfm/IncrementalMapperImpl.cs`) runs the seeds in order and stops at the first success, which
+is COLMAP's result with `num_threads = 1`.
+
+**Why.** CLAUDE.md requires sequential and parallel runs to give the same result; the parallel
+search is only a speed-up, and its race changes both the returned pair and the
+`init_image_pairs` state later calls see.
+
+**Evidence.** `IncrementalMapperTests` (incremental_mapper_test.cc 1:1) pass, including
+`FullPipeline`, `EstimateInitialTwoViewGeometry` and `ResetInitializationStats`, which go
+through this search.
+
+## 59. IncrementalMapper breaks ranking ties by image id
+
+**What differs.** COLMAP ranks images with `std::sort` (unstable) over inputs in hash-map
+order: seed images in `FindFirstInitialImage` (prior focal length, then correspondences) and
+second images in `FindSecondInitialImage` (over a `FlatHashMap` of correspondence counts),
+the next images in `FindNextImages` (by rank, in two buckets), and the overlapping images in
+`FindLocalBundle` (by shared observations, over a `FlatHashMap`). Among equal keys the order is
+unspecified. The port (`Sfm/IncrementalMapperImpl.cs`) breaks every such tie by ascending
+image id. `AdjustLocalBundle` collects its variable points in the enumeration order of the
+caller's set (a `HashSet`, deterministic for the same sequence of operations) and hands that
+order to the triangulator's `MergeTracks`/`CompleteTracks` (entry 51).
+
+**Why.** Ties are common (integer correspondence counts, equal visibility scores), and the
+chosen seed pair, registration order and local bundle all reach the reconstruction. CLAUDE.md
+requires a deterministic order; COLMAP's order among ties carries no meaning and depends on
+abseil's per-process hash seed.
+
+**Evidence.** `IncrementalMapperTests` (incremental_mapper_test.cc 1:1) pass; `FullPipeline`
+registers all 10 frames and matches the ground truth within COLMAP's ReconstructionNear
+bounds (0.1 deg, 0.1).
