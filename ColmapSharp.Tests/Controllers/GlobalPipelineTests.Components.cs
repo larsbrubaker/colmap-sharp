@@ -2,8 +2,9 @@
 // Ported from COLMAP (BSD-3-Clause, see THIRD_PARTY_NOTICES.md).
 //
 // GlobalPipelineTests.Components: the multi-component cases of
-// colmap/controllers/global_pipeline_test.cc (ReconstructOnlyLargestComponent onwards),
-// ported 1:1. Helpers and conventions are in GlobalPipelineTests.cs.
+// colmap/controllers/global_pipeline_test.cc (MultiComponents, ReconstructOnlyLargestComponent
+// and the MultiComponents* cases after it), ported 1:1. Helpers and conventions are in
+// GlobalPipelineTests.cs.
 
 using ColmapSharp.Controllers;
 using ColmapSharp.Estimators;

@@ -294,7 +294,7 @@ pipeline is then compared at Tier C, not Tier A.
 **Evidence.** `CorrespondenceGraphTests` (all 11 cases) pass. Code ported later that walks
 the pairs in this order (COLMAP's `PoseGraph::Load`, and through it the global mapper) will
 see them in load order; a pycolmap fixture for such a pipeline is then compared at Tier C,
-not Tier A. `SceneClustering.Create` reorders the pairs itself (entry 109).
+not Tier A. `SceneClustering.Create` reorders the pairs itself (entry 120).
 
 ## 15. ComputeBoundingBoxAndCentroid sorts instead of std::nth_element
 
@@ -1981,13 +1981,16 @@ noise-free cases.
 port (`Controllers/RotationAveragingPipeline.cs`) checks `BaseController.CheckIfStopped`
 (the host's `CancellationToken` or stop function) before seeding rotations from gravity
 priors, before gravity refinement and before rotation averaging, and returns when a stop was
-requested, so a cancelled run leaves no half-posed frames.
-Without a stop request it runs exactly COLMAP's steps.
+requested. A stop found after seeding first un-poses the seeded frames (whose translation is
+NaN until rotation averaging), so a stopped run never leaves half-posed frames. Without a
+stop request it runs exactly COLMAP's steps.
 
 **Why.** CLAUDE.md requires long-running work to be cancellable from MatterCAD.
 
-**Evidence.** `RotationAveragingPipelineTests.CSharpOnly_CancellationStopsBeforeRotationAveraging`;
-the three ported cases run without a stop request and pass at COLMAP's tolerances.
+**Evidence.** `RotationAveragingPipelineTests.CSharpOnly_CancellationStopsBeforeRotationAveraging`,
+`CSharpOnly_StopBeforeGravitySeedingSeedsNothing` (the first stop check runs before any frame
+is posed) and `CSharpOnly_StopAfterGravitySeedingUnposesSeededFrames`; the three ported cases
+run without a stop request and pass at COLMAP's tolerances.
 
 ## 102. RotationAveragingPipeline seeds gravity rotations through the prior's corr_data_id
 
@@ -2030,11 +2033,14 @@ the sample depth/weight sums, the colour field and the node numbering.
 frame count with `std::sort`, which is unstable, so reconstructions with equal counts end up
 in an order that depends on the standard library. The port
 (`Controllers/GlobalPipeline.cs`) sorts stably, so equally large reconstructions keep the
-order of their view-graph components (largest component first, then smallest frame id).
+order in which they were mapped: the input view-graph components in order (largest first,
+equally large ones by smallest frame id), and within each, the sub-components rotation
+filtering splits it into, in the same order.
 
 **Why.** CLAUDE.md requires ties whose order reaches an output to be broken explicitly.
 
-**Evidence.** `GlobalPipelineTests.GlobalPipeline_MultiComponents` and the other
+**Evidence.** `GlobalPipelineTests.CSharpOnly_EqualSizeReconstructionsKeepComponentOrder`
+pins the order of two equally large components; `GlobalPipeline_MultiComponents` and the other
 multi-component cases (1:1, order-insensitive as in COLMAP) pass.
 
 ## 108. HierarchicalPipeline can be cancelled and then returns before merging
@@ -2054,56 +2060,6 @@ nobody asked for, and could fail COLMAP's final "at least one registered image" 
 **Evidence.** `HierarchicalPipelineTests.CSharpOnly_CancellationStopsBeforeMerging` (C#-only)
 cancels after the first cluster and sees no merge and an empty manager; the four ported
 cases run without a stop request and pass at COLMAP's bounds.
-
-## 109. SceneClustering.Create hands the image pairs over in a scrambled order
-
-**What differs.** COLMAP's `SceneClustering::Create` builds the edge list by iterating the
-`NodeHashMap` from `NumMatchesBetweenAllImages()`, so the edges come in hash order. The
-port (`Scene/SceneClustering.cs`) orders the pairs by the SplitMix64 finalizer of the pair
-id (then by pair id), instead of the correspondence graph's insertion order (entry 14),
-which is ascending pair id.
-
-**Why.** The edge order decides every weight tie: the vertex numbering of the graph cut
-(entry 77) and which overlap images each child cluster gets (entry 93). COLMAP relies,
-without saying so, on that order being unrelated to image ids. In ascending order every tie
-breaks toward the same few low image ids, and a database numbers the images of one rig
-frame consecutively. With `hierarchical_pipeline_test.cc`'s panoramic case, where all
-1770 pairs have 100 matches, the root split's overlap was images 1-3 and 31-33: one frame
-per side. A zero-baseline rig's images of one frame share a projection center, so the two
-halves had only two distinct centers in common. `AlignReconstructionsViaReprojections`
-cannot estimate a similarity from that, the final merge failed, and the run ended with two
-reconstructions. The hash order is backend-specific (entry 14), so a fixed bijection that
-scrambles the ids reproduces the property, not the exact order, and stays deterministic.
-
-**Evidence.** Tier C. `SceneClusteringTests.CSharpOnly_CreateSpreadsTiedOverlapAcrossFrames`
-(C#-only) fails with the insertion order (2 shared frames) and passes with the scrambled
-order (at least 3). `HierarchicalPipeline_WithoutNoiseAndPanoramicNonTrivialFrames` (1:1)
-now merges into one reconstruction. The leaf reconstructions register 27-36 images from
-12-13 image clusters, as pycolmap 4.2.0's `hierarchical_mapping` does on the same dataset
-(27-33); with the insertion order they registered 15-18. The ported
-`scene_clustering_test.cc` cases call `Partition` directly and are unaffected.
-
-## 110. HierarchicalPipeline reconstructs every cluster from a fresh PRNG
-
-**What differs.** COLMAP's `HierarchicalPipeline::Run` reconstructs the clusters on a new
-`ThreadPool`. Each worker thread's `thread_local` PRNG starts from the default seed on its
-first draw and continues across every cluster that worker picks up, so which cluster sees
-which part of the stream depends on the schedule. The port (`Controllers/HierarchicalPipeline.cs`)
-runs `Parallel.ForEach`, which uses the calling thread and reused pool threads. It clears the
-thread's PRNG before each cluster, so every cluster starts from the default seed, and it
-restores the thread's own PRNG afterwards. The merge then draws from the calling thread's
-PRNG, as it does on COLMAP's main thread.
-
-**Why.** Without this, a cluster continued whatever the calling thread or an earlier task
-on the pool thread had drawn, so the result depended on the test order and the scheduler;
-CLAUDE.md requires sequential and parallel runs to give the same result. Each cluster's
-stream is now the one the first cluster on a fresh COLMAP worker gets. This is the same
-choice as entry 71 for feature matching.
-
-**Evidence.** `HierarchicalPipelineTests.CSharpOnly_ResultIgnoresClusterSchedule` (C#-only)
-gets bit-identical poses from one worker and from eight, and fails without the fresh PRNG.
-Before the fix, `HierarchicalPipeline_WithoutNoise` (1:1) passed alone but missed its 5e-4
-projection-center bound (5.2e-4) in the full suite.
 
 ## 113. Reading a truncated binary PLY mesh throws inside the texcoord lists
 
@@ -2199,3 +2155,53 @@ but those rare cases.
 
 **Evidence.** `PoissonTreeOracleTests.LogF_MatchesLibm`: over 4000 float arguments spanning
 2^-40..2^40, the result equals Apple's `logf` (the oracle's) bit for bit.
+
+## 120. SceneClustering.Create hands the image pairs over in a scrambled order
+
+**What differs.** COLMAP's `SceneClustering::Create` builds the edge list by iterating the
+`NodeHashMap` from `NumMatchesBetweenAllImages()`, so the edges come in hash order. The
+port (`Scene/SceneClustering.cs`) orders the pairs by the SplitMix64 finalizer of the pair
+id (then by pair id), instead of the correspondence graph's insertion order (entry 14),
+which is ascending pair id.
+
+**Why.** The edge order decides every weight tie: the vertex numbering of the graph cut
+(entry 77) and which overlap images each child cluster gets (entry 93). COLMAP relies,
+without saying so, on that order being unrelated to image ids. In ascending order every tie
+breaks toward the same few low image ids, and a database numbers the images of one rig
+frame consecutively. With `hierarchical_pipeline_test.cc`'s panoramic case, where all
+1770 pairs have 100 matches, the root split's overlap was images 1-3 and 31-33: one frame
+per side. A zero-baseline rig's images of one frame share a projection center, so the two
+halves had only two distinct centers in common. `AlignReconstructionsViaReprojections`
+cannot estimate a similarity from that, the final merge failed, and the run ended with two
+reconstructions. The hash order is backend-specific (entry 14), so a fixed bijection that
+scrambles the ids reproduces the property, not the exact order, and stays deterministic.
+
+**Evidence.** Tier C. `SceneClusteringTests.CSharpOnly_CreateSpreadsTiedOverlapAcrossFrames`
+(C#-only) fails with the insertion order (2 shared frames) and passes with the scrambled
+order (at least 3). `HierarchicalPipeline_WithoutNoiseAndPanoramicNonTrivialFrames` (1:1)
+now merges into one reconstruction. The leaf reconstructions register 27-36 images from
+12-13 image clusters, as pycolmap 4.2.0's `hierarchical_mapping` does on the same dataset
+(27-33); with the insertion order they registered 15-18. The ported
+`scene_clustering_test.cc` cases call `Partition` directly and are unaffected.
+
+## 121. HierarchicalPipeline reconstructs every cluster from a fresh PRNG
+
+**What differs.** COLMAP's `HierarchicalPipeline::Run` reconstructs the clusters on a new
+`ThreadPool`. Each worker thread's `thread_local` PRNG starts from the default seed on its
+first draw and continues across every cluster that worker picks up, so which cluster sees
+which part of the stream depends on the schedule. The port (`Controllers/HierarchicalPipeline.cs`)
+runs `Parallel.ForEach`, which uses the calling thread and reused pool threads. It clears the
+thread's PRNG before each cluster, so every cluster starts from the default seed, and it
+restores the thread's own PRNG afterwards. The merge then draws from the calling thread's
+PRNG, as it does on COLMAP's main thread.
+
+**Why.** Without this, a cluster continued whatever the calling thread or an earlier task
+on the pool thread had drawn, so the result depended on the test order and the scheduler;
+CLAUDE.md requires sequential and parallel runs to give the same result. Each cluster's
+stream is now the one the first cluster on a fresh COLMAP worker gets. This is the same
+choice as entry 71 for feature matching.
+
+**Evidence.** `HierarchicalPipelineTests.CSharpOnly_ResultIgnoresClusterSchedule` (C#-only)
+gets bit-identical poses from one worker and from eight, and fails without the fresh PRNG.
+Before the fix, `HierarchicalPipeline_WithoutNoise` (1:1) passed alone but missed its 5e-4
+projection-center bound (5.2e-4) in the full suite.

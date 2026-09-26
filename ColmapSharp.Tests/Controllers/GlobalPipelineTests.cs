@@ -233,7 +233,7 @@ public partial class GlobalPipelineTests
 		double meanRecomputed = reconstruction.ComputeMeanReprojectionError();
 
 		await Assert.That(near).IsNull();
-		await Assert.That(meanAfterRun).IsEqualTo(meanRecomputed).Within(4 * Math.Abs(meanRecomputed) * 2.220446049250313E-16);
+		await Assert.That(GTestDouble.DoubleEq(meanAfterRun, meanRecomputed)).IsTrue();
 	}
 
 	[Test]

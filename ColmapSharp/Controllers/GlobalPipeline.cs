@@ -22,7 +22,7 @@
 // - Progress (C#-only): Progress, when set, receives a GlobalPipelineProgress as each mapper
 //   stage starts, at each model update and when a component is finished.
 // - The newly created reconstructions are sorted by registered frames with a stable sort
-//   (docs/CPP_DIVERGENCES.md entry 102).
+//   (docs/CPP_DIVERGENCES.md entry 107).
 // - LOG(WARNING)/LOG(ERROR) go to Util/Log.cs; LOG(INFO) and the timers are dropped, and
 //   with them ReconstructionStats (failed / too-small counts), which only fed the log.
 
@@ -200,7 +200,8 @@ public sealed class GlobalPipeline : BaseController
 
 		// Sort newly created reconstructions by registered frame count. Keep any
 		// reconstructions that were already managed before this run untouched. Stable, so
-		// equally large ones keep their component order (entry 102).
+		// equally large ones keep the order they were mapped in: input component order, then
+		// sub-component order (entry 107).
 		var reconstructions = new List<Reconstruction>();
 		for (int i = firstReconstructionIdx; i < _reconstructionManager.Size; ++i)
 		{

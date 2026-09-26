@@ -262,7 +262,7 @@ public class SceneClusteringTests
 		await Assert.That(childImageSets.Any(imageIds => imageIds.Contains(3) && imageIds.Contains(4) && imageIds.Contains(6))).IsTrue();
 	}
 
-	// C#-only (docs/CPP_DIVERGENCES.md, entry 109). In a synthetic dataset every image pair
+	// C#-only (docs/CPP_DIVERGENCES.md, entry 120). In a synthetic dataset every image pair
 	// has the same number of matches, so every clustering tie falls to the order in which
 	// Create hands over the pairs. Taken in ascending pair id, the root split's overlap was
 	// images 1-3 and 31-33: one frame per side. For a panoramic rig (zero sensor

@@ -23,7 +23,7 @@
 //   descending size, then ascending smallest image id, with empty clusters last.
 // - COLMAP's image_t -> int narrowing of the edge endpoints is kept (unchecked casts), so
 //   the graph cut sees the same vertex ids.
-// - Create's pair order (entry 109). COLMAP iterates a hash map of image pairs; here the
+// - Create's pair order (entry 120). COLMAP iterates a hash map of image pairs; here the
 //   pairs are ordered by a scrambled pair id, so ties do not all break toward low image ids.
 // - The other hash containers COLMAP uses here (FlatHashSet of a child's images, NodeHashMap
 //   of related images) are only looked up, never iterated in a way that reaches an output.
@@ -166,7 +166,7 @@ public sealed class SceneClustering
 	/// <paramref name="databaseCache"/>'s correspondence graph, with the number of matches
 	/// between two images as the edge weight. Pairs are taken in a fixed pseudo-random order
 	/// of their pair ids, not the graph's ascending insertion order
-	/// (docs/CPP_DIVERGENCES.md, entry 109).
+	/// (docs/CPP_DIVERGENCES.md, entry 120).
 	/// </summary>
 	public static SceneClustering Create(Options options, DatabaseCache databaseCache)
 	{

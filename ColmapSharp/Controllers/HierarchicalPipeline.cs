@@ -19,7 +19,7 @@
 // - COLMAP's ThreadPool of workers becomes Parallel.ForEach with the same worker count; each
 //   cluster writes only its own ReconstructionManager, so the merge sees the same inputs in
 //   any schedule. The cluster-pointer NodeHashMap is a Dictionary keyed by reference.
-// - PRNG (entry 110): each cluster starts from a fresh PRNG (the default seed on its first
+// - PRNG (entry 121): each cluster starts from a fresh PRNG (the default seed on its first
 //   draw), as the first cluster on a new COLMAP worker thread does. COLMAP's workers
 //   continue their streams across the clusters they pick up, so its results depend on the
 //   schedule; here they do not.
@@ -249,7 +249,7 @@ public sealed class HierarchicalPipeline : BaseController
 
 		// The cluster draws from a fresh PRNG, as on a new COLMAP worker thread, not from
 		// whatever the calling or reused pool thread drew before; the thread's own PRNG is
-		// restored afterwards (docs/CPP_DIVERGENCES.md entry 110).
+		// restored afterwards (docs/CPP_DIVERGENCES.md entry 121).
 		Mt19937? threadPrng = RandomUtils.Prng;
 		RandomUtils.Prng = null;
 		try

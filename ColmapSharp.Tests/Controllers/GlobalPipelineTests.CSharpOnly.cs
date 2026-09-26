@@ -1,8 +1,9 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // GlobalPipelineTests.CSharpOnly: C#-only cases for ColmapSharp/Controllers/GlobalPipeline.cs
-// (COLMAP has no progress reports and no CancellationToken): the stage progress and
-// cancellation through BaseController.CancellationToken.
+// (COLMAP has no progress reports and no CancellationToken): the stage progress,
+// cancellation through BaseController.CancellationToken, and the order of equally large
+// reconstructions (docs/CPP_DIVERGENCES.md entry 107).
 
 using ColmapSharp.Controllers;
 using ColmapSharp.Mathematics;
@@ -73,6 +74,42 @@ public partial class GlobalPipelineTests
 		mapper.Run();
 
 		await Assert.That(reconstructionManager.Size).IsEqualTo(0);
+	}
+
+	// C#-only (docs/CPP_DIVERGENCES.md entry 107): two disconnected components of the same
+	// size give two reconstructions with the same registered frame count; the stable sort
+	// keeps them in component order, so the component with the smallest frame id comes first.
+	[Test]
+	public async Task CSharpOnly_EqualSizeReconstructionsKeepComponentOrder()
+	{
+		RandomUtils.SetPRNGSeed(1);
+		var gt = new Reconstruction();
+		using InMemoryDatabase database = Synthesize(
+			new SyntheticDatasetOptions
+			{
+				NumRigs = 2,
+				NumCamerasPerRig = 1,
+				NumFramesPerRig = 5,
+				NumPoints3D = 100,
+				CameraHasPriorFocalLength = true,
+				TwoViewGeometryHasRelativePose = true,
+			},
+			gt);
+		List<HashSet<uint>> components = GroupImageIdsByRig(gt);
+		DisconnectDatabaseComponents(components, database);
+
+		ReconstructionManager reconstructionManager = RunPipeline(new GlobalPipelineOptions(), database);
+
+		// The component holding the smallest frame id, and so the smallest image id here
+		// (one camera per rig), is the first input component.
+		uint smallestImageId = gt.Images.Keys.Min();
+		HashSet<uint> firstComponent = components.Single(c => c.Contains(smallestImageId));
+		HashSet<uint> secondComponent = components.Single(c => !c.Contains(smallestImageId));
+
+		await Assert.That(reconstructionManager.Size).IsEqualTo(2);
+		await Assert.That(reconstructionManager.Get(0).NumRegFrames).IsEqualTo(reconstructionManager.Get(1).NumRegFrames);
+		await Assert.That(firstComponent.SetEquals(reconstructionManager.Get(0).RegImageIds())).IsTrue();
+		await Assert.That(secondComponent.SetEquals(reconstructionManager.Get(1).RegImageIds())).IsTrue();
 	}
 
 	// Progress<T> posts to the thread pool; this one reports inline so the test sees every

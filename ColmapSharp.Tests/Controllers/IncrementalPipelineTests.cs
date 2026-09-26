@@ -271,7 +271,7 @@ public partial class IncrementalPipelineTests
 
 		await Assert.That(near).IsNull();
 		// EXPECT_DOUBLE_EQ: within 4 ULPs.
-		await Assert.That(DoubleEq(meanAfterRun, meanRecomputed)).IsTrue();
+		await Assert.That(GTestDouble.DoubleEq(meanAfterRun, meanRecomputed)).IsTrue();
 	}
 
 	[Test]
@@ -394,23 +394,5 @@ public partial class IncrementalPipelineTests
 		var options = new IncrementalPipelineOptions { NumThreads = 1 };
 		string? near = Near(gt, RunPipeline(options, database), 1e-2, 1e-4);
 		await Assert.That(near).IsNull();
-	}
-
-	// EXPECT_DOUBLE_EQ: equal within 4 units in the last place.
-	private static bool DoubleEq(double a, double b)
-	{
-		if (a == b)
-		{
-			return true;
-		}
-
-		long ia = BitConverter.DoubleToInt64Bits(a);
-		long ib = BitConverter.DoubleToInt64Bits(b);
-		if ((ia < 0) != (ib < 0))
-		{
-			return false;
-		}
-
-		return Math.Abs(ia - ib) <= 4;
 	}
 }

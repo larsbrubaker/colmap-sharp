@@ -16,7 +16,8 @@
 // Translation notes:
 // - Cancellation: COLMAP's Run never checks CheckIfStopped. Here BaseController's
 //   CancellationToken (and SetCheckIfStoppedFunc) is checked before gravity seeding, gravity
-//   refinement and rotation averaging (docs/CPP_DIVERGENCES.md entry 101).
+//   refinement and rotation averaging; a stop after seeding un-poses the seeded frames, so a
+//   stopped run never leaves half-posed frames (docs/CPP_DIVERGENCES.md entry 101).
 // - Progress (C#-only): Progress, when set, receives a ControllerProgress as each stage
 //   finishes, the way the incremental pipeline reports its milestones.
 // - LOG(ERROR) goes to Util/Log.cs; LOG(INFO) and the timer are dropped.
@@ -141,7 +142,8 @@ public sealed class RotationAveragingPipeline : BaseController
 		// Get a mutable copy of pose priors.
 		List<PosePrior> posePriors = [.. _databaseCache.PosePriors];
 
-		// Stop before any frame is seeded, so a cancelled run leaves no half-posed frames.
+		// Stop before any frame is seeded; later stops un-pose the seeded frames
+		// (StopAndClearSeeds), so a stopped run never leaves half-posed frames.
 		if (CheckIfStopped())
 		{
 			return;
@@ -150,6 +152,7 @@ public sealed class RotationAveragingPipeline : BaseController
 		// Initialize frame rotations from gravity priors. COLMAP looks the image up by
 		// pose_prior_id; the prior's image is its corr_data_id, as everywhere else (entry 102).
 		var unknownTranslation = new Vector3d(double.NaN, double.NaN, double.NaN);
+		var seededFrameIds = new List<uint>();
 		foreach (PosePrior posePrior in posePriors)
 		{
 			if (!posePrior.HasGravity() || posePrior.CorrDataId.SensorId.Type != SensorType.Camera)
@@ -166,12 +169,13 @@ public sealed class RotationAveragingPipeline : BaseController
 			_reconstruction.Frame(image.FrameId).SetRigFromWorld(new Rigid3d(
 				Quaterniond.FromRotationMatrix(Pose.GravityAlignedRotation(posePrior.Gravity)),
 				unknownTranslation));
+			seededFrameIds.Add(image.FrameId);
 		}
 
 		// Optionally refine gravity priors (only if gravity priors exist).
 		if (options.RefineGravity && posePriors.Count > 0)
 		{
-			if (CheckIfStopped())
+			if (StopAndClearSeeds(seededFrameIds))
 			{
 				return;
 			}
@@ -195,7 +199,7 @@ public sealed class RotationAveragingPipeline : BaseController
 			Progress?.Report(new ControllerProgress(GravityRefinementStage, 1, 1, ""));
 		}
 
-		if (CheckIfStopped())
+		if (StopAndClearSeeds(seededFrameIds))
 		{
 			return;
 		}
@@ -207,5 +211,23 @@ public sealed class RotationAveragingPipeline : BaseController
 		}
 
 		Progress?.Report(new ControllerProgress(RotationAveragingStage, 1, 1, ""));
+	}
+
+	// The stop check after gravity seeding: when stopped, un-poses the seeded frames (their
+	// rotation is a gravity prior and their translation NaN), so a stopped run leaves no
+	// half-posed frames (entry 101).
+	private bool StopAndClearSeeds(List<uint> seededFrameIds)
+	{
+		if (!CheckIfStopped())
+		{
+			return false;
+		}
+
+		foreach (uint frameId in seededFrameIds)
+		{
+			_reconstruction.Frame(frameId).ResetPose();
+		}
+
+		return true;
 	}
 }

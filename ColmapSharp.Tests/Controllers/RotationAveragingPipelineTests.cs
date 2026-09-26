@@ -234,6 +234,76 @@ public class RotationAveragingPipelineTests
 		await Assert.That(maxError).IsLessThan(MathUtils.DegToRad(1e-2));
 	}
 
+	// A database with a gravity prior per image, for the stop tests.
+	private static InMemoryDatabase GravityPriorDatabase()
+	{
+		RandomUtils.SetPRNGSeed(0);
+		var database = new InMemoryDatabase();
+		Synthetic.SynthesizeDataset(
+			new SyntheticDatasetOptions
+			{
+				NumRigs = 1,
+				NumCamerasPerRig = 1,
+				NumFramesPerRig = 5,
+				NumPoints3D = 50,
+				PriorGravity = true,
+			},
+			new Reconstruction(),
+			database);
+		return database;
+	}
+
+	// C#-only (docs/CPP_DIVERGENCES.md entry 101): the first stop check runs before gravity
+	// seeding. The stop function records whether any frame was already posed when it was
+	// first asked; without the check before seeding it would first be asked after seeding.
+	[Test]
+	public async Task CSharpOnly_StopBeforeGravitySeedingSeedsNothing()
+	{
+		using InMemoryDatabase database = GravityPriorDatabase();
+		var reconstruction = new Reconstruction();
+		var controller = new RotationAveragingPipeline(new RotationAveragingPipelineOptions(), database, reconstruction);
+		bool? posedAtFirstCheck = null;
+		controller.SetCheckIfStoppedFunc(() =>
+		{
+			posedAtFirstCheck ??= reconstruction.Frames.Values.Any(frame => frame.HasPose);
+			return true;
+		});
+		controller.Run();
+		int numPosed = reconstruction.Frames.Values.Count(frame => frame.HasPose);
+
+		// Null (never asked) counts as a failure too.
+		await Assert.That(posedAtFirstCheck ?? true).IsFalse();
+		await Assert.That(numPosed).IsEqualTo(0);
+	}
+
+	// C#-only (docs/CPP_DIVERGENCES.md entry 101): a stop that arrives after gravity seeding
+	// un-poses the seeded frames instead of leaving gravity rotations with NaN translations.
+	[Test]
+	public async Task CSharpOnly_StopAfterGravitySeedingUnposesSeededFrames()
+	{
+		using InMemoryDatabase database = GravityPriorDatabase();
+		var reconstruction = new Reconstruction();
+		var controller = new RotationAveragingPipeline(new RotationAveragingPipelineOptions(), database, reconstruction);
+		int numChecks = 0;
+		int numPosedAtStop = 0;
+		controller.SetCheckIfStoppedFunc(() =>
+		{
+			// Let the check before seeding pass, then stop.
+			if (++numChecks == 1)
+			{
+				return false;
+			}
+
+			numPosedAtStop = reconstruction.Frames.Values.Count(frame => frame.HasPose);
+			return true;
+		});
+		controller.Run();
+		int numPosed = reconstruction.Frames.Values.Count(frame => frame.HasPose);
+
+		await Assert.That(numPosedAtStop).IsEqualTo(5);
+		await Assert.That(numPosed).IsEqualTo(0);
+	}
+
 	// Progress<T> posts to the thread pool; this one reports inline so the test sees every
 	// report before it asserts.
 	private sealed class SynchronousProgress(Action<ControllerProgress> report) : IProgress<ControllerProgress>

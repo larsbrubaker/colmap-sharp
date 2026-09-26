@@ -130,7 +130,7 @@ public class HierarchicalPipelineTests
 		(double afterRun, double recomputed) = MeanErrors(reconstruction);
 
 		await Assert.That(failures).IsEmpty();
-		await Assert.That(afterRun).IsEqualTo(recomputed).Within(4 * Math.Abs(recomputed) * 2.220446049250313E-16);
+		await Assert.That(GTestDouble.DoubleEq(afterRun, recomputed)).IsTrue();
 	}
 
 	[Test]
@@ -237,8 +237,8 @@ public class HierarchicalPipelineTests
 
 		await Assert.That(failures1).IsEmpty();
 		await Assert.That(failures2).IsEmpty();
-		await Assert.That(afterRun1).IsEqualTo(recomputed1).Within(4 * Math.Abs(recomputed1) * 2.220446049250313E-16);
-		await Assert.That(afterRun2).IsEqualTo(recomputed2).Within(4 * Math.Abs(recomputed2) * 2.220446049250313E-16);
+		await Assert.That(GTestDouble.DoubleEq(afterRun1, recomputed1)).IsTrue();
+		await Assert.That(GTestDouble.DoubleEq(afterRun2, recomputed2)).IsTrue();
 	}
 
 	// C#-only (docs/CPP_DIVERGENCES.md, entry 108): cancelling after the first cluster stops
@@ -275,7 +275,7 @@ public class HierarchicalPipelineTests
 		await Assert.That(reconstructionManager.Size).IsEqualTo(0);
 	}
 
-	// C#-only (docs/CPP_DIVERGENCES.md, entry 110). Parallel.ForEach runs clusters on the
+	// C#-only (docs/CPP_DIVERGENCES.md, entry 121). Parallel.ForEach runs clusters on the
 	// calling thread and on reused pool threads, whose PRNGs carry whatever earlier work drew,
 	// whereas COLMAP's workers are fresh threads. Before the fix a cluster continued that
 	// stream: HierarchicalPipeline_WithoutNoise passed alone but missed its 5e-4 bound in the
