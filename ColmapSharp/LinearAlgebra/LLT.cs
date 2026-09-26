@@ -22,6 +22,12 @@ public enum ComputationInfo
 
 	/// <summary>The input did not have the required properties (e.g. not positive definite).</summary>
 	NumericalIssue,
+
+	/// <summary>An iterative decomposition (EigenSolver) did not converge.</summary>
+	NoConvergence,
+
+	/// <summary>The input contained a non-finite value (NaN or infinity).</summary>
+	InvalidInput,
 }
 
 /// <summary>

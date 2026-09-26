@@ -23,13 +23,6 @@ only if exhaustive/sequential/spatial matching proves too slow for MatterCAD pho
 Each phase ends with its ported tests green. Test names follow COLMAP's.
 
 ### Phase 1 — Math and linear algebra foundation
-- `LinearAlgebra/`: SVD (JacobiSVD semantics: 3x3, 4x4, Nx9, Nx6, 6x3..6x5, 12x12, MatrixXd
-  with full U), symmetric eigen (4x4 SelfAdjointEigenSolver), general EigenSolver (companion
-  matrix roots; 4x4 with complex eigenvectors), FullPivLU rank (3xN). Inventory in the
-  `MatrixXd.cs` header. Written from textbook algorithms — **Eigen is MPL-2.0 and must not
-  be transcribed.**
-- `Mathematics/` (COLMAP's `math/`):
-  `polynomial` (companion-matrix and Durand–Kerner roots).
 - `random_eigen.h` + `random_eigen_test.cc` (then replace the draw helper in
   `MatrixUtilsTests` with it).
 - Tests: the remaining `math/*_test.cc`, plus C#-only decomposition tests against oracle

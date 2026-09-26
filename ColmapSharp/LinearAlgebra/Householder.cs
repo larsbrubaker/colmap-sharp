@@ -103,6 +103,18 @@ internal static class Householder
 		}
 	}
 
+	/// <summary>
+	/// Applies Q = H_0 H_1 ... H_{k-1} to a vector in place (the last reflector first), so
+	/// Q times a few columns never needs the m x m Q.
+	/// </summary>
+	public static void ApplyQ(MatrixXd packed, ReadOnlySpan<double> tau, Span<double> x)
+	{
+		for (int j = tau.Length - 1; j >= 0; j--)
+		{
+			ApplyLeft(packed.ColumnSpan(j)[(j + 1)..], tau[j], x[j..]);
+		}
+	}
+
 	/// <summary>The upper-triangular part of the packed factor (Eigen's matrixQR() triangularView&lt;Upper&gt;).</summary>
 	public static MatrixXd UpperPart(MatrixXd packed)
 	{

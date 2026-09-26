@@ -23,12 +23,13 @@
 // COLMAP (rounding may differ in the last bits).
 //
 // Inventory of Eigen decompositions COLMAP 4.2.0 calls (src/colmap outside ui/, exe/,
-// CUDA/Caspar and tests), for the next step (SVD + eigen solvers). Provided here already:
+// CUDA/Caspar and tests); all are provided in this folder. The dense ones:
 // HouseholderQR (householderQ, matrixQR; math/matrix.h, geometry/pose.cc
 // GravityAlignedRotation, 8-point F/E null space), ColPivHouseholderQR (rank, solve;
 // absolute_pose.cc, bundle_adjustment_ceres.cc), PartialPivLU (solve; affine,
 // homography, essential 5-pt, sensor/models.h), LLT (matrixL; cost_functions/utils.h),
-// LDLT (solve, info; optim/tiny_solver.h). Still to provide:
+// LDLT (solve, info; optim/tiny_solver.h), and the spectral ones below: JacobiSVD (plus
+// the allocation-free Svd3d / Svd4d), SelfAdjointEigenSolver, EigenSolver, FullPivLU.
 //
 // | Eigen type                         | Shape                 | Calls used                        | Callers                                           |
 // |------------------------------------|-----------------------|-----------------------------------|---------------------------------------------------|
