@@ -269,26 +269,21 @@ public static class PoissonFemConstraints
 	{
 		PoissonMultigrid.SetFem1ValidityFlags(tree, sorted, TestSignature);
 		maxDepth = StdMinMax.StdMin(maxDepth, PoissonMultigrid.MaxDepth(tree));
-		var evaluator = new BSplineData(TestSignature, 0, maxDepth);
+		var evaluator = new PoissonPointEvaluator(TestSignature, 0, maxDepth);
 		BSplineSupportSizes support = BSplineSupportSizes.For(FemSignature.Degree(TestSignature));
 		int leftPointRadius = support.SupportEnd;
 		int rightPointRadius = -support.SupportStart;
 		int width = support.SupportSize;
 		var neighbors = new int[width * width * width];
-		var pointOffset = new int[3];
-
-		// _oneDValues[axis][s + SupportEnd]: the value at the point of function pointOffset + s.
-		var values = new double[3, width];
 		for (int d = 0; d <= maxDepth; d++)
 		{
 			var neighborKey = new NeighborKey(tree, leftPointRadius, rightPointRadius, resetOnMissing: false);
 			neighborKey.Set(maxDepth + tree.DepthOffset);
-			SparseBSplineEvaluator bSplines = evaluator[d];
 			int end = PoissonMultigrid.End(tree, sorted, d);
 			for (int i = PoissonMultigrid.Begin(tree, sorted, d); i < end; i++)
 			{
 				int node = sorted.TreeNodes[i];
-				if (tree.IsGhost(node) || (tree.Flags(node) & FemTree.SpaceFlag) == 0)
+				if (!PoissonMultigrid.IsValidSpaceNode(tree, node))
 				{
 					continue;
 				}
@@ -301,18 +296,8 @@ public static class PoissonFemConstraints
 				}
 
 				// evaluator.initEvaluationState( p , d , off , eState ): the node's offset is the
-				// point offset, and each axis tabulates the functions around it at the float position.
-				for (int k = 0; k < 3; k++)
-				{
-					pointOffset[k] = tree.LocalOffset(node, k);
-					for (int s = -leftPointRadius; s <= rightPointRadius; s++)
-					{
-						double p = interpolation.Value(slot, k);
-						PoissonPolynomial[] components = bSplines.PolynomialsAndOffset(ref p, pointOffset[k], pointOffset[k] + s);
-						values[k, s + leftPointRadius] = components[0].Evaluate(p);
-					}
-				}
-
+				// point offset.
+				evaluator.Init(d, interpolation.Value(slot, 0), interpolation.Value(slot, 1), interpolation.Value(slot, 2), tree.LocalOffset(node, 0), tree.LocalOffset(node, 1), tree.LocalOffset(node, 2));
 				float dualValue = interpolation.Value(slot, 4);
 				for (int j = 0; j < neighbors.Length; j++)
 				{
@@ -322,17 +307,9 @@ public static class PoissonFemConstraints
 						continue;
 					}
 
-					// PointEvaluatorState::value: v0 * ( v1 * ( v2 * 1. ) ), then (Real).
-					double value = 1.0;
-					for (int k = 2; k >= 0; k--)
-					{
-						int dOff = tree.LocalOffset(n, k) - pointOffset[k];
-						double v = dOff >= -support.SupportEnd && dOff <= -support.SupportStart ? values[k, dOff + support.SupportEnd] : 0;
-						value = v * value;
-					}
-
+					float value = (float)evaluator.Value(tree.LocalOffset(n, 0), tree.LocalOffset(n, 1), tree.LocalOffset(n, 2));
 					float dot = 0;
-					dot += dualValue * (float)value;
+					dot += dualValue * value;
 					constraints[tree.NodeIndex(n)] += dot;
 				}
 			}

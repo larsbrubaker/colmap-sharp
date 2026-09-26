@@ -70,6 +70,9 @@ public static class PoissonMultigrid
 	/// <summary>Active with FEM_FLAG_2 set (None is invalid). Port of <c>_isValidFEM2Node</c>.</summary>
 	public static bool IsValidFem2Node(FemTree tree, int node) => !tree.IsGhost(node) && (tree.Flags(node) & FemTree.FemFlag2) != 0;
 
+	/// <summary>Active with SPACE_FLAG set (None is invalid). Port of <c>_isValidSpaceNode</c>.</summary>
+	public static bool IsValidSpaceNode(FemTree tree, int node) => !tree.IsGhost(node) && (tree.Flags(node) & FemTree.SpaceFlag) != 0;
+
 	/// <summary>
 	/// True if every degree-<paramref name="degree2"/> function overlapping the
 	/// degree-<paramref name="degree1"/> function at (depth, off) is interiorly supported, on all

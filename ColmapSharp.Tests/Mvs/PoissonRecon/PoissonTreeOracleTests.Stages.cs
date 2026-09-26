@@ -259,7 +259,7 @@ public partial class PoissonTreeOracleTests
 		SparseNodeData interpolation = PoissonInterpolation.Build(set, 0.5f, pointWeight, (int)parameters.Depth, 1);
 		produced.F("interpolation", DumpField(tree, interpolation, PoissonInterpolation.Width));
 		produced.I("interpolationinfo", [interpolation.Count, tree.NodeCount]);
-		return new Prepared(set, parameters, density, normals, colors, interpolation);
+		return new Prepared(set, parameters, density, normals, colors, interpolation, pointWeight);
 	}
 
 	// The harness's setSortedTreeNodes cases.
@@ -297,5 +297,6 @@ public partial class PoissonTreeOracleTests
 		DensityEstimator Density,
 		SparseNodeData Normals,
 		SparseNodeData Colors,
-		SparseNodeData Interpolation);
+		SparseNodeData Interpolation,
+		float PointWeight);
 }

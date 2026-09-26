@@ -2,7 +2,8 @@
 // Poisson::Solver::Solve (thirdparty/PoissonRecon/Reconstructors.h, MIT, as vendored by
 // COLMAP 4.2.0) after finalizeForMultigrid: addFEMConstraints (the divergence of the normal
 // field, FEMTree.System.inl's _addFEMConstraints) and addInterpolationConstraints
-// (_addInterpolationConstraints). Built and run by
+// (_addInterpolationConstraints), then the solver's per-depth matrix rows and prolongation
+// constraints (_getSliceMatrixAndProlongationConstraints, _getProlongedMatrixRowSize). Built and run by
 // oracle/fixture_poisson_tree.py, which writes ColmapSharp.Tests/TestData/oracle/poisson_system.json
 // (read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests.System.cs). Not part of any
 // build. The shared set-up and output format are in oracle/poisson_harness.h; the stages up to
@@ -139,6 +140,56 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input) {
   // solveDepth , iInfo ), on top of the FEM constraints.
   tree.addInterpolationConstraints(constraints, solveDepth, std::make_tuple(iInfo));
   dump("interpolationconstraints", constraints);
+
+  // The solver's per-depth assembly, as _solveSystemGS calls it (whole depth, F initialized at
+  // the depth with setStencil<false> and setStencils<true>, bsData( solveDepth )), with a
+  // synthetic prolonged solution so the prolongation constraints are not trivially zero. Only
+  // depths of at most kSliceLimit nodes are dumped, to keep the fixture small.
+  {
+    const size_t kSliceLimit = 12000;
+    typename FEMIntegrator::template System<Sigs, IsotropicUIntPack<Dim, 1>> S({0., 1.});
+    typename FEMIntegrator::template PointEvaluator<Sigs, IsotropicUIntPack<Dim, 1>> bsData(solveDepth);
+    std::vector<Real> prolonged(tree._sNodesEnd(tree._maxDepth - 1));
+    for (size_t i = 0; i < prolonged.size(); i++) prolonged[i] = (Real)((long long)(i * 37 % 101) - 50) / (Real)64;
+    std::vector<long long> depths, rowSizes, columns, prolongedRowSizes;
+    std::vector<double> values, sliceConstraints, diagonal;
+    for (int d = 1; d <= tree._maxDepth; d++) {
+      node_index_type begin = tree._sNodesBegin(d), end = tree._sNodesEnd(d);
+      if ((size_t)(end - begin) > kSliceLimit) continue;
+      depths.push_back(d);
+      S.init(d);
+      typename FEMTree<Dim, Real>::template CCStencil<IsotropicUIntPack<Dim, 1>> cc;
+      typename FEMTree<Dim, Real>::template PCStencils<IsotropicUIntPack<Dim, 1>> pc;
+      S.template setStencil<false>(cc);
+      S.template setStencils<true>(pc);
+      typename FEMTree<Dim, Real>::template SystemMatrixType<5, 5, 5> M;
+      std::vector<Real> diag(end - begin), cons(end - begin);
+      tree._getSliceMatrixAndProlongationConstraints(Sigs(), S, M, &diag[0], bsData, d, begin, end, &prolonged[0], &cons[0], cc, pc, std::make_tuple(iInfo));
+      for (node_index_type i = 0; i < end - begin; i++) {
+        rowSizes.push_back(M.rowSize(i));
+        for (size_t j = 0; j < M.rowSize(i); j++) columns.push_back(M[i][j].N), values.push_back(M[i][j].Value);
+        sliceConstraints.push_back(cons[i]);
+        diagonal.push_back(tree._isValidFEM1Node(tree._sNodes.treeNodes[i + begin]) ? diag[i] : 0.);
+      }
+      // _getProlongedMatrixRowSize of every valid node, with its parent's one-ring window.
+      typename FEMTree<Dim, Real>::ConstOneRingNeighborKey key;
+      key.set(tree._localToGlobal(d));
+      for (node_index_type i = begin; i < end; i++) {
+        const FEMTreeNode* node = tree._sNodes.treeNodes[i];
+        if (!tree._isValidFEM1Node(node)) continue;
+        typename FEMTreeNode::template ConstNeighbors<IsotropicUIntPack<Dim, 3>> pNeighbors;
+        key.getNeighbors(IsotropicUIntPack<Dim, 1>(), IsotropicUIntPack<Dim, 1>(), node->parent, pNeighbors);
+        prolongedRowSizes.push_back(tree.template _getProlongedMatrixRowSize<5, 5, 5>(node, pNeighbors));
+      }
+    }
+    PrintI(name + "/slicedepths", depths);
+    PrintI(name + "/slicerowsizes", rowSizes);
+    PrintI(name + "/slicecolumns", columns);
+    PrintF(name + "/slicevalues", values);
+    PrintF(name + "/sliceconstraints", sliceConstraints);
+    PrintF(name + "/slicediagonal", diagonal);
+    PrintI(name + "/prolongedrowsizes", prolongedRowSizes);
+  }
 
   delete normalInfo;
   delete iInfo;

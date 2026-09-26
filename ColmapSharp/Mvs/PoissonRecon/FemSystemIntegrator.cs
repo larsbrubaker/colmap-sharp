@@ -55,6 +55,9 @@ public sealed class FemSystemIntegrator
 		SetDerivativeWeights(counts, w, 0, Math.Min(derivatives + 1, weights.Length) - 1);
 	}
 
+	/// <summary>The basis' FEM signature (all axes).</summary>
+	public int Signature => integrator.TestSignature;
+
 	/// <summary>The depth of the finer functions (Base::highDepth).</summary>
 	public int HighDepth => integrator.HighDepth;
 
