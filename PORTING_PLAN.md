@@ -38,7 +38,7 @@ resize (Apache-2.0) would make it exact if a fixture ever needs that.
 - `Reconstruction.ExtractColors*` (the host decodes images; take a Bitmap provider).
 - `scene_clustering`, `reconstruction_clustering`.
 - Deferred tests: `reconstruction_test.cc` ExtractColorsForAllImages;
-  `reconstruction_matchers_test.cc` Near (needs alignment); an IdMap test that reaches
+  an IdMap test that reaches
   `Compact()`.
 - Before the pipeline phases, decide how the library surfaces COLMAP's `LOG(WARNING)`
   messages (dropped for now).
@@ -56,8 +56,8 @@ Estimators implement `IEstimator<TX,TY,TModel>` (+ `ILocalEstimator` for LO-RANS
 `readonly struct`s — see `Optim/Estimator.cs` and `Estimators/Solvers/SimilarityTransform.cs`.
 `LoRansac.Estimate` hides (does not override) `Ransac.Estimate`: call it on the LoRansac type.
 Open estimators: `two_view_geometry`'s `EstimateRigTwoViewGeometries` (+ its `Nominal` test;
-`generalized_pose` is now on main), `alignment`,
-`global_positioning_test.cc` Nominal and MultiCameraRig (need ReconstructionNear from alignment).
+`generalized_pose` is now on main), `global_positioning_test.cc` Nominal and MultiCameraRig
+(ReconstructionNear is now available).
 
 ### Phase 7 — Nonlinear least-squares solver (Ceres replacement)
 Done: Jet/autodiff, losses, manifolds, Problem, LM trust region, DENSE_QR,
@@ -79,11 +79,11 @@ Cancellation is checked between iterations only (like COLMAP). Optional: Vector1
 
 ### Phase 8 — Bundle adjustment
 Done: `ceres::Covariance` subset (dense QR, `Solver/Covariance.cs`; divergence 45), default Ceres bundle adjuster (`Estimators/BundleAdjustment*.cs`), cost functions, 7-value
-pose blocks. Open: `CreatePosePriorBundleAdjuster` / `PosePriorBundleAdjuster` (needs
-`estimators/alignment`'s `AlignReconstructionToPosePriors`) with PosePriorBundleAdjusterBackendTest.Nominal
+pose blocks. Open: `CreatePosePriorBundleAdjuster` / `PosePriorBundleAdjuster` (alignment is on
+main) with PosePriorBundleAdjusterBackendTest.Nominal
 and the five PosePriorBundleAdjuster.* cases; BundleAdjusterBackendTest.Nominal,
 .NominalMultiCameraRigConstantSensorFromRig and DefaultBundleAdjuster.NominalMultiCameraRig (their
-`ReconstructionNear` matcher needs alignment); `covariance` (+ test).
+`ReconstructionNear` is on main); `covariance` (+ test).
 Skipped: CeresBundleAdjustmentOptions.FallsBackToCpuWithoutCudaDevice (CUDA), the CASPAR
 instantiations of the backend suites and `bundle_adjustment_caspar_test.cc` (GPU backend out of
 scope). Performance: ~2.6× slower than native Ceres on a 100-image synthetic scene (7.6 s vs
@@ -106,7 +106,7 @@ Memory: VLFeat's scale space for a 6400×4800 upsampled first octave is multi-GB
 MatterCAD (esp. wasm32) must cap `max_image_size` accordingly.
 
 ### Phase 10 — Incremental SfM
-`sfm/observation_manager.MergeAndFilterReconstructions` (needs alignment),
+`sfm/observation_manager.MergeAndFilterReconstructions` (alignment is on main),
 `incremental_triangulator`, `incremental_mapper(_impl)`,
 `controllers/incremental_pipeline`, `controllers/bundle_adjustment`.
 End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us.

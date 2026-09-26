@@ -1128,6 +1128,31 @@ and the C#-only Nominal/MultiCameraRig alignment checks meet COLMAP's bounds (0.
 0.5 projection-center error after a similarity alignment). The 1:1 Nominal and
 MultiCameraRig cases wait for `ReconstructionNear` (estimators/alignment).
 
+## 49. Alignment visits hash containers in a fixed order
+
+**What differs.** Three places in `colmap/estimators/alignment.cc` iterate hash containers
+where the order reaches a result; `Estimators/Alignment*.cs` fixes each order:
+- `MergeReconstructions` copies the source images missing from the target in the iteration
+  order of a `FlatHashSet`, which decides the order their frames are registered in the target
+  (`RegFrameIds`). The port copies them in the source's `RegImageIds()` order (registration
+  order). The source points are merged in `Points3D` order (ascending id, entry 21), which
+  decides the ids the new target points get.
+- `AlignReconstructionsViaPoints` pairs each source point with the target point seen most
+  often along its track via `std::max_element` over a `FlatHashMap`, so a tie goes to
+  whichever id the hash map yields first. The port breaks ties by first appearance along the
+  source track.
+- `AlignReconstructionToOrigRigScales` sums the per-rig scales in the order of the caller's
+  rig map (a `NodeHashMap` in C++, the caller's `IReadOnlyDictionary` here), so the mean scale
+  can differ from a given COLMAP build in the last ulp. Within a rig the sensors are visited in
+  ascending id order in both (`std::map`).
+
+**Why.** CLAUDE.md requires deterministic iteration. COLMAP relies on no particular order: its
+tests check only counts (`MergeReconstructions`) and the recovered transform within 1e-6.
+
+**Evidence.** `AlignmentTests` (alignment_test.cc 1:1) pass: `MergeReconstructions`,
+`AlignReconstructionsViaPoints` and `AlignReconstructionToOrigRigScales` with COLMAP's
+expectations and tolerances.
+
 ## 50. ObservationManager iterates its image pairs in insertion order and prints its graph
 
 **What differs.** COLMAP's `ObservationManager` (sfm/observation_manager.cc) keeps the
