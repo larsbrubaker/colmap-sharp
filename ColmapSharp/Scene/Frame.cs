@@ -132,6 +132,24 @@ public sealed class Frame : IEquatable<Frame>
 		_dataIds.Clear();
 	}
 
+	/// <summary>
+	/// Replaces the data ids and finalizes them, even if already finalized. This is C++'s
+	/// "copy the frame, clear and re-add its data ids, finalize, move-assign back" in
+	/// Reconstruction::TranscribeImageIdsToDatabase, done in place so the images' FramePtr
+	/// and bundle adjustment's RigFromWorldStorage keep referring to this object.
+	/// </summary>
+	internal void ReplaceFinalizedDataIds(IReadOnlyList<DataId> dataIds)
+	{
+		HasFinalDataIds = false;
+		ClearDataIds();
+		foreach (DataId dataId in dataIds)
+		{
+			AddDataId(dataId);
+		}
+
+		FinalizeDataIds();
+	}
+
 	/// <summary>All data ids of a sensor type, in order.</summary>
 	public IEnumerable<DataId> DataIdsOfType(SensorType type) => _dataIds.Where(dataId => dataId.SensorId.Type == type);
 

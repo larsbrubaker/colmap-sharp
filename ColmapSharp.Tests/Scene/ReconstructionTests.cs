@@ -5,7 +5,8 @@
 // TEST(Suite, Name) named Suite_Name, testing ColmapSharp/Scene/Reconstruction*.cs. This
 // file holds the helpers and the construction, add, register and 3D point cases;
 // ReconstructionTests.Queries.cs holds normalization, transforms, cropping, lookups,
-// statistics and validation.
+// statistics and validation; ReconstructionTests.Database.cs holds
+// TranscribeImageIdsToDatabase.
 //
 // Translation notes: pointer comparisons (`&reconstruction.Image(1)`) are reference
 // equality; `frame.RigFromWorld().translation().z() = v` is SetRigFromWorld with that
@@ -14,10 +15,10 @@
 // COLMAP's gtest_main seeds the PRNG with 0 before every test, so tests that draw call
 // RandomUtils.SetPRNGSeed(0) and draw before their first await.
 //
-// Not ported yet (they need scene/synthetic's SynthesizeDataset, scene/database,
+// Not ported yet (they need scene/synthetic's SynthesizeDataset,
 // scene/reconstruction_io or util/ply, none of which is ported): ConstructCopy,
 // AssignCopy, Print, SetRigsAndFrames, SetRigsAndFramesResetsNumRegImages,
-// DeleteAllPoints2DAndPoints3D, TranscribeImageIdsToDatabase, TearDown, ConvertToPLY,
+// DeleteAllPoints2DAndPoints3D, TearDown, ConvertToPLY,
 // ImportPLYFromVector, ReadWriteTextRoundtrip, ReadWriteBinaryRoundtrip,
 // ReadAutoDetectFormat, ExtractColorsForAllImages.
 

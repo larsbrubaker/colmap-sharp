@@ -596,3 +596,30 @@ agreeing to about 1e-10 across seeds; the port returns the same four poses to 1e
 (`Gp3pTests.CSharpOnly_MatchesPoseLibSolutionSet`, order-insensitive, since the order depends
 on R0). The 1:1 `GeneralizedAbsolutePoseTests.ParameterizedGP3PEstimatorTests_Nominal` cases
 pass with COLMAP's tolerances.
+each satisfies the original system to 1e-8. Not compared against C++ PoseLib.
+
+## 33. DatabaseCache iterates its objects in ascending id order
+
+**What differs.** COLMAP's `DatabaseCache` keeps rigs, cameras, frames and images in
+`NodeHashMap`s. `Scene/DatabaseCache.cs` keeps them in `Util/IdMap.cs`, so `Rigs`/`Cameras`/
+`Frames`/`Images` enumerate in ascending id order, like `Reconstruction` (entry 21). Where
+that order reaches an output:
+- `FindImageWithName` returns the smallest-id image when several share a name (only possible
+  through `AddImage`; database names are unique).
+- `Reconstruction.Load` visits the cache in that order, so when an existing object conflicts
+  with the cache, the reported check failure is the one for the smallest id.
+- `CreateFromCache` copies objects in that order; the copies land in IdMaps again, so the
+  result is the same either way.
+The correspondence graph is unaffected: `Load` adds pairs in the order the database returns
+them and `CreateFromCache` in the source graph's insertion order (entry 14), both as in COLMAP.
+`ReconstructionPruning.FindRedundantPoints3D` lists redundant ids in `Points3D` order (entry
+21); its selection is order-free because the queue key `(gain, point3D_id)` is a total order.
+
+**Why.** CLAUDE.md requires deterministic iteration. COLMAP relies on no particular order here
+(its tests use order-free properties), so ascending id is the natural choice.
+
+**Evidence.** The 1:1 `DatabaseCacheTests` and `ReconstructionTests.
+Reconstruction_TranscribeImageIdsToDatabase` pass with COLMAP's expectations;
+`DatabaseCacheTests.CSharpOnly_CreateFromCacheKeepsWholeFrames` and
+`ReconstructionPruningTests.CSharpOnly_SameTilePointIsRedundant` pin the filtering and the
+selection tie-break.

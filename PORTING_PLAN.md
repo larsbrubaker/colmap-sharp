@@ -35,8 +35,8 @@ resize (Apache-2.0) would make it exact if a fixture ever needs that.
 
 ### Phase 4 — Scene
 - `synthetic` (the synthetic dataset generator most downstream tests use).
-- `database_cache`, `reconstruction_manager`, `reconstruction_pruning`, `Reconstruction.Load`,
-  `TranscribeImageIdsToDatabase`.
+- `ReconstructionManager.Read`/`Write` (reconstruction_io is now on main; `Write`'s
+  `std::sort` on point counts needs an index tie-break).
 - `rig` (scene/rig: `ReadRigConfig`/`ApplyRigConfig` + `rig_test.cc`; needs synthetic).
 - `pose_graph` (+ `pose_graph_test.cc`; component functions take a `Reconstruction`).
 - `util/ply` (+ `ply_test.cc`), `Reconstruction.ConvertToPLY`/`ImportPLY`, and
@@ -48,7 +48,8 @@ resize (Apache-2.0) would make it exact if a fixture ever needs that.
   DeleteAllPoints2DAndPoints3D, TearDown, SetRigsAndFrames, ConvertToPLY, ImportPLYFromVector,
   ReadWriteTextRoundtrip, ReadWriteBinaryRoundtrip, ReadAutoDetectFormat,
   ExtractColorsForAllImages; `reconstruction_matchers_test.cc` Eq/Near (Near needs alignment);
-  an IdMap test that reaches `Compact()`.
+  `reconstruction_pruning_test.cc` VaryingCoverageGain, VaryingTrackLength,
+  VaryingSpatialDistribution (need synthetic); an IdMap test that reaches `Compact()`.
 - Before the pipeline phases, decide how the library surfaces COLMAP's `LOG(WARNING)`
   messages (dropped for now).
 

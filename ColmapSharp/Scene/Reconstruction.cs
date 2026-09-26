@@ -11,8 +11,8 @@
 // Read/Write/ReadText/ReadBinary/WriteText/WriteBinary. Tests:
 // ColmapSharp.Tests/Scene/ReconstructionTests*.cs (reconstruction_test.cc).
 //
-// Not ported yet, each waiting on its own port: Load (scene/database_cache),
-// TranscribeImageIdsToDatabase (scene/database), ConvertToPLY/ImportPLY (util/ply), and
+// Load and TranscribeImageIdsToDatabase are in Reconstruction.Database.cs.
+// Not ported yet, each waiting on its own port: ConvertToPLY/ImportPLY (util/ply), and
 // ExtractColorsForImage/ExtractColorsForAllImages (they read image files through
 // Bitmap::Read, which is not ported: the host decodes images).
 //
