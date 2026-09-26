@@ -23,8 +23,10 @@
 //   descending size, then ascending smallest image id, with empty clusters last.
 // - COLMAP's image_t -> int narrowing of the edge endpoints is kept (unchecked casts), so
 //   the graph cut sees the same vertex ids.
-// - The hash containers COLMAP uses here (FlatHashSet of a child's images, NodeHashMap of
-//   related images) are only looked up, never iterated in a way that reaches an output.
+// - Create's pair order (entry 109). COLMAP iterates a hash map of image pairs; here the
+//   pairs are ordered by a scrambled pair id, so ties do not all break toward low image ids.
+// - The other hash containers COLMAP uses here (FlatHashSet of a child's images, NodeHashMap
+//   of related images) are only looked up, never iterated in a way that reaches an output.
 
 using ColmapSharp.Mathematics;
 using ColmapSharp.Util;
@@ -162,16 +164,28 @@ public sealed class SceneClustering
 	/// <summary>
 	/// Port of SceneClustering::Create: partitions the scene graph of
 	/// <paramref name="databaseCache"/>'s correspondence graph, with the number of matches
-	/// between two images as the edge weight. Pairs are taken in the correspondence graph's
-	/// order (docs/CPP_DIVERGENCES.md, entry 14).
+	/// between two images as the edge weight. Pairs are taken in a fixed pseudo-random order
+	/// of their pair ids, not the graph's ascending insertion order
+	/// (docs/CPP_DIVERGENCES.md, entry 109).
 	/// </summary>
 	public static SceneClustering Create(Options options, DatabaseCache databaseCache)
 	{
 		var numMatchesBetweenImages = databaseCache.CorrespondenceGraph.NumMatchesBetweenAllImages();
 
+		// COLMAP walks a hash map here, so the edge order, which breaks every weight tie in
+		// the graph cut and the overlap selection, has nothing to do with image ids. The
+		// correspondence graph's insertion order is ascending pair id, which breaks all ties
+		// toward the same few low image ids. Those are usually the images of one rig frame,
+		// so sibling clusters could overlap in a single frame, too few to align
+		// zero-baseline (panoramic) rigs. Scrambling the pair id restores the property
+		// COLMAP relies on and stays deterministic.
+		var orderedPairs = numMatchesBetweenImages
+			.OrderBy(pair => ScramblePairId(pair.Key))
+			.ThenBy(pair => pair.Key);
+
 		var allImagePairs = new List<(uint, uint)>(numMatchesBetweenImages.Count);
 		var allNumInliers = new List<int>(numMatchesBetweenImages.Count);
-		foreach (var (pairId, numMatches) in numMatchesBetweenImages)
+		foreach (var (pairId, numMatches) in orderedPairs)
 		{
 			allImagePairs.Add(Types.PairIdToImagePair(pairId));
 			allNumInliers.Add(unchecked((int)numMatches));
@@ -180,6 +194,19 @@ public sealed class SceneClustering
 		var sceneClustering = new SceneClustering(options);
 		sceneClustering.Partition(allImagePairs, allNumInliers);
 		return sceneClustering;
+	}
+
+	// The SplitMix64 finalizer (Steele, Lea and Flood, OOPSLA 2014): a bijection on 64-bit
+	// values whose output order is unrelated to the input order.
+	private static ulong ScramblePairId(ulong pairId)
+	{
+		unchecked
+		{
+			var z = pairId + 0x9E3779B97F4A7C15UL;
+			z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+			z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+			return z ^ (z >> 31);
+		}
 	}
 
 	private void PartitionHierarchicalCluster(IReadOnlyList<(int, int)> edges, IReadOnlyList<int> weights, Cluster cluster)

@@ -6,10 +6,12 @@
 //
 // Tier C: the partition comes from Mathematics/MultilevelPartitioner.cs instead of METIS
 // (docs/CPP_DIVERGENCES.md, entry 77), and every expected membership below is COLMAP's.
-// CSharpOnly_FlatChildClustersOrderedBySizeThenSmallestId is an extra C#-only check.
+// CSharpOnly_FlatChildClustersOrderedBySizeThenSmallestId and
+// CSharpOnly_CreateSpreadsTiedOverlapAcrossFrames are extra C#-only checks.
 // UnorderedClustersEq compares the clusters as sets, ignoring the order of the clusters and
 // of the images in each; here both sides are reduced to a sorted list of "{a,b,...}" strings.
 
+using ColmapSharp.Mathematics;
 using ColmapSharp.Scene;
 
 using TUnit.Assertions;
@@ -258,5 +260,47 @@ public class SceneClusteringTests
 		// connectivity to images 3 and 4 participates in the graph cut. The exact partition
 		// is implementation-dependent in METIS.
 		await Assert.That(childImageSets.Any(imageIds => imageIds.Contains(3) && imageIds.Contains(4) && imageIds.Contains(6))).IsTrue();
+	}
+
+	// C#-only (docs/CPP_DIVERGENCES.md, entry 109). In a synthetic dataset every image pair
+	// has the same number of matches, so every clustering tie falls to the order in which
+	// Create hands over the pairs. Taken in ascending pair id, the root split's overlap was
+	// images 1-3 and 31-33: one frame per side. For a panoramic rig (zero sensor
+	// translation) every image of a frame has the same projection center, so the two halves
+	// shared only two distinct centers and could never be aligned, and the hierarchical
+	// pipeline ended with two reconstructions
+	// (HierarchicalPipeline_WithoutNoiseAndPanoramicNonTrivialFrames). A similarity needs
+	// at least three distinct centers.
+	[Test]
+	public async Task CSharpOnly_CreateSpreadsTiedOverlapAcrossFrames()
+	{
+		RandomUtils.SetPRNGSeed(0);
+		using var database = new InMemoryDatabase();
+		Synthetic.SynthesizeDataset(
+			new SyntheticDatasetOptions
+			{
+				NumRigs = 2,
+				NumCamerasPerRig = 3,
+				NumFramesPerRig = 10,
+				NumPoints3D = 100,
+				SensorFromRigTranslationStddev = 0,
+				SensorFromRigRotationStddev = 30,
+			},
+			new Reconstruction(),
+			database);
+		var databaseCache = DatabaseCache.Create(database, new DatabaseCache.Options());
+
+		var options = new SceneClustering.Options { LeafMaxNumImages = 10, ImageOverlap = 3 };
+		var sceneClustering = SceneClustering.Create(options, databaseCache);
+
+		var children = sceneClustering.GetRootCluster()!.ChildClusters;
+		var sharedFrameIds = children[0].ImageIds
+			.Intersect(children[1].ImageIds)
+			.Select(imageId => databaseCache.Images[imageId].FrameId)
+			.Distinct()
+			.Count();
+
+		await Assert.That(children.Count).IsEqualTo(2);
+		await Assert.That(sharedFrameIds).IsGreaterThanOrEqualTo(3);
 	}
 }
