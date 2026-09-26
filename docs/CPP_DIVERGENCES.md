@@ -1097,3 +1097,24 @@ cameras are either co-centered (panoramic) or centimeters apart.
 
 **Evidence.** `GeneralizedPoseEstimationTests` (generalized_pose_test.cc 1:1), whose
 EstimateGeneralizedRelativePose_Nominal covers panoramic and non-panoramic rigs, passes.
+
+## 50. ObservationManager iterates its image pairs in insertion order and prints its graph
+
+**What differs.** COLMAP's `ObservationManager` (sfm/observation_manager.cc) keeps the
+per-pair statistics in an absl `FlatHashMap`, so `ImagePairs()` iterates in hash order, which
+abseil seeds per process. The port (`Sfm/ObservationManager.cs`) keeps them in a `Dictionary`
+that is only ever added to, so `ImagePairs` iterates in insertion order: the correspondence
+graph's pair order (`CorrespondenceGraph.NumMatchesBetweenAllImages`), then the pairs
+`AddImage` added, visiting existing images in the order the manager added them (ascending
+image id at construction, entry 21, then `AddImage` order). Separately, COLMAP's `operator<<`
+streams the correspondence graph's `shared_ptr`, i.e. its address; `ToString` prints the
+graph's own `ToString` instead ("null" when there is none, as in C++).
+
+**Why.** CLAUDE.md requires reproducible results, and the hash order carries no meaning. No
+count inside the manager depends on it; the consumer that iterates `ImagePairs`
+(`IncrementalTriangulator::Retriangulate`) visits pairs in that order, so the port's
+retriangulation order is deterministic where COLMAP's varies from run to run. .NET has no
+stable object address to print.
+
+**Evidence.** `ObservationManagerTests` (observation_manager_test.cc 1:1, including `Print`,
+which has no graph) pass.

@@ -107,7 +107,8 @@ Memory: VLFeat's scale space for a 6400×4800 upsampled first octave is multi-GB
 MatterCAD (esp. wasm32) must cap `max_image_size` accordingly.
 
 ### Phase 10 — Incremental SfM
-`sfm/observation_manager`, `incremental_triangulator`, `incremental_mapper(_impl)`,
+`sfm/observation_manager.MergeAndFilterReconstructions` (needs alignment),
+`incremental_triangulator`, `incremental_mapper(_impl)`,
 `controllers/incremental_pipeline`, `controllers/bundle_adjustment`.
 End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us.
 
