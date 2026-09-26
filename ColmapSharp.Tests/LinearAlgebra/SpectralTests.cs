@@ -3,7 +3,8 @@
 // SpectralTests (C#-only; COLMAP has no test for Eigen itself): hand-checked conventions of
 // JacobiSVD, Svd3d, SelfAdjointEigenSolver, EigenSolver and FullPivLU that the numpy
 // comparison in SpectralOracleTests does not pin: sorting and sign of singular values,
-// thin/full factor shapes, non-finite input, eigenvalue order, complex-pair order. Tier B
+// thin/full factor shapes, non-finite input, eigenvalue order, complex-pair order, and that
+// EigenSolver's eigenvalues-only path is bit-identical to the full solve. Tier B
 // where a tolerance appears; exact where the value is exactly representable.
 
 using System.Numerics;
@@ -82,6 +83,116 @@ public class SpectralTests
 		await Assert.That(values[1]).IsEqualTo(new Complex(2, -1));
 		Complex[,] vectors = solver.Eigenvectors();
 		await Assert.That(vectors[0, 1]).IsEqualTo(Complex.Conjugate(vectors[0, 0]));
+	}
+
+	// The eigenvalues-only solve skips Z and confines the QR sweeps to the active window;
+	// it must reproduce the full solve's eigenvalues bit for bit (GR6P's 64 x 64 action
+	// matrix relies on this). The inputs deflate many times, with complex pairs, real
+	// eigenvalues and 2x2 blocks with real eigenvalues that are split by a rotation.
+	[Test]
+	[Arguments(0)]
+	[Arguments(1)]
+	[Arguments(2)]
+	[Arguments(3)]
+	[Arguments(4)]
+	public async Task EigenSolver_EigenvaluesOnlyMatchesFullSolveBitwise(int caseIndex)
+	{
+		MatrixXd a = EigenvaluesOnlyCase(caseIndex);
+		var full = new EigenSolver(a, computeEigenvectors: true);
+		var valuesOnly = new EigenSolver(a, computeEigenvectors: false);
+		await Assert.That(full.Info).IsEqualTo(ComputationInfo.Success);
+		await Assert.That(valuesOnly.Info).IsEqualTo(ComputationInfo.Success);
+		Complex[] expected = full.Eigenvalues();
+		Complex[] actual = valuesOnly.Eigenvalues();
+		int complexCount = 0;
+		for (int i = 0; i < expected.Length; i++)
+		{
+			await Assert.That(BitConverter.DoubleToInt64Bits(actual[i].Real))
+				.IsEqualTo(BitConverter.DoubleToInt64Bits(expected[i].Real)).Because($"case {caseIndex} value {i} real");
+			await Assert.That(BitConverter.DoubleToInt64Bits(actual[i].Imaginary))
+				.IsEqualTo(BitConverter.DoubleToInt64Bits(expected[i].Imaginary)).Because($"case {caseIndex} value {i} imag");
+			if (expected[i].Imaginary != 0)
+			{
+				complexCount++;
+			}
+		}
+
+		// Every case mixes real eigenvalues and complex pairs.
+		await Assert.That(complexCount).IsGreaterThan(0);
+		await Assert.That(complexCount).IsLessThan(expected.Length);
+	}
+
+	private static MatrixXd EigenvaluesOnlyCase(int caseIndex)
+	{
+		var random = new Random(1234 + caseIndex);
+		switch (caseIndex)
+		{
+			case 0:
+			case 1:
+			case 2:
+			{
+				// Dense random matrices, 64 x 64 like GR6P's action matrix and smaller.
+				int n = caseIndex switch { 0 => 64, 1 => 17, _ => 8 };
+				var m = new MatrixXd(n, n);
+				for (int r = 0; r < n; r++)
+				{
+					for (int c = 0; c < n; c++)
+					{
+						m[r, c] = random.NextDouble() - 0.5;
+					}
+				}
+
+				return m;
+			}
+
+			case 3:
+			{
+				// Q B Q^T with B block triangular: real eigenvalues 3, -1, 0.5, 2, 2 (repeated)
+				// and complex pairs 1 +- 2i, -0.5 +- 0.25i, on a random orthogonal basis.
+				MatrixXd b = MatrixXd.FromRowMajor(9, 9,
+				[
+					3, 1, 0, 0, 0, 0, 0, 0, 0,
+					0, -1, 0, 0, 0, 0, 0, 0, 0,
+					0, 0, 1, -2, 0, 0, 0, 0, 0,
+					0, 0, 2, 1, 0, 0, 0, 0, 0,
+					0, 0, 0, 0, 0.5, 0.3, 0, 0, 0,
+					0, 0, 0, 0, 0, 2, 0, 0, 0,
+					0, 0, 0, 0, 0, 0, -0.5, 0.25, 0,
+					0, 0, 0, 0, 0, 0, -0.25, -0.5, 0,
+					0, 0, 0, 0, 0, 0, 0, 0, 2,
+				]);
+				var g = new MatrixXd(9, 9);
+				for (int r = 0; r < 9; r++)
+				{
+					for (int c = 0; c < 9; c++)
+					{
+						g[r, c] = random.NextDouble() - 0.5;
+					}
+				}
+
+				MatrixXd q = new HouseholderQR(g).HouseholderQ();
+				return q * b * q.Transpose();
+			}
+
+			default:
+			{
+				// Companion matrix of (x^2 + 1)(x - 1)(x - 2)(x + 3)(x^2 - 2x + 5)
+				// = x^7 - 2x^6 - 3x^5 + 12x^4 - 21x^3 + 38x^2 - 55x + 30.
+				double[] coefficients = [-2, -3, 12, -21, 38, -55, 30];
+				var m = new MatrixXd(7, 7);
+				for (int c = 0; c < 7; c++)
+				{
+					m[0, c] = -coefficients[c];
+				}
+
+				for (int r = 1; r < 7; r++)
+				{
+					m[r, r - 1] = 1;
+				}
+
+				return m;
+			}
+		}
 	}
 
 	// Regression: a thin U of a wide matrix went through the full N x N Householder Q

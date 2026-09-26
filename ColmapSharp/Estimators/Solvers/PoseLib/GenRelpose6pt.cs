@@ -58,10 +58,13 @@ internal static partial class GenRelpose6pt
 		Span<double> m = stackalloc double[84 * 15];
 		SetupCoeffMatrix(p1, x1, p2, x2, m);
 
-		var c0 = MatrixXd.Zero(99, 99);
-		var c1 = MatrixXd.Zero(99, 64);
-		Span<double> c0Data = c0.AsSpan();
-		Span<double> c1Data = c1.AsSpan();
+		// The elimination template [C0 | C1] as one column-major 99 x 163 per-thread buffer
+		// (C1's columns follow C0's): at 130 KB it would otherwise be a fresh allocation on
+		// every RANSAC hypothesis.
+		double[] template = t_template ??= new double[99 * (99 + 64)];
+		Span<double> c0Data = template.AsSpan(0, 99 * 99);
+		Span<double> c1Data = template.AsSpan(99 * 99, 99 * 64);
+		template.AsSpan().Clear();
 		ReadOnlySpan<int> coeffs0Ind = Coeffs0Indices;
 		ReadOnlySpan<int> c0Ind = C0Indices;
 		for (int i = 0; i < 4655; i++)
@@ -76,7 +79,23 @@ internal static partial class GenRelpose6pt
 			c1Data[c1Ind[i]] = m[coeffs1Ind[i]];
 		}
 
-		MatrixXd c12 = new PartialPivLU(c0).Solve(c1);
+		// C12 = C0.partialPivLu().solve(C1). Eliminating [C0 | C1] together does the
+		// forward substitution of all 64 columns in the same pass (bit-identical to solving
+		// column by column). The action matrix reads only C12's rows 78..98, and back
+		// substitution of a row needs only the rows below it, so the other 78 rows are never
+		// finished.
+		Span<int> permutation = stackalloc int[99];
+		PartialPivLU.FactorAugmentedInPlace(template, 99, 64, permutation);
+		var c12 = new double[21, 64];
+		for (int j = 0; j < 64; j++)
+		{
+			Span<double> column = c1Data.Slice(99 * j, 99);
+			PartialPivLU.BackSubstituteTrailingRows(c0Data, 99, column, 78);
+			for (int r = 0; r < 21; r++)
+			{
+				c12[r, j] = column[78 + r];
+			}
+		}
 
 		// Setup action matrix
 		var am = MatrixXd.Zero(64, 64);
@@ -225,21 +244,23 @@ internal static partial class GenRelpose6pt
 	{
 		ReadOnlySpan<int> ind = [5, 6, 7, 9, 10, 12, 15, 16, 18, 22, 26, 27, 29, 33, 38, 43, 44, 47, 51, 56, 63];
 
-		// Truncated action matrix containing non-trivial rows
-		var ams = new double[21, 64];
+		// Truncated action matrix containing non-trivial rows (row-major, ams[i * 64 + j]).
+		Span<double> ams = stackalloc double[21 * 64];
 		for (int i = 0; i < 21; i++)
 		{
 			for (int j = 0; j < 64; j++)
 			{
-				ams[i, j] = am[ind[i], j];
+				ams[i * 64 + j] = am[ind[i], j];
 			}
 		}
 
 		Span<double> zi = stackalloc double[8];
 
-		// AA.leftCols(20) and the right-hand side -AA.col(20), reused across eigenvalues.
-		var aa = new MatrixXd(21, 20);
-		var rhs = new VectorXd(21);
+		// AA.leftCols(20) (column-major, 21 rows) and the right-hand side -AA.col(20),
+		// refilled for each eigenvalue and solved in place by HouseholderQR's kernels.
+		Span<double> aaData = stackalloc double[21 * 20];
+		Span<double> rhs = stackalloc double[21];
+		Span<double> tau = stackalloc double[20];
 		for (int i = 0; i < eigv.Length; i++)
 		{
 			zi[0] = eigv[i];
@@ -250,30 +271,30 @@ internal static partial class GenRelpose6pt
 
 			for (int k = 0; k < 21; k++)
 			{
-				aa[k, 0] = ams[k, 5];
-				aa[k, 1] = ams[k, 6];
-				aa[k, 2] = ams[k, 4] + zi[0] * ams[k, 7];
-				aa[k, 3] = ams[k, 9];
-				aa[k, 4] = ams[k, 8] + zi[0] * ams[k, 10];
-				aa[k, 5] = ams[k, 3] + zi[0] * ams[k, 11] + zi[1] * ams[k, 12];
-				aa[k, 6] = ams[k, 15];
-				aa[k, 7] = ams[k, 14] + zi[0] * ams[k, 16];
-				aa[k, 8] = ams[k, 13] + zi[0] * ams[k, 17] + zi[1] * ams[k, 18];
-				aa[k, 9] = ams[k, 2] + zi[0] * ams[k, 19] + zi[1] * ams[k, 20] + zi[2] * ams[k, 21] + zi[3] * ams[k, 22];
-				aa[k, 10] = ams[k, 26];
-				aa[k, 11] = ams[k, 25] + zi[0] * ams[k, 27];
-				aa[k, 12] = ams[k, 24] + zi[0] * ams[k, 28] + zi[1] * ams[k, 29];
-				aa[k, 13] = ams[k, 23] + zi[0] * ams[k, 30] + zi[1] * ams[k, 31] + zi[2] * ams[k, 32] + zi[3] * ams[k, 33];
-				aa[k, 14] = ams[k, 1] + zi[0] * ams[k, 34] + zi[1] * ams[k, 35] + zi[2] * ams[k, 36]
-					+ zi[3] * ams[k, 37] + zi[4] * ams[k, 38];
-				aa[k, 15] = ams[k, 43];
-				aa[k, 16] = ams[k, 42] + zi[0] * ams[k, 44];
-				aa[k, 17] = ams[k, 41] + zi[0] * ams[k, 45] + zi[1] * ams[k, 46] + zi[2] * ams[k, 47];
-				aa[k, 18] = ams[k, 40] + zi[0] * ams[k, 48] + zi[1] * ams[k, 49] + zi[2] * ams[k, 50] + zi[3] * ams[k, 51];
-				aa[k, 19] = ams[k, 39] + zi[0] * ams[k, 52] + zi[1] * ams[k, 53] + zi[2] * ams[k, 54]
-					+ zi[3] * ams[k, 55] + zi[4] * ams[k, 56];
-				double col20 = ams[k, 0] + zi[0] * ams[k, 57] + zi[1] * ams[k, 58] + zi[2] * ams[k, 59]
-					+ zi[3] * ams[k, 60] + zi[4] * ams[k, 61] + zi[5] * ams[k, 62] + zi[6] * ams[k, 63];
+				aaData[0 * 21 + k] = ams[k * 64 + 5];
+				aaData[1 * 21 + k] = ams[k * 64 + 6];
+				aaData[2 * 21 + k] = ams[k * 64 + 4] + zi[0] * ams[k * 64 + 7];
+				aaData[3 * 21 + k] = ams[k * 64 + 9];
+				aaData[4 * 21 + k] = ams[k * 64 + 8] + zi[0] * ams[k * 64 + 10];
+				aaData[5 * 21 + k] = ams[k * 64 + 3] + zi[0] * ams[k * 64 + 11] + zi[1] * ams[k * 64 + 12];
+				aaData[6 * 21 + k] = ams[k * 64 + 15];
+				aaData[7 * 21 + k] = ams[k * 64 + 14] + zi[0] * ams[k * 64 + 16];
+				aaData[8 * 21 + k] = ams[k * 64 + 13] + zi[0] * ams[k * 64 + 17] + zi[1] * ams[k * 64 + 18];
+				aaData[9 * 21 + k] = ams[k * 64 + 2] + zi[0] * ams[k * 64 + 19] + zi[1] * ams[k * 64 + 20] + zi[2] * ams[k * 64 + 21] + zi[3] * ams[k * 64 + 22];
+				aaData[10 * 21 + k] = ams[k * 64 + 26];
+				aaData[11 * 21 + k] = ams[k * 64 + 25] + zi[0] * ams[k * 64 + 27];
+				aaData[12 * 21 + k] = ams[k * 64 + 24] + zi[0] * ams[k * 64 + 28] + zi[1] * ams[k * 64 + 29];
+				aaData[13 * 21 + k] = ams[k * 64 + 23] + zi[0] * ams[k * 64 + 30] + zi[1] * ams[k * 64 + 31] + zi[2] * ams[k * 64 + 32] + zi[3] * ams[k * 64 + 33];
+				aaData[14 * 21 + k] = ams[k * 64 + 1] + zi[0] * ams[k * 64 + 34] + zi[1] * ams[k * 64 + 35] + zi[2] * ams[k * 64 + 36]
+					+ zi[3] * ams[k * 64 + 37] + zi[4] * ams[k * 64 + 38];
+				aaData[15 * 21 + k] = ams[k * 64 + 43];
+				aaData[16 * 21 + k] = ams[k * 64 + 42] + zi[0] * ams[k * 64 + 44];
+				aaData[17 * 21 + k] = ams[k * 64 + 41] + zi[0] * ams[k * 64 + 45] + zi[1] * ams[k * 64 + 46] + zi[2] * ams[k * 64 + 47];
+				aaData[18 * 21 + k] = ams[k * 64 + 40] + zi[0] * ams[k * 64 + 48] + zi[1] * ams[k * 64 + 49] + zi[2] * ams[k * 64 + 50] + zi[3] * ams[k * 64 + 51];
+				aaData[19 * 21 + k] = ams[k * 64 + 39] + zi[0] * ams[k * 64 + 52] + zi[1] * ams[k * 64 + 53] + zi[2] * ams[k * 64 + 54]
+					+ zi[3] * ams[k * 64 + 55] + zi[4] * ams[k * 64 + 56];
+				double col20 = ams[k * 64 + 0] + zi[0] * ams[k * 64 + 57] + zi[1] * ams[k * 64 + 58] + zi[2] * ams[k * 64 + 59]
+					+ zi[3] * ams[k * 64 + 60] + zi[4] * ams[k * 64 + 61] + zi[5] * ams[k * 64 + 62] + zi[6] * ams[k * 64 + 63];
 
 				// AA(20, 20) = AA(20, 20) - zi[7] lands in the right-hand-side column.
 				if (k == 20)
@@ -284,29 +305,48 @@ internal static partial class GenRelpose6pt
 				rhs[k] = -col20;
 			}
 
-			aa[0, 0] = aa[0, 0] - zi[0];
-			aa[1, 1] = aa[1, 1] - zi[0];
-			aa[2, 2] = aa[2, 2] - zi[1];
-			aa[3, 3] = aa[3, 3] - zi[0];
-			aa[4, 4] = aa[4, 4] - zi[1];
-			aa[5, 5] = aa[5, 5] - zi[2];
-			aa[6, 6] = aa[6, 6] - zi[0];
-			aa[7, 7] = aa[7, 7] - zi[1];
-			aa[8, 8] = aa[8, 8] - zi[2];
-			aa[9, 9] = aa[9, 9] - zi[4];
-			aa[10, 10] = aa[10, 10] - zi[0];
-			aa[11, 11] = aa[11, 11] - zi[1];
-			aa[12, 12] = aa[12, 12] - zi[2];
-			aa[13, 13] = aa[13, 13] - zi[4];
-			aa[14, 14] = aa[14, 14] - zi[5];
-			aa[15, 15] = aa[15, 15] - zi[0];
-			aa[16, 16] = aa[16, 16] - zi[1];
-			aa[17, 17] = aa[17, 17] - zi[3];
-			aa[18, 18] = aa[18, 18] - zi[4];
-			aa[19, 19] = aa[19, 19] - zi[5];
+			// AA(i, i) is aaData[i * 22] (column-major, 21 rows).
+			aaData[0 * 22] = aaData[0 * 22] - zi[0];
+			aaData[1 * 22] = aaData[1 * 22] - zi[0];
+			aaData[2 * 22] = aaData[2 * 22] - zi[1];
+			aaData[3 * 22] = aaData[3 * 22] - zi[0];
+			aaData[4 * 22] = aaData[4 * 22] - zi[1];
+			aaData[5 * 22] = aaData[5 * 22] - zi[2];
+			aaData[6 * 22] = aaData[6 * 22] - zi[0];
+			aaData[7 * 22] = aaData[7 * 22] - zi[1];
+			aaData[8 * 22] = aaData[8 * 22] - zi[2];
+			aaData[9 * 22] = aaData[9 * 22] - zi[4];
+			aaData[10 * 22] = aaData[10 * 22] - zi[0];
+			aaData[11 * 22] = aaData[11 * 22] - zi[1];
+			aaData[12 * 22] = aaData[12 * 22] - zi[2];
+			aaData[13 * 22] = aaData[13 * 22] - zi[4];
+			aaData[14 * 22] = aaData[14 * 22] - zi[5];
+			aaData[15 * 22] = aaData[15 * 22] - zi[0];
+			aaData[16 * 22] = aaData[16 * 22] - zi[1];
+			aaData[17 * 22] = aaData[17 * 22] - zi[3];
+			aaData[18 * 22] = aaData[18 * 22] - zi[4];
+			aaData[19 * 22] = aaData[19 * 22] - zi[5];
 
-			VectorXd s = new HouseholderQR(aa).Solve(rhs);
-			sols[i] = new Vector3d(s[14], s[19], zi[0]);
+			// AA.leftCols(20).householderQr().solve(-AA.col(20)): the factorization, Q^T b
+			// and the back substitution of HouseholderQR.Solve, on the stack.
+			Householder.FactorInPlace(aaData, 21, 20, tau);
+			for (int j = 0; j < 20; j++)
+			{
+				Householder.ApplyLeft(aaData.Slice(j * 21 + j + 1, 20 - j), tau[j], rhs[j..]);
+			}
+
+			for (int r = 19; r >= 0; r--)
+			{
+				double sum = rhs[r];
+				for (int c = r + 1; c < 20; c++)
+				{
+					sum -= aaData[c * 21 + r] * rhs[c];
+				}
+
+				rhs[r] = sum / aaData[r * 21 + r];
+			}
+
+			sols[i] = new Vector3d(rhs[14], rhs[19], zi[0]);
 		}
 	}
 
@@ -370,12 +410,12 @@ internal static partial class GenRelpose6pt
 		}
 	}
 
-	/// <summary>AM.row(row) = -C12.row(c12Row).</summary>
-	private static void SetNegatedRow(MatrixXd am, int row, MatrixXd c12, int c12Row)
+	/// <summary>AM.row(row) = -C12.row(c12Row), with c12 holding C12's rows 78..98.</summary>
+	private static void SetNegatedRow(MatrixXd am, int row, double[,] c12, int c12Row)
 	{
 		for (int j = 0; j < 64; j++)
 		{
-			am[row, j] = -c12[c12Row, j];
+			am[row, j] = -c12[c12Row - 78, j];
 		}
 	}
 
@@ -480,6 +520,10 @@ internal static partial class GenRelpose6pt
 			Qz = qa1 * qb4 + qa2 * qb3 - qa3 * qb2 + qa4 * qb1,
 		};
 	}
+
+	/// <summary>Per-thread elimination template buffer, column-major [C0 | C1].</summary>
+	[ThreadStatic]
+	private static double[]? t_template;
 
 	/// <summary>PoseLib's CameraPose: rotation quaternion (w, x, y, z) and translation.</summary>
 	private readonly record struct Pose(double Qw, double Qx, double Qy, double Qz, Vector3d T);
