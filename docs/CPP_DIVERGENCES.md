@@ -1401,6 +1401,69 @@ and 57).
 **Evidence.** `ModelTests.Model_GetMaxOverlappingImagesTies` (C#-only) pins the order;
 `Model_GetMaxOverlappingImages` (model_test.cc 1:1) passes.
 
+## 66. The incremental pipeline has no Caspar (GPU) bundle adjustment options
+
+**What differs.** COLMAP's `IncrementalPipelineOptions::LocalBundleAdjustment()` and
+`GlobalBundleAdjustment()` also fill `BundleAdjustmentOptions::caspar` (the GPU backend's
+`solver_iter_max` and `gpu_index`). ColmapSharp's `BundleAdjustmentOptions` has no Caspar
+member, so `Controllers/IncrementalPipelineOptions.cs` fills only the Ceres options. `Check`
+rejects a Caspar backend exactly as a COLMAP build without `CASPAR_ENABLED` does, and
+`EffBa{Local,Global}MaxNumIterations` still return Caspar's default (200,
+`IncrementalPipelineOptions.CasparDefaultSolverIterMax`) for a Caspar configuration.
+
+**Why.** Caspar is a GPU solver, out of scope for a managed library (PORTING_PLAN.md).
+
+**Evidence.** The `caspar` assertions of incremental_pipeline_test.cc's
+`PropagatesExplicitMaxNumIterations` and `DefaultMaxNumIterationsUsesBackendDefaults` are the
+only lines not ported; their Ceres lines and all of `EffBaMaxNumIterations` pass.
+
+## 67. BundleAdjustmentController takes BundleAdjustmentOptions instead of an OptionManager
+
+**What differs.** COLMAP's `BundleAdjustmentController(const OptionManager&, ...)` reads only
+`*options.bundle_adjustment`. The CLI's `OptionManager` is not ported, so
+`Controllers/BundleAdjustmentController.cs` takes that `BundleAdjustmentOptions` directly.
+
+**Why.** `OptionManager` is the command-line option registry (CLI executables are out of
+scope); the controller's behavior depends on nothing else in it.
+
+**Evidence.** A default `OptionManager` constructs a default `BundleAdjustmentOptions`
+(option_manager.cc); `BundleAdjustmentControllerTests` (bundle_adjustment_test.cc 1:1) pass
+with `new BundleAdjustmentOptions()`.
+
+## 68. The incremental pipeline reads point colors through a host callback, not image_path
+
+**What differs.** COLMAP's `IncrementalPipelineOptions::image_path` names a folder that
+`Reconstruction::ExtractColorsForImage` reads `image_path / image.Name()` from with
+`Bitmap::Read`. ColmapSharp's options have `ReadImage`, a `Func<string, Bitmap?>` from image
+name to the decoded image, and `Reconstruction.ExtractColorsForImage(imageId, bitmap)` takes
+the bitmap (converted to RGB like `Bitmap::Read(as_rgb=true)`). A null `ReadImage` or a null
+result behaves like COLMAP's failed read (the points stay black; COLMAP also logs a warning).
+
+**Why.** The library does not decode image files (the host does, Phase 3), and MatterCAD may
+hold the photos in memory rather than in a folder.
+
+**Evidence.** With the default (null) `ReadImage` the pipeline behaves like COLMAP's default
+empty `image_path`, which is what incremental_pipeline_test.cc runs; the C#-only
+`IncrementalPipeline_ExtractsColorsFromReadImage` checks every image is requested and every
+point takes the image color.
+
+## 69. ExtractColorsForAllImages sums colors per image and reduces in image-id order
+
+**What differs.** COLMAP's `Reconstruction::ExtractColorsForAllImages` adds each image's
+interpolated colors into per-thread sums (whichever pool thread ran the image) and merges the
+thread sums, so the floating-point summation order depends on scheduling and the thread
+count. `Scene/Reconstruction.Colors.cs` fills one partial sum per image (in parallel) and
+reduces them in ascending image-id order.
+
+**Why.** CLAUDE.md requires sequential and parallel runs to give the same result. The sums
+are of float colors in double, so the orders differ at most in the last bits of the mean,
+which can move the rounded 8-bit color by one only at an exact .5 tie.
+
+**Evidence.** `ReconstructionTests.Reconstruction_ExtractColorsForAllImages`
+(reconstruction_test.cc 1:1) passes; the C#-only
+`Reconstruction_ExtractColorsForAllImagesIndependentOfThreadCount` gets identical colors
+with 1 and 8 threads.
+
 ## 70. Feature matching never waits for pairs it did not queue
 
 **What differs.** COLMAP's `FeatureMatcherController::Match` and

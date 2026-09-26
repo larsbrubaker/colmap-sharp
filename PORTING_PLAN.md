@@ -34,9 +34,7 @@ resampler matching OIIO within 1 grey level, `docs/CPP_DIVERGENCES.md`); porting
 resize (Apache-2.0) would make it exact if a fixture ever needs that.
 
 ### Phase 4 — Scene
-- `Reconstruction.ExtractColors*` (the host decodes images; take a Bitmap provider).
 - `scene_clustering`, `reconstruction_clustering`.
-- Deferred test: `reconstruction_test.cc` ExtractColorsForAllImages.
 - Before the pipeline phases, decide how the library surfaces COLMAP's `LOG(WARNING)`
   messages (dropped for now).
 
@@ -93,10 +91,12 @@ Memory: VLFeat's scale space for a 6400×4800 upsampled first octave is multi-GB
 MatterCAD (esp. wasm32) must cap `max_image_size` accordingly.
 
 ### Phase 10 — Incremental SfM
-`controllers/incremental_pipeline` (its tests are the first to run the mapper's untested paths:
-local BA/refinement, structure-less and general-frame registration, generalized initial pair,
-redundant-points global BA — add C#-only smoke tests if the pipeline tests don't reach them), `controllers/bundle_adjustment`.
-End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us.
+End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us (also the
+first chance to reach the structure-based → structure-less registration fallback, which no
+synthetic scene triggers).
+Skipped (Caspar GPU BA out of scope): the `caspar` assertion lines in
+`incremental_pipeline_test.cc` IncrementalPipelineOptions.PropagatesExplicitMaxNumIterations and
+DefaultMaxNumIterationsUsesBackendDefaults.
 
 ### Phase 11 — Pipeline controllers
 `undistorters`,

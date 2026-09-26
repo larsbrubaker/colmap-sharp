@@ -13,8 +13,8 @@
 //
 // Load and TranscribeImageIdsToDatabase are in Reconstruction.Database.cs, ConvertToPLY and
 // ImportPLY in Reconstruction.Ply.cs.
-// Not ported yet: ExtractColorsForImage/ExtractColorsForAllImages (they read image files
-// through Bitmap::Read, which is not ported: the host decodes images).
+// ExtractColorsForImage and ExtractColorsForAllImages are in Reconstruction.Colors.cs (they
+// take host-decoded bitmaps: Bitmap::Read is not ported).
 //
 // Design (later phases build on it):
 // - Ownership. The reconstruction owns every rig, camera, frame, image and 3D point.
