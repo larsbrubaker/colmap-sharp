@@ -93,6 +93,16 @@ public interface ICameraModel<TSelf>
 		where T : struct, IScalar<T>;
 
 	/// <summary>
+	/// <see cref="ImgFromCam"/> in double with analytic Jacobians (C++
+	/// <c>ImgFromCamWithJac</c>, colmap/sensor/models_jacobian.h). <paramref name="jParams"/>
+	/// receives the 2 x NumParams Jacobian d(x, y) / d(params) and <paramref name="jUvw"/>
+	/// the 2x3 Jacobian d(x, y) / d(u, v, w), both row-major; an empty span (C++ nullptr)
+	/// skips that Jacobian. Every COLMAP model provides it (has_img_from_cam_with_jac).
+	/// The kernels are in the *CameraModels.Jacobian.cs files.
+	/// </summary>
+	static abstract bool ImgFromCamWithJac(ReadOnlySpan<double> parameters, double u, double v, double w, out double x, out double y, Span<double> jParams, Span<double> jUvw, bool checkCheirality = true);
+
+	/// <summary>
 	/// Lifts pixel coordinates to normalized camera coordinates (u, v, 1). Returns false if
 	/// lifting fails. On failure the outputs are unspecified: C++ leaves them untouched for
 	/// the fisheye models and EQUIRECTANGULAR and partly written for EUCM, while this port

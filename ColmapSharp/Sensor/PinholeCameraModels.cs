@@ -19,7 +19,7 @@ namespace ColmapSharp.Sensor;
 /// principal point are modeled. Parameters: f, cx, cy.
 /// See https://en.wikipedia.org/wiki/Pinhole_camera_model
 /// </summary>
-public readonly struct SimplePinholeCameraModel : IPerspectivePinholeCameraModel<SimplePinholeCameraModel>
+public readonly partial struct SimplePinholeCameraModel : IPerspectivePinholeCameraModel<SimplePinholeCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.SimplePinhole;
@@ -87,7 +87,7 @@ public readonly struct SimplePinholeCameraModel : IPerspectivePinholeCameraModel
 /// point are modeled. Parameters: fx, fy, cx, cy.
 /// See https://en.wikipedia.org/wiki/Pinhole_camera_model
 /// </summary>
-public readonly struct PinholeCameraModel : IPerspectivePinholeCameraModel<PinholeCameraModel>
+public readonly partial struct PinholeCameraModel : IPerspectivePinholeCameraModel<PinholeCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.Pinhole;
@@ -157,7 +157,7 @@ public readonly struct PinholeCameraModel : IPerspectivePinholeCameraModel<Pinho
 /// to VisualSfM's model, except that the distortion is applied to the projections and not
 /// to the measurements. Parameters: f, cx, cy, k.
 /// </summary>
-public readonly struct SimpleRadialCameraModel : IPerspectivePinholeCameraModel<SimpleRadialCameraModel>, IDistortedCameraModel<SimpleRadialCameraModel>
+public readonly partial struct SimpleRadialCameraModel : IPerspectivePinholeCameraModel<SimpleRadialCameraModel>, IDistortedCameraModel<SimpleRadialCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.SimpleRadial;
@@ -246,7 +246,7 @@ public readonly struct SimpleRadialCameraModel : IPerspectivePinholeCameraModel<
 /// equivalent to Bundler's model (except for an inverse z-axis in the camera coordinate
 /// system). Parameters: f, cx, cy, k1, k2.
 /// </summary>
-public readonly struct RadialCameraModel : IPerspectivePinholeCameraModel<RadialCameraModel>, IDistortedCameraModel<RadialCameraModel>
+public readonly partial struct RadialCameraModel : IPerspectivePinholeCameraModel<RadialCameraModel>, IDistortedCameraModel<RadialCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.Radial;
@@ -337,7 +337,7 @@ public readonly struct RadialCameraModel : IPerspectivePinholeCameraModel<Radial
 /// Parameters: fx, fy, cx, cy, k1, k2, p1, p2.
 /// See http://docs.opencv.org/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
 /// </summary>
-public readonly struct OpenCVCameraModel : IPerspectivePinholeCameraModel<OpenCVCameraModel>, IDistortedCameraModel<OpenCVCameraModel>
+public readonly partial struct OpenCVCameraModel : IPerspectivePinholeCameraModel<OpenCVCameraModel>, IDistortedCameraModel<OpenCVCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.OpenCV;
@@ -433,7 +433,7 @@ public readonly struct OpenCVCameraModel : IPerspectivePinholeCameraModel<OpenCV
 /// Parameters: fx, fy, cx, cy, k1, k2, p1, p2, k3, k4, k5, k6.
 /// See http://docs.opencv.org/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
 /// </summary>
-public readonly struct FullOpenCVCameraModel : IPerspectivePinholeCameraModel<FullOpenCVCameraModel>, IDistortedCameraModel<FullOpenCVCameraModel>
+public readonly partial struct FullOpenCVCameraModel : IPerspectivePinholeCameraModel<FullOpenCVCameraModel>, IDistortedCameraModel<FullOpenCVCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.FullOpenCV;
@@ -538,7 +538,7 @@ public readonly struct FullOpenCVCameraModel : IPerspectivePinholeCameraModel<Fu
 /// calibration and removal of distortion from scenes of structured environments. Machine
 /// vision and applications, 2001.
 /// </summary>
-public readonly struct FOVCameraModel : IPerspectivePinholeCameraModel<FOVCameraModel>, IDistortedCameraModel<FOVCameraModel>
+public readonly partial struct FOVCameraModel : IPerspectivePinholeCameraModel<FOVCameraModel>, IDistortedCameraModel<FOVCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.FOV;

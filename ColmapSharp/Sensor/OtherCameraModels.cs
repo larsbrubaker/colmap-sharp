@@ -18,7 +18,7 @@ namespace ColmapSharp.Sensor;
 /// See "Simultaneous linear estimation of multiple view geometry and lens distortion" by
 /// A. Fitzgibbon 2001.
 /// </summary>
-public readonly struct SimpleDivisionCameraModel : IPerspectivePinholeCameraModel<SimpleDivisionCameraModel>, IDistortedCameraModel<SimpleDivisionCameraModel>
+public readonly partial struct SimpleDivisionCameraModel : IPerspectivePinholeCameraModel<SimpleDivisionCameraModel>, IDistortedCameraModel<SimpleDivisionCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.SimpleDivision;
@@ -114,7 +114,7 @@ public readonly struct SimpleDivisionCameraModel : IPerspectivePinholeCameraMode
 /// See "Simultaneous linear estimation of multiple view geometry and lens distortion" by
 /// A. Fitzgibbon 2001.
 /// </summary>
-public readonly struct DivisionCameraModel : IPerspectivePinholeCameraModel<DivisionCameraModel>, IDistortedCameraModel<DivisionCameraModel>
+public readonly partial struct DivisionCameraModel : IPerspectivePinholeCameraModel<DivisionCameraModel>, IDistortedCameraModel<DivisionCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.Division;
@@ -210,7 +210,7 @@ public readonly struct DivisionCameraModel : IPerspectivePinholeCameraModel<Divi
 /// EUCM camera model, described in "An Enhanced Unified Camera Model", Bogdan Khomutenko,
 /// Gaetan Garcia, Philippe Martinet, 2018. Parameters: fx, fy, cx, cy, alpha, beta.
 /// </summary>
-public readonly struct EUCMCameraModel : IPerspectivePinholeCameraModel<EUCMCameraModel>
+public readonly partial struct EUCMCameraModel : IPerspectivePinholeCameraModel<EUCMCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.EUCM;
@@ -338,7 +338,7 @@ public readonly struct EUCMCameraModel : IPerspectivePinholeCameraModel<EUCMCame
 /// is fully specified by the image dimensions: no focal length, principal point or lens
 /// distortion. Parameters: w, h.
 /// </summary>
-public readonly struct EquirectangularCameraModel : ISphericalCameraModel<EquirectangularCameraModel>
+public readonly partial struct EquirectangularCameraModel : ISphericalCameraModel<EquirectangularCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.Equirectangular;

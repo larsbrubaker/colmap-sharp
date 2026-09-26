@@ -81,6 +81,9 @@ public readonly struct Matrix2d : IEquatable<Matrix2d>
 	/// <summary>The transpose.</summary>
 	public Matrix2d Transpose() => new(_m00, _m10, _m01, _m11);
 
+	/// <summary>Frobenius norm, Eigen's norm() on a matrix.</summary>
+	public double Norm() => Math.Sqrt(_m00 * _m00 + _m10 * _m10 + _m01 * _m01 + _m11 * _m11);
+
 	/// <summary>Determinant, m00*m11 - m01*m10.</summary>
 	public double Determinant() => _m00 * _m11 - _m01 * _m10;
 

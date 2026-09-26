@@ -33,9 +33,6 @@ Each phase ends with its ported tests green. Test names follow COLMAP's.
 `normalization`, `pose_prior`; `sim3_matchers_test.cc`.
 
 ### Phase 3 — Sensor
-`sensor/models_jacobian.h` (`ImgFromCamWithJac`, `CameraModelImgFromCamWithJac`,
-`CamRayFromImgJacobian`) + `models_jacobian_test.cc`; `rig`.
-
 Skipped `bitmap_test.cc` cases (the host decodes and encodes images, so OIIO file I/O is not
 ported; C# `Bitmap` is a reference type, so C++ move semantics have no counterpart):
 `MoveConstructEmpty`, `MoveConstruct`, `MoveAssignEmpty`, `MoveAssign`, `ReadWriteAsRGB`,

@@ -139,6 +139,22 @@ public enum SensorType
 	Imu = 1,
 }
 
+/// <summary>SensorTypeToString, COLMAP's stream spelling of a SensorType.</summary>
+public static class SensorTypeExtensions
+{
+	/// <summary>
+	/// "INVALID", "CAMERA" or "IMU", as MAKE_ENUM_CLASS_OVERLOAD_STREAM streams the enum
+	/// (e.g. in Rig's operator&lt;&lt;).
+	/// </summary>
+	public static string ToColmapString(this SensorType type) => type switch
+	{
+		SensorType.Invalid => "INVALID",
+		SensorType.Camera => "CAMERA",
+		SensorType.Imu => "IMU",
+		_ => throw new ArgumentOutOfRangeException(nameof(type)),
+	};
+}
+
 /// <summary>
 /// Port of colmap::sensor_t: a sensor identified by its type and its id within that type
 /// (a camera_t for cameras). Ordered by (type, id) like COLMAP's operator&lt;.

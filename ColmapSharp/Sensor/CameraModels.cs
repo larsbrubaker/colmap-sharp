@@ -10,8 +10,10 @@
 // model directly. Unknown ids throw where COLMAP's switch throws std::domain_error
 // ("Camera model does not exist").
 //
-// Not here yet: CameraModelImgFromCamWithJac and CamRayFromImgJacobian, which need the
-// analytic per-model Jacobians of colmap/sensor/models_jacobian.h (a separate port).
+// CameraModelImgFromCamWithJac dispatches to the analytic per-model ImgFromCamWithJac
+// kernels of colmap/sensor/models_jacobian.h (the *CameraModels.Jacobian.cs files), and
+// CamRayFromImgJacobian inverts their 2x3 projection Jacobian (models.cc). Their tests are
+// in ColmapSharp.Tests/Sensor/ModelsJacobianTests.cs.
 
 using ColmapSharp.LinearAlgebra;
 
@@ -107,6 +109,74 @@ public static class CameraModels
 		Get(modelId).ImgFromCam(parameters, uvw.X, uvw.Y, uvw.Z, out double x, out double y, checkCheirality) ? new Vector2d(x, y) : null;
 
 	/// <summary>
+	/// CameraModelImgFromCamWithJac: <see cref="CameraModelImgFromCam"/> through the model's
+	/// analytic ImgFromCamWithJac, also returning the projection Jacobian
+	/// <paramref name="jUvw"/> = d(x, y) / d(u, v, w). Null if the projection fails, in which
+	/// case <paramref name="jUvw"/> is zero (C++ leaves its output untouched).
+	/// </summary>
+	public static Vector2d? CameraModelImgFromCamWithJac(CameraModelId modelId, ReadOnlySpan<double> parameters, Vector3d uvw, out Matrix2x3d jUvw, bool checkCheirality = true)
+	{
+		// 2x3 row-major Jacobian. Zero-init so a kernel that skips an entry can't leak an
+		// uninitialized read.
+		Span<double> jUvwData = stackalloc double[6];
+		jUvwData.Clear();
+		if (Get(modelId).ImgFromCamWithJac(parameters, uvw.X, uvw.Y, uvw.Z, out double x, out double y, jUvwData, checkCheirality))
+		{
+			jUvw = Matrix2x3d.FromRowMajor(jUvwData);
+			return new Vector2d(x, y);
+		}
+
+		jUvw = Matrix2x3d.Zero;
+		return null;
+	}
+
+	/// <summary>
+	/// CameraModelImgFromCamWithJac with <c>J_uvw = nullptr</c>: projects through the
+	/// model's analytic kernel without computing the Jacobian.
+	/// </summary>
+	public static Vector2d? CameraModelImgFromCamWithJac(CameraModelId modelId, ReadOnlySpan<double> parameters, Vector3d uvw, bool checkCheirality = true) =>
+		Get(modelId).ImgFromCamWithJac(parameters, uvw.X, uvw.Y, uvw.Z, out double x, out double y, default, checkCheirality) ? new Vector2d(x, y) : null;
+
+	/// <summary>
+	/// CamRayFromImgJacobian: the Jacobian of <see cref="CameraModelCamRayFromImg"/>,
+	/// d(u, v, w) / d(x, y), obtained by inverting the projection Jacobian
+	/// d(x, y) / d(u, v, w) at a unit bearing vector. Null if <paramref name="jUvw"/> is rank
+	/// deficient.
+	/// <para>
+	/// Central projection depends only on the direction of the ray, so the ray lies in the
+	/// null space of <paramref name="jUvw"/> and it has rank 2. For a <i>unit</i> ray its
+	/// Moore-Penrose pseudo-inverse is exactly the Jacobian of the normalized unprojection,
+	/// and its range is the tangent plane of the unit sphere at the ray, so no explicit
+	/// tangent basis is required. Uses the closed form of Terekhov and Larsson, "Tangent
+	/// Sampson Error", ICCV 2023, Lemma 1:
+	/// J_uvw^+ = 1 / (d . (g_x x g_y)) * [ (g_y x d), (d x g_x) ], where g_x and g_y are the
+	/// rows of J_uvw. This is cheaper than forming J^T (J J^T)^-1 and exposes the rank
+	/// condition directly as the scalar triple product in the denominator.
+	/// </para>
+	/// </summary>
+	/// <param name="camRay">Unit bearing vector at which <paramref name="jUvw"/> was evaluated.</param>
+	/// <param name="jUvw">Jacobian d(x, y) / d(u, v, w).</param>
+	public static Matrix3x2d? CamRayFromImgJacobian(Vector3d camRay, Matrix2x3d jUvw)
+	{
+		Vector3d gX = jUvw.Row(0);
+		Vector3d gY = jUvw.Row(1);
+		double alpha = camRay.Dot(gX.Cross(gY));
+		// Since the projection is degree-zero homogeneous, g_x x g_y is parallel to the ray,
+		// so for a unit ray |alpha| == ||g_x x g_y|| and alpha^2 is exactly det(J J^T), the
+		// product of the squared singular values. Requiring
+		// |alpha| > kMinRelAlpha * (||g_x||^2 + ||g_y||^2) therefore rejects singular value
+		// ratios below kMinRelAlpha, i.e. condition numbers worse than ~1e6. Relative, so
+		// the test is invariant to focal length.
+		const double kMinRelAlpha = 1e-6;
+		if (!(Math.Abs(alpha) > kMinRelAlpha * (gX.SquaredNorm + gY.SquaredNorm)))
+		{
+			return null;
+		}
+
+		return Matrix3x2d.FromColumns(gY.Cross(camRay), camRay.Cross(gX)) / alpha;
+	}
+
+	/// <summary>
 	/// CameraModelCamFromImg: pixels to normalized camera coordinates (u, v), or null if
 	/// lifting fails. Limited to the forward hemisphere; see
 	/// <see cref="CameraModelCamRayFromImg"/>.
@@ -188,6 +258,8 @@ public static class CameraModels
 
 		public abstract bool ImgFromCam(ReadOnlySpan<double> parameters, double u, double v, double w, out double x, out double y, bool checkCheirality);
 
+		public abstract bool ImgFromCamWithJac(ReadOnlySpan<double> parameters, double u, double v, double w, out double x, out double y, Span<double> jUvw, bool checkCheirality);
+
 		public abstract bool CamFromImg(ReadOnlySpan<double> parameters, double x, double y, out double u, out double v);
 
 		public abstract bool CamRayFromImg(ReadOnlySpan<double> parameters, double x, double y, out double rx, out double ry, out double rz);
@@ -231,6 +303,9 @@ public static class CameraModels
 
 		public override bool ImgFromCam(ReadOnlySpan<double> parameters, double u, double v, double w, out double x, out double y, bool checkCheirality) =>
 			CameraModelMath.ImgFromCam<TModel>(parameters, u, v, w, out x, out y, checkCheirality);
+
+		public override bool ImgFromCamWithJac(ReadOnlySpan<double> parameters, double u, double v, double w, out double x, out double y, Span<double> jUvw, bool checkCheirality) =>
+			TModel.ImgFromCamWithJac(parameters, u, v, w, out x, out y, default, jUvw, checkCheirality);
 
 		public override bool CamFromImg(ReadOnlySpan<double> parameters, double x, double y, out double u, out double v) =>
 			TModel.CamFromImg(parameters, x, y, out u, out v);

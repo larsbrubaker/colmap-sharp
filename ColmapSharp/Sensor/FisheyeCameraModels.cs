@@ -20,7 +20,7 @@ namespace ColmapSharp.Sensor;
 /// Parameters: fx, fy, cx, cy, k1, k2, k3, k4.
 /// See http://docs.opencv.org/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
 /// </summary>
-public readonly struct OpenCVFisheyeCameraModel : IPerspectiveFisheyeCameraModel<OpenCVFisheyeCameraModel>, IDistortedCameraModel<OpenCVFisheyeCameraModel>
+public readonly partial struct OpenCVFisheyeCameraModel : IPerspectiveFisheyeCameraModel<OpenCVFisheyeCameraModel>, IDistortedCameraModel<OpenCVFisheyeCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.OpenCVFisheye;
@@ -138,7 +138,7 @@ public readonly struct OpenCVFisheyeCameraModel : IPerspectiveFisheyeCameraModel
 /// suitable for fish-eye cameras: OPENCV_FISHEYE with a single radial coefficient.
 /// Parameters: f, cx, cy, k.
 /// </summary>
-public readonly struct SimpleRadialFisheyeCameraModel : IPerspectiveFisheyeCameraModel<SimpleRadialFisheyeCameraModel>, IDistortedCameraModel<SimpleRadialFisheyeCameraModel>
+public readonly partial struct SimpleRadialFisheyeCameraModel : IPerspectiveFisheyeCameraModel<SimpleRadialFisheyeCameraModel>, IDistortedCameraModel<SimpleRadialFisheyeCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.SimpleRadialFisheye;
@@ -247,7 +247,7 @@ public readonly struct SimpleRadialFisheyeCameraModel : IPerspectiveFisheyeCamer
 /// suitable for fish-eye cameras: OPENCV_FISHEYE with two radial coefficients.
 /// Parameters: f, cx, cy, k1, k2.
 /// </summary>
-public readonly struct RadialFisheyeCameraModel : IPerspectiveFisheyeCameraModel<RadialFisheyeCameraModel>, IDistortedCameraModel<RadialFisheyeCameraModel>
+public readonly partial struct RadialFisheyeCameraModel : IPerspectiveFisheyeCameraModel<RadialFisheyeCameraModel>, IDistortedCameraModel<RadialFisheyeCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.RadialFisheye;
@@ -360,7 +360,7 @@ public readonly struct RadialFisheyeCameraModel : IPerspectiveFisheyeCameraModel
 /// with Distortion Models and Accuracy Evaluation", J Weng et al., TPAMI, 1992.
 /// Parameters: fx, fy, cx, cy, k1, k2, p1, p2, k3, k4, sx1, sy1.
 /// </summary>
-public readonly struct ThinPrismFisheyeCameraModel : IPerspectiveFisheyeCameraModel<ThinPrismFisheyeCameraModel>, IDistortedCameraModel<ThinPrismFisheyeCameraModel>
+public readonly partial struct ThinPrismFisheyeCameraModel : IPerspectiveFisheyeCameraModel<ThinPrismFisheyeCameraModel>, IDistortedCameraModel<ThinPrismFisheyeCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.ThinPrismFisheye;
@@ -488,7 +488,7 @@ public readonly struct ThinPrismFisheyeCameraModel : IPerspectiveFisheyeCameraMo
 /// Parameters: fx, fy, cx, cy, k0, k1, k2, k3, k4, k5, p0, p1, s0, s1, s2, s3.
 /// See https://facebookresearch.github.io/projectaria_tools/docs/tech_insights/camera_intrinsic_models#the-fisheyeradtanthinprism-fisheye624-model
 /// </summary>
-public readonly struct RadTanThinPrismFisheyeModel : IPerspectiveFisheyeCameraModel<RadTanThinPrismFisheyeModel>, IDistortedCameraModel<RadTanThinPrismFisheyeModel>
+public readonly partial struct RadTanThinPrismFisheyeModel : IPerspectiveFisheyeCameraModel<RadTanThinPrismFisheyeModel>, IDistortedCameraModel<RadTanThinPrismFisheyeModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.RadTanThinPrismFisheye;
@@ -631,7 +631,7 @@ public readonly struct RadTanThinPrismFisheyeModel : IPerspectiveFisheyeCameraMo
 /// fish-eye cameras whose distortion can be ignored or has been pre-corrected. One focal
 /// length. Parameters: f, cx, cy.
 /// </summary>
-public readonly struct SimpleFisheyeCameraModel : IPerspectiveFisheyeCameraModel<SimpleFisheyeCameraModel>
+public readonly partial struct SimpleFisheyeCameraModel : IPerspectiveFisheyeCameraModel<SimpleFisheyeCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.SimpleFisheye;
@@ -720,7 +720,7 @@ public readonly struct SimpleFisheyeCameraModel : IPerspectiveFisheyeCameraModel
 /// fish-eye cameras whose distortion can be ignored or has been pre-corrected. Two focal
 /// lengths. Parameters: fx, fy, cx, cy.
 /// </summary>
-public readonly struct FisheyeCameraModel : IPerspectiveFisheyeCameraModel<FisheyeCameraModel>
+public readonly partial struct FisheyeCameraModel : IPerspectiveFisheyeCameraModel<FisheyeCameraModel>
 {
 	/// <inheritdoc/>
 	public static CameraModelId ModelId => CameraModelId.Fisheye;
