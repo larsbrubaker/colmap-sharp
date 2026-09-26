@@ -33,7 +33,8 @@ namespace ColmapSharp.Estimators.Solvers;
 /// <summary>
 /// EPNP solver for the PNP (Perspective-N-Point) problem. Port of colmap::EPNPEstimator.
 /// </summary>
-public readonly struct EPNPEstimator : IEstimator<Point2DWithRay, Vector3d, Matrix3x4d>
+public readonly struct EPNPEstimator
+	: IEstimator<Point2DWithRay, Vector3d, Matrix3x4d>, ILocalEstimator<Point2DWithRay, Vector3d, Matrix3x4d>
 {
 	private readonly ImgFromCamFunc _imgFromCamFunc;
 
@@ -65,6 +66,13 @@ public readonly struct EPNPEstimator : IEstimator<Point2DWithRay, Vector3d, Matr
 
 		camsFromWorld.Add(camFromWorld);
 	}
+
+	/// <summary>
+	/// LO-RANSAC's local estimate (EstimateAbsolutePose uses EPnP as P3P's local optimizer):
+	/// EPNPEstimator has no Refine, so this re-estimates from the inliers.
+	/// </summary>
+	public void EstimateLocal(ReadOnlySpan<Point2DWithRay> points2D, ReadOnlySpan<Vector3d> points3D, in Matrix3x4d initialModel, List<Matrix3x4d> camsFromWorld) =>
+		Estimate(points2D, points3D, camsFromWorld);
 
 	/// <summary>
 	/// Calculate the squared reprojection error given a set of 2D-3D point correspondences

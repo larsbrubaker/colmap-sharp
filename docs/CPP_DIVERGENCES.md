@@ -1026,3 +1026,40 @@ before the reset the port reproduced pycolmap's 155 and 30. `SiftCancellationTes
 a pre-cancelled token throws at the first check before any allocation; a cancel at a check in
 the middle of an image throws at that check; runs with a live token, with no token, and on the
 same extractor after a cancel give bit-identical features.
+
+## 45. Covariance factors a dense Jacobian instead of Ceres' sparse QR
+
+**What differs.** COLMAP's pose refinements (`RefineAbsolutePose`,
+`RefineGeneralizedAbsolutePose`) call `ceres::Covariance` with default options: SPARSE_QR,
+which factors the problem's sparse tangent-space Jacobian with a column-pivoting sparse QR
+(SuiteSparseQR or Eigen's `SparseQR` with COLAMD ordering) and reads (J'J)^-1 from R. The
+port (`Solver/Covariance.cs`) builds the same Jacobian densely (loss function applied,
+constant blocks and blocks no residual uses without columns, as in Ceres' ComputeCovarianceSparsity) and factors it with the dense column-pivoting Householder
+QR of `LinearAlgebra/ColPivHouseholderQR.cs`; rank deficiency (by that QR's rank threshold)
+makes `Compute` fail, as in Ceres. The covariance is the same matrix up to round-off.
+
+**Why.** SuiteSparseQR is GPL/LGPL and Eigen's sparse QR is MPL-2.0 (CLAUDE.md contract 2).
+COLMAP's covariance callers are single poses (plus a camera) against their observations, a
+few columns, where dense is exact enough and fast. The Phase 8 BA covariance
+(`estimators/covariance`) is COLMAP's own Schur-based code and does not use this.
+
+**Evidence.** `CovarianceTests` (the SPARSE_QR legs of Ceres' covariance_test.cc
+NormalBehavior, ManifoldInTangentSpace and ManifoldInTangentSpaceWithConstantBlocks, at
+Ceres' 1e-5 tolerance) and the covariance checks of `PoseEstimationTests` pass.
+
+## 46. IsPanoramicRig compares rig camera origins to the smallest camera index
+
+**What differs.** `IsPanoramicRig` (estimators/generalized_pose.cc) decides whether all
+cameras used by a set of correspondences share one optical center: it puts the camera
+indices in a `FlatHashSet`, takes the set's first element as the reference, and checks
+every other camera's origin with `isApprox(reference, 1e-6)`. The set's iteration order is
+unspecified. The port (`Estimators/GeneralizedPoseEstimation.cs`) takes the smallest camera
+index as the reference.
+
+**Why.** Hash iteration order is not reproducible across containers (CLAUDE.md, hash
+container rule). The choice only matters when origins agree to about 1e-6 relative with some
+reference but not another (isApprox is not transitive), i.e. never for a real rig, where
+cameras are either co-centered (panoramic) or centimeters apart.
+
+**Evidence.** `GeneralizedPoseEstimationTests` (generalized_pose_test.cc 1:1), whose
+EstimateGeneralizedRelativePose_Nominal covers panoramic and non-panoramic rigs, passes.

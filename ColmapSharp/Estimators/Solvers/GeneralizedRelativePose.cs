@@ -108,7 +108,8 @@ public readonly struct GR6PEstimator : IEstimator<GrnpObservation, GrnpObservati
 /// Kneip's original implementation in OpenGV licensed under the BSD license. The model is
 /// rig2_from_rig1. Port of colmap::GR8PEstimator.
 /// </summary>
-public readonly struct GR8PEstimator : IEstimator<GrnpObservation, GrnpObservation, Rigid3d>
+public readonly struct GR8PEstimator
+	: IEstimator<GrnpObservation, GrnpObservation, Rigid3d>, ILocalEstimator<GrnpObservation, GrnpObservation, Rigid3d>
 {
 	/// <summary>
 	/// The minimum number of samples needed to estimate a model. Note that in theory the
@@ -126,6 +127,13 @@ public readonly struct GR8PEstimator : IEstimator<GrnpObservation, GrnpObservati
 	{
 		GR8PSolver.Estimate(points1, points2, rigs2FromRigs1);
 	}
+
+	/// <summary>
+	/// LO-RANSAC's local estimate (the generalized relative pose estimators use GR8P as GR6P's
+	/// local optimizer): GR8PEstimator has no Refine, so this re-estimates from the inliers.
+	/// </summary>
+	public void EstimateLocal(ReadOnlySpan<GrnpObservation> points1, ReadOnlySpan<GrnpObservation> points2, in Rigid3d initialModel, List<Rigid3d> rigs2FromRigs1) =>
+		Estimate(points1, points2, rigs2FromRigs1);
 
 	/// <summary>
 	/// Calculate the squared tangent Sampson error (in pixels) between corresponding points.

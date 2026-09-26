@@ -56,7 +56,7 @@ Estimators implement `IEstimator<TX,TY,TModel>` (+ `ILocalEstimator` for LO-RANS
 `readonly struct`s — see `Optim/Estimator.cs` and `Estimators/Solvers/SimilarityTransform.cs`.
 `LoRansac.Estimate` hides (does not override) `Ransac.Estimate`: call it on the LoRansac type.
 Open estimators: `two_view_geometry`'s `EstimateRigTwoViewGeometries` (+ its `Nominal` test;
-needs `generalized_pose`), `pose`, `generalized_pose`, `triangulation`, `alignment`,
+`generalized_pose` is now on main), `alignment`,
 `rotation_averaging`, `global_positioning`,
 `gravity_refinement`, `view_graph_calibration`.
 
@@ -79,7 +79,7 @@ Cancellation is checked between iterations only (like COLMAP). Optional: Vector1
 `Jet` (IEEE-exact, no FMA) need a CLAUDE.md rule clarification first.
 
 ### Phase 8 — Bundle adjustment
-Done: default Ceres bundle adjuster (`Estimators/BundleAdjustment*.cs`), cost functions, 7-value
+Done: `ceres::Covariance` subset (dense QR, `Solver/Covariance.cs`; divergence 45), default Ceres bundle adjuster (`Estimators/BundleAdjustment*.cs`), cost functions, 7-value
 pose blocks. Open: `CreatePosePriorBundleAdjuster` / `PosePriorBundleAdjuster` (needs
 `estimators/alignment`'s `AlignReconstructionToPosePriors`) with PosePriorBundleAdjusterBackendTest.Nominal
 and the five PosePriorBundleAdjuster.* cases; BundleAdjusterBackendTest.Nominal,
