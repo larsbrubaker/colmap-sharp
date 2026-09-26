@@ -1561,6 +1561,65 @@ so on flat grids the effect is provably zero.
 cases (boundary_weight 1000), match pycolmap's positions and faces byte for byte
 (`MeshSimplificationOracleTests`).
 
+## 74. PoissonRecon arithmetic is strict IEEE, not -ffast-math
+
+**What differs.** COLMAP compiles its vendored PoissonRecon with `-funroll-loops -ffast-math`
+(`src/thirdparty/PoissonRecon/CMakeLists.txt`, non-MSVC). Fast-math lets the compiler
+reassociate sums, contract multiply-adds, replace divisions by reciprocal multiplies and
+assume no NaN/Inf, so the numbers the pycolmap wheel's `poisson_meshing` produces depend on
+that compiler's choices. The port (`ColmapSharp/Mvs/PoissonRecon/`) performs every operation
+as written in the C++ source, in source order, with no contraction.
+
+**Why.** CLAUDE.md's "No FMA" rule and cross-platform determinism: fast-math output is not a
+property of PoissonRecon but of one compiler build, and cannot be reproduced from managed
+code. Matching the source's arithmetic is the reproducible target.
+
+**Evidence.** The building blocks are pinned bit for bit against the same templates built
+with `-ffp-contract=off` and without fast-math (`oracle/poisson_bspline_harness.cc`,
+`PoissonBSplineOracleTests`). The meshing pipeline as a whole is Tier C against pycolmap
+(poisson_meshing_test.cc is itself an outcome test).
+
+## 75. The Poisson normal transform uses a correctly rounded pow(x, 1./3), not libm's
+
+**What differs.** PoissonRecon scales the normal transform by `pow( fabs( det ) , 1./Dim )`
+(`TransformedInputOrientedSampleStream`, Reconstructors.streams.h), taking `pow` from the
+platform libm. The port computes the correctly rounded double of x^fl(1/3) in managed code
+(`Mvs/PoissonRecon/PowOneThird.cs`: a double-double Newton step on the cube root plus the
+x^-(1/3 - fl(1/3)) correction). Apple's libm, which the macOS pycolmap wheel uses, is not
+correctly rounded for every input, so on those inputs the two differ in the last bit of the
+double (and possibly of the float the C++ casts it to).
+
+**Why.** .NET's `Math.Pow` is the host's libm (and browser-wasm has its own), so using it
+would make the unit-cube normals depend on the platform. A correctly rounded result is the
+one value every platform can reproduce, and it equals Apple's wherever Apple's is correctly
+rounded.
+
+**Evidence.** `PoissonTreeOracleTests.PowOneThird_IsCorrectlyRoundedAndMatchesLibmWhereLibmIs`:
+over 4000 float arguments spanning 2^-80..2^80, the port matches the fixture's 60-digit
+correctly rounded values in all cases, and Apple's libm in all but the 7 where libm is off by
+one ulp. For COLMAP's inputs the argument is the determinant of the unit-cube scaling,
+typically far from those cases, and the tree-stage fixtures match bit for bit.
+
+## 76. Poisson meshing runs in memory; the file-to-file call is a wrapper
+
+**What differs.** COLMAP's `PoissonMeshing(options, input_path, output_path)` hands PoissonRecon
+a PLY file and gets a PLY file back (`RunPoissonRecon` / `RunSurfaceTrimmer` parse command
+lines and stream the files). The port's core takes the points, normals and optional colors
+as float arrays (`Mvs/PoissonRecon/PoissonSampleSet.Build` is the first stage) and will
+return an in-memory mesh with per-vertex colors and optional density. A thin wrapper with
+COLMAP's file-to-file signature (reading and writing PLY through `Util/Ply*`) serves the
+ported poisson_meshing_test.cc cases. The stages take a `CancellationToken` and report
+`IProgress<PoissonProgress>` (tree build, density, splat, solve per depth, level set, trim),
+which the C++ has no equivalent for.
+
+**Why.** MatterCAD reconstructs from memory and must show progress and let the user cancel
+(CLAUDE.md); writing temporary PLY files would add I/O and a browser-wasm file-system
+dependency for nothing. The numbers are unchanged: the samples are consumed in the same
+order the PLY stream would deliver them, as float (PoissonRecon's Real).
+
+**Evidence.** `PoissonTreeOracleTests` feeds the harness's points through the in-memory API
+and matches PoissonRecon's tree and accumulated samples bit for bit.
+
 ## 77. ComputeNormalizedMinGraphCut partitions with our own multilevel bisection, not METIS
 
 **What differs.** COLMAP's `ComputeNormalizedMinGraphCut` (math/graph_cut.cc) calls
@@ -1885,3 +1944,36 @@ sequential and parallel runs to agree, and for cancellation through `Cancellatio
 **Evidence.** `UndistortersTests.COLMAPUndistorter_StopsPendingWork`,
 `CSharpOnly_CancellationTokenStopsWithoutThrowing`, `CSharpOnly_ThreadCountDoesNotChangeImages`
 and `BaseControllerTests.BaseController_CancellationTokenStops` pass.
+
+## 106. Poisson splatting runs sequentially in sample order
+
+**What differs.** PoissonRecon splats the samples' normals (`setInterpolatedDataField`) in a
+`ThreadPool::ParallelFor` over samples, adding into shared per-node sums with atomic float
+adds and into per-thread depth/weight sums. COLMAP's `PoissonMeshing` runs PoissonRecon on
+every hardware thread by default (`num_threads = -1`), so the order of those float additions,
+and with it the last bits of the normal field, varies from run to run; it also decides which
+thread creates a node first and so the node numbering. The port
+(`Mvs/PoissonRecon/PoissonSplat.cs`) splats sequentially in sample order, which is what
+PoissonRecon does with one thread.
+
+**Why.** CLAUDE.md requires deterministic results, and there is no fixed multi-threaded
+order to match. The single-threaded order is the one reproducible reference.
+
+**Evidence.** `PoissonTreeOracleTests.DensityStage_MatchesHarness` (density3, density5,
+density6) matches a single-threaded run of the vendored C++ bit for bit: the normal field,
+the sample depth/weight sums, the colour field and the node numbering.
+
+## 116. PoissonRecon's log( float ) is the double logarithm rounded to float
+
+**What differs.** `_getSampleDepthAndWeight` calls `log` on float ratios, which resolves to
+the float overload (`logf`) of the platform libm. The port computes
+`(float)Math.Log((double)x)` (`PoissonSplat.LogF`). `Math.Log` is the host's libm as well, but
+its error is far below a float ulp, so the result is the correctly rounded float except when
+the exact logarithm lies within about 2^-29 relative of a float rounding boundary.
+
+**Why.** .NET's `MathF.Log` maps to the host's `logf`, whose accuracy varies by platform and
+on browser-wasm; the rounded double logarithm gives the same float on every platform in all
+but those rare cases.
+
+**Evidence.** `PoissonTreeOracleTests.LogF_MatchesLibm`: over 4000 float arguments spanning
+2^-40..2^40, the result equals Apple's `logf` (the oracle's) bit for bit.
