@@ -33,8 +33,10 @@ public static partial class TextureMapping
 	{
 		private readonly TriangleBvh tree;
 
-		/// <summary>Port of OcclusionTester::Build.</summary>
-		public OcclusionTester(MeshGeometry geometry)
+		/// <summary>
+		/// Port of OcclusionTester::Build, on up to <paramref name="numThreads"/> threads.
+		/// </summary>
+		public OcclusionTester(MeshGeometry geometry, int numThreads, CancellationToken cancellationToken)
 		{
 			float[] v = geometry.Vertices;
 			int[] f = geometry.Faces;
@@ -74,7 +76,7 @@ public static partial class TextureMapping
 				faceIds.Add(i);
 			}
 
-			tree = new TriangleBvh(corners.ToArray(), faceIds.ToArray());
+			tree = new TriangleBvh(corners.ToArray(), faceIds.ToArray(), numThreads, cancellationToken);
 		}
 
 		/// <summary>No triangle blocks the vertex (see <see cref="BlockerState"/>).</summary>
@@ -159,7 +161,7 @@ public static partial class TextureMapping
 			return viewPerFace;
 		}
 
-		var tester = new OcclusionTester(geometry);
+		var tester = new OcclusionTester(geometry, options.NumThreads, cancellationToken);
 		var views = new ViewData[numImages];
 		for (int ii = 0; ii < numImages; ii++)
 		{
@@ -185,6 +187,13 @@ public static partial class TextureMapping
 		var bestScore = new double[numFaces];
 		Array.Fill(bestScore, -1.0);
 		var vertexStates = new long[geometry.Vertices.Length / 3];
+		// Progress counts finished (image, chunk) pairs. The count and the report happen
+		// under one lock, so reported fractions only grow; reports are thinned to steps of
+		// about 1/1000 of the stage so a host's UI is not flooded.
+		var progressLock = new object();
+		long chunksDone = 0;
+		long totalChunks = (long)numImages * numChunks;
+		long reportEvery = Math.Max(1, totalChunks / 1000);
 		for (int ii = 0; ii < numImages; ii++)
 		{
 			int image = ii;
@@ -205,10 +214,19 @@ public static partial class TextureMapping
 						positive[(long)fi * words + (image >> 6)] |= 1UL << (image & 63);
 					}
 				}
-			});
 
-			// Reported from this thread after each image, so the fractions only grow.
-			progress?.Report(ProgressPrepared + (ProgressViewsSelected - ProgressPrepared) * (ii + 1) / numImages);
+				if (progress != null)
+				{
+					lock (progressLock)
+					{
+						chunksDone++;
+						if (chunksDone % reportEvery == 0 || chunksDone == totalChunks)
+						{
+							progress.Report(ProgressPrepared + (ProgressViewsSelected - ProgressPrepared) * chunksDone / totalChunks);
+						}
+					}
+				}
+			});
 		}
 
 		for (int iter = 0; iter < options.ViewSelectionSmoothingIterations; iter++)

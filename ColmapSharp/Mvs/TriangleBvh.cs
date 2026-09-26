@@ -17,8 +17,10 @@
 // Layout: flat arrays in depth-first order. An inner node's left child is the next node and
 // its right child's index is stored; each subtree owns a fixed block of 2n - 1 node slots
 // (n = its triangle count), so subtrees can be built in parallel and still land in the same
-// slots (unused slots are left over where SAH stops early). Triangles are reordered so every
-// leaf covers a contiguous range, and stored as corner plus edges in double.
+// slots (unused slots are left over where SAH stops early). The build uses at most the
+// caller's thread count and checks its cancellation token at every subtree. Triangles are
+// reordered so every leaf covers a contiguous range, and stored as corner plus edges in
+// double.
 //
 // Determinism: a query's answer is a yes/no over all triangles. The node boxes only prune
 // (they are padded and rounded outward, so they never drop a triangle the exact test hits),
@@ -67,8 +69,15 @@ public sealed class TriangleBvh
 	/// <summary>
 	/// Builds the tree. <paramref name="triangleCorners"/> holds nine floats per triangle
 	/// (x, y, z of each corner) and <paramref name="triangleIds"/> the id reported for each.
+	/// Large subtrees are built on up to <paramref name="numThreads"/> threads (-1 or 0: all
+	/// available, 1: sequential); the tree is the same for any thread count.
+	/// <paramref name="cancellationToken"/> is checked between subtrees.
 	/// </summary>
-	public TriangleBvh(ReadOnlySpan<float> triangleCorners, ReadOnlySpan<int> triangleIds)
+	public TriangleBvh(
+		ReadOnlySpan<float> triangleCorners,
+		ReadOnlySpan<int> triangleIds,
+		int numThreads = -1,
+		CancellationToken cancellationToken = default)
 	{
 		int count = triangleIds.Length;
 		if (triangleCorners.Length != 9 * count)
@@ -100,7 +109,9 @@ public sealed class TriangleBvh
 		nodeCount = new int[maxNodes];
 		if (count > 0)
 		{
-			new Builder(this, triBounds, centroids, order).Build(0, 0, count, 0);
+			var builder = new Builder(this, triBounds, centroids, order, Util.Threading.GetEffectiveNumThreads(numThreads), cancellationToken);
+			builder.Build(0, 0, count, 0);
+			ParallelSplits = builder.ParallelSplits;
 		}
 
 		tris = new double[TriStride * count];
@@ -130,6 +141,16 @@ public sealed class TriangleBvh
 
 	/// <summary>Number of triangles in the tree.</summary>
 	public int Count => ids.Length;
+
+	/// <summary>For tests: how many splits built their two subtrees concurrently.</summary>
+	internal int ParallelSplits { get; }
+
+	/// <summary>
+	/// For tests: the whole layout (node boxes, node links and counts, triangle ids in leaf
+	/// order), which must not depend on the thread count.
+	/// </summary>
+	internal (float[] NodeBounds, int[] NodeFirst, int[] NodeCount, int[] Ids) Layout =>
+		(nodeBounds, nodeFirst, nodeCount, ids);
 
 	/// <summary>
 	/// Whether the segment from the origin to the end point crosses a triangle whose id is
@@ -351,11 +372,27 @@ public sealed class TriangleBvh
 
 	// The build state shared by all subtrees. Each subtree touches only its own range of
 	// `order` and its own block of node slots, so subtrees may be built concurrently.
-	private sealed class Builder(TriangleBvh tree, double[] triBounds, double[] centroids, int[] order)
+	//
+	// Parallelism: a split of a large subtree forks only while a spare worker is available
+	// (numThreads - 1 of them, shared by the whole build), so at most numThreads threads
+	// build at once; otherwise the two halves are built one after the other.
+	private sealed class Builder(
+		TriangleBvh tree,
+		double[] triBounds,
+		double[] centroids,
+		int[] order,
+		int numThreads,
+		CancellationToken cancellationToken)
 	{
+		private int spareWorkers = numThreads - 1;
+		private int parallelSplits;
+
+		public int ParallelSplits => parallelSplits;
+
 		// Builds the subtree over order[start, end) into node slots [node, node + 2n - 1).
 		public void Build(int node, int start, int end, int depth)
 		{
+			cancellationToken.ThrowIfCancellationRequested();
 			Span<double> box = stackalloc double[6];
 			Span<double> cbox = stackalloc double[6];
 			ResetBox(box);
@@ -399,17 +436,42 @@ public sealed class TriangleBvh
 			int right = left + (2 * (mid - start) - 1);
 			tree.nodeFirst[node] = right;
 			tree.nodeCount[node] = -(axis + 1);
-			if (count >= ParallelBuildThreshold)
+			if (count >= ParallelBuildThreshold && TryTakeWorker())
 			{
-				Parallel.Invoke(
-					() => Build(left, start, mid, depth + 1),
-					() => Build(right, mid, end, depth + 1));
+				Interlocked.Increment(ref parallelSplits);
+				try
+				{
+					Parallel.Invoke(
+						() => Build(left, start, mid, depth + 1),
+						() => Build(right, mid, end, depth + 1));
+				}
+				catch (AggregateException e)
+				{
+					// Surface cancellation (or the first failure) as itself, not wrapped.
+					cancellationToken.ThrowIfCancellationRequested();
+					System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(e.InnerExceptions[0]).Throw();
+				}
+				finally
+				{
+					Interlocked.Increment(ref spareWorkers);
+				}
 			}
 			else
 			{
 				Build(left, start, mid, depth + 1);
 				Build(right, mid, end, depth + 1);
 			}
+		}
+
+		private bool TryTakeWorker()
+		{
+			if (Interlocked.Decrement(ref spareWorkers) >= 0)
+			{
+				return true;
+			}
+
+			Interlocked.Increment(ref spareWorkers);
+			return false;
 		}
 
 		private void MakeLeaf(int node, int start, int count)

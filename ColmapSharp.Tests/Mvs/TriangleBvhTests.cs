@@ -126,6 +126,56 @@ public class TriangleBvhTests
 		await Assert.That(hits).IsLessThan(300);
 	}
 
+	// Random small triangles; the build tests use 40,000, above the parallel threshold (32,768).
+	private static (float[] Corners, int[] Ids) RandomTriangles(int count, int seed)
+	{
+		var random = new Random(seed);
+		float Uniform(float lo, float hi) => lo + (hi - lo) * (float)random.NextDouble();
+		var corners = new float[9 * count];
+		var ids = new int[count];
+		for (int i = 0; i < count; i++)
+		{
+			float cx = Uniform(-5, 5), cy = Uniform(-5, 5), cz = Uniform(-5, 5);
+			for (int k = 0; k < 9; k++)
+			{
+				corners[9 * i + k] = (k % 3 == 0 ? cx : k % 3 == 1 ? cy : cz) + Uniform(-0.05f, 0.05f);
+			}
+
+			ids[i] = i;
+		}
+
+		return (corners, ids);
+	}
+
+	[Test]
+	public async Task Build_ParallelLayoutMatchesSequential()
+	{
+		(float[] corners, int[] ids) = RandomTriangles(40_000, 7);
+		var sequential = new TriangleBvh(corners, ids, numThreads: 1);
+		await Assert.That(sequential.ParallelSplits).IsEqualTo(0);
+
+		var expected = sequential.Layout;
+		foreach (int threads in new[] { 2, 4, -1, -1, -1 })
+		{
+			var parallel = new TriangleBvh(corners, ids, threads);
+			await Assert.That(parallel.ParallelSplits).IsGreaterThan(0);
+			var actual = parallel.Layout;
+			await Assert.That(actual.NodeBounds.AsSpan().SequenceEqual(expected.NodeBounds)).IsTrue();
+			await Assert.That(actual.NodeFirst.AsSpan().SequenceEqual(expected.NodeFirst)).IsTrue();
+			await Assert.That(actual.NodeCount.AsSpan().SequenceEqual(expected.NodeCount)).IsTrue();
+			await Assert.That(actual.Ids.AsSpan().SequenceEqual(expected.Ids)).IsTrue();
+		}
+	}
+
+	[Test]
+	public async Task Build_HonorsCancellation()
+	{
+		(float[] corners, int[] ids) = RandomTriangles(40_000, 8);
+		using var cts = new CancellationTokenSource();
+		cts.Cancel();
+		await Assert.That(() => new TriangleBvh(corners, ids, 4, cts.Token)).Throws<OperationCanceledException>();
+	}
+
 	[Test]
 	public async Task AnyHit_CoincidentCentroidsStillBuild()
 	{
@@ -296,6 +346,10 @@ public class TriangleBvhTests
 		TextureMapping.MeshTextureMapping(mesh, images, new MeshTextureMappingOptions { NumThreads = -1 }, progress);
 
 		await Assert.That(progress.Values.Count).IsGreaterThan(3);
+
+		// With a single image, view selection still reports per chunk of faces (8 here).
+		int viewSelectionReports = progress.Values.Count(v => v > 0.05 && v < 0.7);
+		await Assert.That(viewSelectionReports).IsGreaterThanOrEqualTo(5);
 		for (int i = 1; i < progress.Values.Count; i++)
 		{
 			await Assert.That(progress.Values[i]).IsGreaterThanOrEqualTo(progress.Values[i - 1]);
