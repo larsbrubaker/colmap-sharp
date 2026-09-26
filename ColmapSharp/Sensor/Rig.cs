@@ -9,10 +9,17 @@
 // C++'s std::map becomes a SortedDictionary with the same (type, id) key order, so
 // NonRefSensors and the printed form iterate as COLMAP's do. C++ hands out Rigid3d& and
 // std::optional<Rigid3d>& for in-place edits; Rigid3d is a readonly struct here, so edits
-// go through SetSensorFromRig / ResetSensorFromRig and NonRefSensors is read-only. Bundle
-// adjustment edits sensor_from_rig in place through Ceres parameter blocks
-// (bundle_adjustment_ceres.cc); Phase 8 gives it mutable parameter storage rather than
-// references into this dictionary.
+// go through SetSensorFromRig / ResetSensorFromRig and NonRefSensors is a read-only view.
+// Bundle adjustment edits sensor_from_rig in place through a Ceres parameter block
+// (bundle_adjustment_ceres.cc registers `sensor_from_rig.params.data()` as one 7-value
+// block with the EigenQuaternion x Euclidean<3> product manifold, and normalizes its
+// quaternion in place first). In C++ that address is stable for the sensor's lifetime in
+// the rig: std::map nodes do not move, and assigning or resetting the std::optional reuses
+// its inline storage. Here each non-reference sensor owns one Geometry/Rigid3dStorage from
+// AddSensor on, plus a has-value flag; SetSensorFromRig / ResetSensorFromRig write into it
+// and flip the flag, never replacing it, and SensorFromRigStorage hands it to the
+// optimizer. Contract: while a problem holds the block, do not reset the transform (the
+// solver would go on refining the stale values of an unset transform).
 //
 // Rig is a class (C++ copies it by value) with COLMAP's value equality; copying a Rig
 // reference shares it.
@@ -37,8 +44,14 @@ namespace ColmapSharp.Sensor;
 /// </summary>
 public sealed class Rig : IEquatable<Rig>
 {
-	// sensor_from_rig transformations of the non-reference sensors; null where unknown.
-	private readonly SortedDictionary<SensorId, Rigid3d?> _sensorsFromRig = [];
+	// sensor_from_rig transformations of the non-reference sensors, including unknown ones.
+	private readonly SortedDictionary<SensorId, SensorFromRigSlot> _sensorsFromRig = [];
+
+	/// <summary>Creates an empty rig.</summary>
+	public Rig()
+	{
+		NonRefSensors = new NonRefSensorsView(_sensorsFromRig);
+	}
 
 	/// <summary>Unique identifier of the rig; <see cref="InvalidRigId"/> until set.</summary>
 	public uint RigId { get; set; } = InvalidRigId;
@@ -65,7 +78,7 @@ public sealed class Rig : IEquatable<Rig>
 	}
 
 	/// <summary>All sensors except the reference sensor, in (type, id) order.</summary>
-	public IReadOnlyDictionary<SensorId, Rigid3d?> NonRefSensors => _sensorsFromRig;
+	public IReadOnlyDictionary<SensorId, Rigid3d?> NonRefSensors { get; }
 
 	/// <summary>
 	/// Adds the reference sensor. Must be called before all <see cref="AddSensor"/> calls.
@@ -81,7 +94,9 @@ public sealed class Rig : IEquatable<Rig>
 	{
 		Check.Ge(NumSensors, 1, "The reference sensor needs to be added first before other sensors.");
 		Check.That(!HasSensor(sensorId), $"Sensor ({sensorId.Type.ToColmapString()}, {sensorId.Id}) is inserted twice into the rig");
-		_sensorsFromRig.Add(sensorId, sensorFromRig);
+		var slot = new SensorFromRigSlot();
+		slot.Set(sensorFromRig);
+		_sensorsFromRig.Add(sensorId, slot);
 	}
 
 	/// <summary>Whether the sensor (reference or not) is in the rig.</summary>
@@ -93,6 +108,22 @@ public sealed class Rig : IEquatable<Rig>
 	/// <summary>Whether a non-reference sensor has a known sensor_from_rig transform.</summary>
 	public bool HasSensorFromRig(SensorId sensorId) =>
 		sensorId != RefSensorId && HasSensor(sensorId) && _sensorsFromRig[sensorId].HasValue;
+
+	/// <summary>
+	/// The mutable storage behind a non-reference sensor's sensor_from_rig, for an optimizer
+	/// to register as one 7-value parameter block and write into (see the file header). The
+	/// same object for the sensor's lifetime in the rig. Throws like SensorFromRig.
+	/// </summary>
+	public Rigid3dStorage SensorFromRigStorage(SensorId sensorId)
+	{
+		SensorFromRigSlot slot = FindSlotOrThrow(sensorId);
+		if (!slot.HasValue)
+		{
+			throw new InvalidOperationException("bad optional access");
+		}
+
+		return slot.Storage;
+	}
 
 	/// <summary>All sensor ids, including the reference sensor, in (type, id) order.</summary>
 	public SortedSet<SensorId> SensorIds()
@@ -119,8 +150,7 @@ public sealed class Rig : IEquatable<Rig>
 	/// <summary>Sets (or, with null, clears) a non-reference sensor's sensor_from_rig transform.</summary>
 	public void SetSensorFromRig(SensorId sensorId, Rigid3d? sensorFromRig)
 	{
-		FindSensorFromRigOrThrow(sensorId);
-		_sensorsFromRig[sensorId] = sensorFromRig;
+		FindSlotOrThrow(sensorId).Set(sensorFromRig);
 	}
 
 	/// <summary>Clears a non-reference sensor's sensor_from_rig transform.</summary>
@@ -132,7 +162,9 @@ public sealed class Rig : IEquatable<Rig>
 		var copy = new Rig { RigId = RigId, RefSensorId = RefSensorId };
 		foreach (var (sensorId, sensorFromRig) in _sensorsFromRig)
 		{
-			copy._sensorsFromRig.Add(sensorId, sensorFromRig);
+			var slot = new SensorFromRigSlot();
+			slot.Set(sensorFromRig.Value);
+			copy._sensorsFromRig.Add(sensorId, slot);
 		}
 
 		return copy;
@@ -153,7 +185,7 @@ public sealed class Rig : IEquatable<Rig>
 		// is std::optional's (both empty, or both set and Rigid3d == holds).
 		foreach (var (mine, theirs) in _sensorsFromRig.Zip(other._sensorsFromRig))
 		{
-			if (mine.Key != theirs.Key || mine.Value != theirs.Value)
+			if (mine.Key != theirs.Key || mine.Value.Value != theirs.Value.Value)
 			{
 				return false;
 			}
@@ -192,10 +224,71 @@ public sealed class Rig : IEquatable<Rig>
 	private static string FormatSensor(SensorId sensorId) =>
 		string.Create(CultureInfo.InvariantCulture, $"({sensorId.Type.ToColmapString()}, {sensorId.Id})");
 
-	private Rigid3d? FindSensorFromRigOrThrow(SensorId sensorId)
+	private Rigid3d? FindSensorFromRigOrThrow(SensorId sensorId) => FindSlotOrThrow(sensorId).Value;
+
+	private SensorFromRigSlot FindSlotOrThrow(SensorId sensorId)
 	{
 		Check.That(sensorId != RefSensorId, "The reference sensor does not have a SensorFromRig transformation, which is fixed to identity");
-		Check.That(_sensorsFromRig.TryGetValue(sensorId, out Rigid3d? sensorFromRig), $"Sensor ({sensorId.Type.ToColmapString()}, {sensorId.Id}) not found in the rig");
-		return sensorFromRig;
+		Check.That(_sensorsFromRig.TryGetValue(sensorId, out SensorFromRigSlot? slot), $"Sensor ({sensorId.Type.ToColmapString()}, {sensorId.Id}) not found in the rig");
+		return slot!;
+	}
+
+	// C++'s std::optional<Rigid3d> map value: storage that lives as long as the entry, and
+	// whether it holds a transform.
+	private sealed class SensorFromRigSlot
+	{
+		public Rigid3dStorage Storage { get; } = new();
+
+		public bool HasValue { get; private set; }
+
+		public Rigid3d? Value => HasValue ? Storage.Value : null;
+
+		// Writes into the existing storage (a reset keeps the stale values, like an
+		// optimizer's block would), so the Params array never changes identity.
+		public void Set(Rigid3d? value)
+		{
+			HasValue = value.HasValue;
+			if (value.HasValue)
+			{
+				Storage.Value = value.Value;
+			}
+		}
+	}
+
+	// NonRefSensors: the slots seen as COLMAP's std::map<sensor_t, std::optional<Rigid3d>>.
+	private sealed class NonRefSensorsView(SortedDictionary<SensorId, SensorFromRigSlot> slots)
+		: IReadOnlyDictionary<SensorId, Rigid3d?>
+	{
+		public int Count => slots.Count;
+
+		public IEnumerable<SensorId> Keys => slots.Keys;
+
+		public IEnumerable<Rigid3d?> Values => slots.Values.Select(slot => slot.Value);
+
+		public Rigid3d? this[SensorId key] => slots[key].Value;
+
+		public bool ContainsKey(SensorId key) => slots.ContainsKey(key);
+
+		public bool TryGetValue(SensorId key, out Rigid3d? value)
+		{
+			if (slots.TryGetValue(key, out SensorFromRigSlot? slot))
+			{
+				value = slot.Value;
+				return true;
+			}
+
+			value = null;
+			return false;
+		}
+
+		public IEnumerator<KeyValuePair<SensorId, Rigid3d?>> GetEnumerator()
+		{
+			foreach (var (key, slot) in slots)
+			{
+				yield return new KeyValuePair<SensorId, Rigid3d?>(key, slot.Value);
+			}
+		}
+
+		System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 	}
 }

@@ -303,8 +303,9 @@ public class FrameTests
 	}
 
 	// C#-only (no frame_test.cc counterpart): pins the in-place pose storage that Phase 8's
-	// bundle adjustment writes through (Frame.cs header). The arrays stay the same objects
-	// across pose resets, and a write into them is the frame's new pose.
+	// bundle adjustment writes through (Frame.cs header). Params is one 7-value array in
+	// colmap::Rigid3d::params order that stays the same object across pose resets, and a
+	// write into it is the frame's new pose.
 	[Test]
 	public async Task RigFromWorldStorage_IsStableAndWritable()
 	{
@@ -312,21 +313,25 @@ public class FrameTests
 		await Assert.That(() => frame.RigFromWorldStorage).ThrowsException();
 		frame.SetRigFromWorld(new Rigid3d());
 		Rigid3dStorage storage = frame.RigFromWorldStorage;
-		double[] rotation = storage.Rotation;
-		double[] translation = storage.Translation;
+		double[] parameters = storage.Params;
 
-		// Eigen coeffs() order: [qx, qy, qz, qw].
-		await Assert.That(rotation.SequenceEqual([0.0, 0.0, 0.0, 1.0])).IsTrue();
-		translation[2] = 5;
+		// [qx, qy, qz, qw, tx, ty, tz].
+		await Assert.That(parameters.SequenceEqual([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])).IsTrue();
+		parameters[6] = 5;
 		await Assert.That(frame.RigFromWorld().Translation).IsEqualTo(new Vector3d(0, 0, 5));
+
+		// Rotation and Translation are views of the same array.
+		ArraySegment<double> translation = storage.Translation;
+		translation[0] = 7;
+		await Assert.That(parameters[4]).IsEqualTo(7);
+		await Assert.That(ReferenceEquals(storage.Rotation.Array, parameters)).IsTrue();
 
 		frame.ResetPose();
 		frame.SetRigFromWorld(new Rigid3d(Quaterniond.Identity, new Vector3d(1, 2, 3)));
 		using (Assert.Multiple())
 		{
-			await Assert.That(ReferenceEquals(frame.RigFromWorldStorage.Rotation, rotation)).IsTrue();
-			await Assert.That(ReferenceEquals(frame.RigFromWorldStorage.Translation, translation)).IsTrue();
-			await Assert.That(translation.SequenceEqual([1.0, 2.0, 3.0])).IsTrue();
+			await Assert.That(ReferenceEquals(frame.RigFromWorldStorage.Params, parameters)).IsTrue();
+			await Assert.That(parameters.SequenceEqual([0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 3.0])).IsTrue();
 		}
 	}
 }

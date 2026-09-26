@@ -14,12 +14,14 @@
 //   rig alive rather than dangling, so forgetting a reset is a silent bug, not a crash.
 // - Pose storage. rig_from_world is COLMAP's std::optional<Rigid3d>. Here the value lives
 //   in a Geometry/Rigid3dStorage the frame owns for its whole lifetime, plus a HasPose flag.
-//   Phase 8's bundle adjustment registers RigFromWorldStorage's arrays as parameter blocks
-//   and writes into them in place, as Ceres does through `Rigid3d&` in COLMAP; ResetPose
-//   and SetRigFromWorld keep the same arrays, so held blocks stay valid.
+//   Phase 8's bundle adjustment registers RigFromWorldStorage.Params as ONE 7-value
+//   parameter block [qx, qy, qz, qw, tx, ty, tz] (COLMAP 4.2.0's
+//   `rig_from_world.params.data()`, with the EigenQuaternion x Euclidean<3> product
+//   manifold) and writes into it in place, as Ceres does through `Rigid3d&` in COLMAP;
+//   ResetPose and SetRigFromWorld keep the same array, so a held block stays valid.
 //   Contract for the optimizer: fetch RigFromWorldStorage (and Camera.Params) when setting
 //   up a problem, and while that problem is live do not ResetPose, assign Camera.Params or
-//   call SetParamsFromString. ResetPose only clears HasPose (the arrays keep the old
+//   call SetParamsFromString. ResetPose only clears HasPose (the array keeps the old
 //   values, which the solver would go on refining), and replacing Params swaps in a new
 //   array the solver does not see.
 // - Copying. C++ copy construction/assignment is Clone(): it copies ids, data ids and the

@@ -81,7 +81,11 @@ conjugate gradients and the JACOBI / SCHUR_JACOBI preconditioners
 `parameter_block_ordering.cc`, `graph_algorithms.h`, `reorder_program.cc`) in
 `SchurEliminator.cs`, `SchurComplementSolvers.cs`, `BlockRandomAccessMatrix.cs`,
 `SmallBlas.cs`, `ImplicitSchurComplement.cs`, `IterativeSchurSolver.cs` and
-`SchurOrdering.cs` (with `corrector_test.cc`, `trust_region_minimizer_test.cc`,
+`SchurOrdering.cs`; the gradient checker and Ridders numeric differentiation
+(`include/ceres/gradient_checker.h`, `internal/ceres/gradient_checker.cc`,
+`internal/ceres/is_close.cc`, `include/ceres/numeric_diff_options.h`, and the RIDDERS path
+of `include/ceres/internal/numeric_diff.h` and
+`include/ceres/dynamic_numeric_diff_cost_function.h`) in `GradientChecker.cs` (with `corrector_test.cc`, `trust_region_minimizer_test.cc`,
 `schur_eliminator_test.cc`, `implicit_schur_complement_test.cc`,
 `conjugate_gradients_solver_test.cc`, `schur_complement_solver_test.cc`,
 `iterative_schur_complement_solver_test.cc`, `parameter_block_ordering_test.cc`,

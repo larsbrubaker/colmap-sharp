@@ -104,4 +104,34 @@ public class RigTests
 		rig.AddSensor(new SensorId(SensorType.Camera, 2), new Rigid3d());
 		await Assert.That(rig.ToString()).IsEqualTo("Rig(rig_id=0, ref_sensor_id=(IMU, 0), sensors=[(CAMERA, 1), (CAMERA, 2)])");
 	}
+
+	// C#-only (no rig_test.cc counterpart): pins the in-place sensor_from_rig storage that
+	// Phase 8's bundle adjustment registers as one 7-value block (Rig.cs header). The Params
+	// array is the same object across set, reset and set again, and a write into it is the
+	// rig's new transform.
+	[Test]
+	public async Task SensorFromRigStorage_IsStableAndWritable()
+	{
+		var rig = new Rig();
+		var refSensor = new SensorId(SensorType.Camera, 0);
+		var sensor = new SensorId(SensorType.Camera, 1);
+		rig.AddRefSensor(refSensor);
+		rig.AddSensor(sensor);
+		await Assert.That(() => rig.SensorFromRigStorage(sensor)).ThrowsException();
+		await Assert.That(() => rig.SensorFromRigStorage(refSensor)).ThrowsException();
+
+		rig.SetSensorFromRig(sensor, new Rigid3d(ColmapSharp.LinearAlgebra.Quaterniond.Identity, new ColmapSharp.LinearAlgebra.Vector3d(1, 2, 3)));
+		double[] parameters = rig.SensorFromRigStorage(sensor).Params;
+		await Assert.That(parameters.SequenceEqual([0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 3.0])).IsTrue();
+		parameters[4] = 9;
+		await Assert.That(rig.SensorFromRig(sensor).Translation).IsEqualTo(new ColmapSharp.LinearAlgebra.Vector3d(9, 2, 3));
+		await Assert.That(rig.NonRefSensors[sensor]!.Value.Translation.X).IsEqualTo(9);
+
+		rig.ResetSensorFromRig(sensor);
+		await Assert.That(rig.HasSensorFromRig(sensor)).IsFalse();
+		await Assert.That(rig.NonRefSensors[sensor]).IsNull();
+		rig.SetSensorFromRig(sensor, new Rigid3d());
+		await Assert.That(ReferenceEquals(rig.SensorFromRigStorage(sensor).Params, parameters)).IsTrue();
+		await Assert.That(parameters.SequenceEqual([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])).IsTrue();
+	}
 }

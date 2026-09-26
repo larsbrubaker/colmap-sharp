@@ -89,8 +89,10 @@ Cancellation is checked between iterations only (like COLMAP). Optional: Vector1
 `Jet` (IEEE-exact, no FMA) need a CLAUDE.md rule clarification first.
 
 ### Phase 8 — Bundle adjustment
-`estimators/bundle_adjustment*` (the non-GPU paths), `cost_functions/*`,
-`ceres_loss_function`, `covariance`.
+`estimators/bundle_adjustment*` (the non-GPU paths; `CreateLossFunction` lives on the option
+classes), `covariance`. Cost functions are done (`Estimators/CostFunctions/`); poses and
+sensor_from_rig are single 7-value blocks (`Rigid3dStorage.Params`, `Rig.SensorFromRigStorage`)
+with the EigenQuaternion × Euclidean<3> product manifold, as in COLMAP 4.2.
 
 ### Phase 9 — Features
 `feature/sift` covariant extractor (`CovariantSiftCPUFeatureExtractor`: affine shape, DSP-SIFT
