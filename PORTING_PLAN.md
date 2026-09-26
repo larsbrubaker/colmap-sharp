@@ -34,10 +34,6 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
 - `delaunay_meshing`: 3D Delaunay tetrahedralization written here (CGAL excluded), then
   COLMAP's graph-cut surface extraction.
 
-### Phase 13 — Global and hierarchical mapping
-`sfm/global_mapper` and the `rotation_averaging` controller (ported; review fixes pending),
-`controllers/global_pipeline`, `controllers/hierarchical_pipeline`.
-
 ### Verification
 - End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us (also the
   first chance to reach the structure-based → structure-less registration fallback, which no
