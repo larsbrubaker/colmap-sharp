@@ -1173,3 +1173,23 @@ stable object address to print.
 
 **Evidence.** `ObservationManagerTests` (observation_manager_test.cc 1:1, including `Print`,
 which has no graph) pass.
+
+## 51. IncrementalTriangulator visits points and pairs in a deterministic order
+
+**What differs.** COLMAP's `IncrementalTriangulator` (sfm/incremental_triangulator.cc)
+iterates hash containers whose order reaches its output: `CompleteAllTracks` and
+`MergeAllTracks` walk `Reconstruction::Point3DIds()` (an unordered set), `Retriangulate` walks
+`ObservationManager::ImagePairs()` (an absl flat map), and `CompleteTracks`/`MergeTracks` walk
+the caller's `FlatHashSet`. Which point is merged or completed first decides which merges
+succeed (a merged point's average position changes the next test) and which observations a
+track claims; which pair is retriangulated first decides which pair continues or creates a
+point. The port (`Sfm/IncrementalTriangulator*.cs`) walks `Point3DIds` in ascending id order
+(entry 21), `ImagePairs` in insertion order (entry 50), and the caller's collection in its own
+enumeration order. The modified-point set is a `HashSet`, whose order depends only on the
+sequence of adds and removes, so it is the same on every run.
+
+**Why.** CLAUDE.md requires reproducible results; abseil seeds its hash per process, so
+COLMAP's order carries no meaning and varies run to run.
+
+**Evidence.** `IncrementalTriangulatorTests` (incremental_triangulator_test.cc 1:1) pass;
+their counts do not depend on the order on the noise-free synthetic scenes.

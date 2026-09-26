@@ -107,7 +107,7 @@ MatterCAD (esp. wasm32) must cap `max_image_size` accordingly.
 
 ### Phase 10 — Incremental SfM
 `sfm/observation_manager.MergeAndFilterReconstructions` (alignment is on main),
-`incremental_triangulator`, `incremental_mapper(_impl)`,
+`incremental_mapper(_impl)` (pass copies of modified-point sets to CompleteTracks/MergeTracks),
 `controllers/incremental_pipeline`, `controllers/bundle_adjustment`.
 End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us.
 
