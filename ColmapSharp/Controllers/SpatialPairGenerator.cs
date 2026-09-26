@@ -74,6 +74,9 @@ public sealed class SpatialPairGenerator : PairGenerator
 	public override bool HasFinished() => currentIdx >= positionIdxs.Count;
 
 	/// <inheritdoc/>
+	public override int NumBatches => positionIdxs.Count; // One block per image with a position.
+
+	/// <inheritdoc/>
 	public override List<(uint ImageId1, uint ImageId2)> Next()
 	{
 		var imagePairs = new List<(uint, uint)>();

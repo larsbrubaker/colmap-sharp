@@ -1401,6 +1401,51 @@ and 57).
 **Evidence.** `ModelTests.Model_GetMaxOverlappingImagesTies` (C#-only) pins the order;
 `Model_GetMaxOverlappingImages` (model_test.cc 1:1) passes.
 
+## 70. Feature matching never waits for pairs it did not queue
+
+**What differs.** COLMAP's `FeatureMatcherController::Match` and
+`GeometricVerifierController::Verify` (controllers/feature_matching_utils.cc) count an output
+for every pair that passes the skip checks, then `Pop` that many results. Two kinds of pair
+are counted but never queued for a worker that exists: in `Verify`, a pair with neither
+matches nor inlier matches; in `Match` with `skip_geometric_verification` (and no guided
+matching), a pair whose raw matches already exist (it goes to the verifier queue, which then
+has no verifiers). COLMAP blocks forever on such a batch. The port
+(`Controllers/FeatureMatchingUtils.cs`) skips the first kind (still deleting its stale
+two-view geometry, as COLMAP does first) and writes the second back unverified (its matches
+and an empty two-view geometry).
+
+**Why.** A hang is an upstream bug, not behavior to reproduce. The existing-matches
+generator COLMAP uses for verification only yields matched pairs, but `Verify` is public and a
+caller's own pair list with unmatched pairs does hit the first case. Every pair the port
+handles is written exactly as a non-hanging COLMAP run would write it.
+
+**Evidence.** Reading of feature_matching_utils.cc (the `num_outputs` counts against the
+`Push` calls). `FeatureMatchingUtilsTests` (feature_matching_utils_test.cc 1:1) pass.
+
+## 71. Unseeded RANSAC in the matching controllers starts every pair from the default seed
+
+**What differs.** With `ransac_options.random_seed = -1` (the default), COLMAP's verifier
+threads draw from their thread-local PRNG, seeded once when the thread first uses it, and the
+stream continues from pair to pair, so a pair's RANSAC samples depend on which thread
+verified it and what that thread verified before. The port runs each verification (and each
+frame pair of rig verification) on a PRNG freshly seeded with `kDefaultPRNGSeed`, so every
+pair sees the stream of a fresh COLMAP thread, and then restores the worker's own PRNG:
+`Parallel.For` also runs iterations on the calling thread, whose generator COLMAP's separate
+worker threads never touch. With one thread, COLMAP's first pair matches exactly; later pairs
+draw different samples, a Tier C difference. The feature-pairs importer is single-threaded in
+COLMAP too, on its own thread; the port seeds once at the start of the import (that thread's
+stream, which then continues across pairs as in COLMAP) and restores the caller's PRNG at the
+end.
+
+**Why.** CLAUDE.md requires sequential and parallel runs to give the same result. COLMAP's
+own multi-threaded results are timing dependent, so there is no fixed stream to reproduce.
+
+**Evidence.** `FeatureMatchingUtilsTests.CSharpOnly_MatchIsThreadCountIndependent`: on
+outlier-laden (60% inlier) matches with keypoint noise, 1 and 4 threads write identical
+two-view geometries; with the reseed removed, the test fails.
+`CSharpOnly_MatchAndVerifyLeaveCallerPrngUntouched`: the caller's next draw after `Match` and
+`Verify` is the same as without them, with 1 and 4 threads. `FeatureMatchingTests` pass.
+
 ## 77. ComputeNormalizedMinGraphCut partitions with our own multilevel bisection, not METIS
 
 **What differs.** COLMAP's `ComputeNormalizedMinGraphCut` (math/graph_cut.cc) calls
@@ -1470,3 +1515,35 @@ sets of rigs, frames and registered frames do not depend on it.
 
 **Evidence.** `RigConfigTests.ApplyRigConfig_*` (rig_test.cc 1:1) pass with COLMAP's counts of
 rigs, frames and registered frames. None of them checks the registration order.
+
+## 82. ImageReader reads images through a host-supplied source, not the file system
+
+**What differs.** COLMAP's `ImageReaderOptions` names folders (`image_path`, `mask_path`) and
+a file (`camera_mask_path`), lists them with `GetRecursiveFileList`, and decodes with
+`Bitmap::Read` (OpenImageIO). The port (`Controllers/ImageReader.cs`,
+`Controllers/ImageSource.cs`) takes an `IImageSource` for the images and one for the masks
+(names plus a decode callback), and an already-decoded `Bitmap` for the camera mask. The
+reader keeps `Bitmap::Read`'s final grey/RGB conversion. A camera mask the host cannot
+decode is the host's error to report, where COLMAP logs "Failed to read invalid mask file"
+and continues without a mask.
+
+**Why.** OpenImageIO is native and excluded (docs/LICENSE_AUDIT.md), and MatterCAD (which
+also runs in the browser) owns image decoding and EXIF extraction (`Sensor/ExifReader.cs`).
+Everything after decoding (camera and rig assignment, focal length from EXIF, GPS and gravity
+priors, mask lookup by `name.png` then `stem.png`) is unchanged.
+
+**Evidence.** `ImageReaderTests` (image_reader_test.cc 1:1, with the written test files as
+an `InMemoryImageSource` of the same bitmaps and unreadable files as null entries) pass.
+
+## 83. Feature extraction commits images in reader order
+
+**What differs.** COLMAP's feature extractor controller runs extractor threads between
+job queues and writes each image as it leaves the extractors, so with more than one thread
+the image, frame and pose prior ids follow completion order and vary from run to run. The
+port (`Controllers/FeatureExtraction.cs`) extracts a batch of images in parallel and writes
+the batch in reader order, so the ids always equal COLMAP's single-threaded run.
+
+**Why.** CLAUDE.md requires sequential and parallel runs to give the same result.
+
+**Evidence.** `FeatureExtractionTests.CSharpOnly_ThreadCountIndependentAndReportsProgress`:
+1 and 3 threads give identical image ids, keypoints and descriptors.

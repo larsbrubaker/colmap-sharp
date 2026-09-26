@@ -47,6 +47,12 @@ internal sealed class CppLineTokens
 	private readonly string[] _tokens;
 	private int _next;
 
+	/// <summary>
+	/// Whether a token is left: false where `>>` would hit the end of the line (its sentry
+	/// fails and nothing is stored), as opposed to a token that fails to parse.
+	/// </summary>
+	public bool HasToken => _next < _tokens.Length;
+
 	/// <summary>Splits <paramref name="line"/> at C isspace characters.</summary>
 	public CppLineTokens(string line)
 	{

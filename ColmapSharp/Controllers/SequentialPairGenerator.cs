@@ -86,6 +86,9 @@ public sealed class SequentialPairGenerator : PairGenerator
 	public override bool HasFinished() => imageIdx >= imageIds.Count;
 
 	/// <inheritdoc/>
+	public override int NumBatches => imageIds.Count; // One block per image.
+
+	/// <inheritdoc/>
 	public override List<(uint ImageId1, uint ImageId2)> Next()
 	{
 		var imagePairs = new List<(uint, uint)>();

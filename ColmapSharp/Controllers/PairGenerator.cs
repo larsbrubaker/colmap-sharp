@@ -42,6 +42,14 @@ public abstract class PairGenerator
 	/// <summary>The next block of image pairs; empty once finished.</summary>
 	public abstract List<(uint ImageId1, uint ImageId2)> Next();
 
+	/// <summary>
+	/// C#-only: how many blocks <see cref="Next"/> returns from a <see cref="Reset"/> until
+	/// <see cref="HasFinished"/>, or 0 when that is not known in advance (the transitive
+	/// generator's blocks depend on the matching results). Lets the controllers report a
+	/// determinate progress total.
+	/// </summary>
+	public virtual int NumBatches => 0;
+
 	/// <summary>Port of PairGenerator::AllPairs: every remaining block, concatenated.</summary>
 	public List<(uint ImageId1, uint ImageId2)> AllPairs()
 	{
@@ -89,6 +97,17 @@ public sealed class ExhaustivePairGenerator : PairGenerator
 
 	/// <inheritdoc/>
 	public override bool HasFinished() => startIdx1 >= imageIds.Count;
+
+	/// <inheritdoc/>
+	public override int NumBatches
+	{
+		get
+		{
+			// Next steps startIdx2 through the blocks for each block of startIdx1.
+			int numBlocks = (imageIds.Count + blockSize - 1) / blockSize;
+			return numBlocks * numBlocks;
+		}
+	}
 
 	/// <inheritdoc/>
 	public override List<(uint ImageId1, uint ImageId2)> Next()
@@ -281,6 +300,9 @@ public sealed class ImportedPairGenerator : PairGenerator
 	public override bool HasFinished() => pairIdx >= imagePairs.Count;
 
 	/// <inheritdoc/>
+	public override int NumBatches => (int)((imagePairs.Count + (long)options.BlockSize - 1) / options.BlockSize);
+
+	/// <inheritdoc/>
 	public override List<(uint ImageId1, uint ImageId2)> Next()
 	{
 		var blockImagePairs = new List<(uint, uint)>();
@@ -381,6 +403,9 @@ public sealed class ExistingMatchedPairGenerator : PairGenerator
 
 	/// <inheritdoc/>
 	public override bool HasFinished() => startIdx >= imagePairs.Count;
+
+	/// <inheritdoc/>
+	public override int NumBatches => (int)((imagePairs.Count + (long)options.BatchSize - 1) / options.BatchSize);
 
 	/// <inheritdoc/>
 	public override List<(uint ImageId1, uint ImageId2)> Next()
