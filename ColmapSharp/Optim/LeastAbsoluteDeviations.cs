@@ -14,7 +14,9 @@
 // Translation notes:
 // - C++ keeps references to the caller's options and A; this port copies the options and
 //   keeps a reference to A (SparseMatrixCsc's pattern is immutable, its values are not, so
-//   callers must not change A's values between construction and Solve, as in C++).
+//   callers must not change A's values between construction and Solve, as in C++). The one
+//   option COLMAP's callers change after construction, max_num_iterations, is settable
+//   through the MaxNumIterations property.
 // - std::runtime_error (underdetermined system) maps to InvalidOperationException.
 // - Solve writes into the caller's x (the Eigen::VectorXd* out-parameter), which must have
 //   A.Cols entries; C++ would resize it.
@@ -123,6 +125,22 @@ public sealed class LeastAbsoluteDeviationSolver
 	/// returns false without producing NaN output.
 	/// </summary>
 	public bool Valid { get; }
+
+	/// <summary>
+	/// The ADMM iteration cap of the next Solve. COLMAP's solver holds a reference to the
+	/// caller's options, so a caller that raises max_num_iterations between solves (rotation
+	/// averaging's L1 phase doubles it) changes this solver's cap without refactoring; this
+	/// port copies the options, so such callers set the cap here instead.
+	/// </summary>
+	public int MaxNumIterations
+	{
+		get => _options.MaxNumIterations;
+		set
+		{
+			Check.Gt(value, 0);
+			_options.MaxNumIterations = value;
+		}
+	}
 
 	/// <summary>
 	/// Runs ADMM from scratch and writes the solution into <paramref name="x"/> (length

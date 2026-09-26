@@ -1027,6 +1027,40 @@ a pre-cancelled token throws at the first check before any allocation; a cancel 
 the middle of an image throws at that check; runs with a live token, with no token, and on the
 same extractor after a cancel give bit-identical features.
 
+## 44. Rotation averaging lays out its linear system in ascending id order
+
+**What differs.** COLMAP's `RotationAveragingProblem` allocates frame parameters in the
+iteration order of a `FlatHashSet<frame_t>`, camera (unknown cam_from_rig) parameters in the
+order of a `NodeHashMap<camera_t, int>`, and constraint rows in the order of
+`PoseGraph::ValidEdges()` (a `NodeHashMap`); `ComputeResiduals` and the IRLS weights walk the
+pair constraints in `NodeHashMap<image_pair_t, …>` order, which is also the order of the
+jitter draws near the ±π boundary of the 1-DOF residual. The gauge is fixed at the *first*
+active frame in hash order (the first gravity-aligned one, if any).
+`Estimators/RotationAveragingProblem*.cs` allocates frames and cameras in ascending id order,
+rows in ascending pair id order, visits constraints in that order, and fixes the gauge at the
+smallest-id (gravity-aligned, if any) active frame.
+
+The driver code (`Estimators/RotationEstimator.cs`, `Estimators/RotationAveraging.cs`) does the
+same where COLMAP walks hash containers: the maximum spanning tree numbers the active images in
+ascending id order (COLMAP: `FlatHashSet` order, and node 0 is the tree's root, which is held
+at the identity rotation) and adds edges in ascending pair id order (which breaks weight ties);
+the stratified gravity subset copies its edges in ascending pair id order;
+`InitializeRigRotationsFromImages` walks frames in ascending id order, which fixes the order in
+which quaternion samples are summed; `CreateExpandedReconstruction` numbers its singleton rigs
+in ascending rig id (then sensor) order and its new frames in ascending frame id (then data id)
+order.
+
+**Why.** CLAUDE.md's hash-order rule: the layout changes the floating-point grouping of the
+normal equations and the Cholesky ordering, the jitter draw order, and the gauge (the solution
+is only defined up to a global rotation, so a different fixed frame gives a globally rotated
+result). COLMAP relies on none of these: its tests compare gauge-invariant relative rotations.
+
+**Evidence.** `RotationAveragingTests` (rotation_averaging_test.cc 1:1, all 15 cases) pass
+with COLMAP's tolerances, including `DeterministicRandomSeed` and the 1e-12 degree
+`RidgeRegularizationDoesNotBiasSolution`; the `CSharpOnly_*` cases recover the synthetic scenes' relative
+rotations within COLMAP's 1e-2 degree bar, and `CSharpOnly_DeterministicWithSeed` pins
+bit-identical repeat solves.
+
 ## 45. Covariance factors a dense Jacobian instead of Ceres' sparse QR
 
 **What differs.** COLMAP's pose refinements (`RefineAbsolutePose`,
