@@ -173,4 +173,52 @@ public class GlobalMapperTests
 		await Assert.That(options.GlobalPositioning().RefineSensorFromRig).IsFalse();
 		await Assert.That(options.BundleAdjustment().RefineSensorFromRig).IsFalse();
 	}
+
+	// Rotation averaging, then track establishment with the given options; the number of
+	// established tracks.
+	private static int EstablishTracksCount(GlobalMapperOptions options)
+	{
+		RandomUtils.SetPRNGSeed(0);
+		using var database = new InMemoryDatabase();
+		Synthetic.SynthesizeDataset(
+			new SyntheticDatasetOptions
+			{
+				NumRigs = 1,
+				NumCamerasPerRig = 1,
+				NumFramesPerRig = 5,
+				NumPoints3D = 50,
+				TwoViewGeometryHasRelativePose = true,
+			},
+			new Reconstruction(),
+			database);
+		var reconstruction = new Reconstruction();
+		var globalMapper = new GlobalMapper(DatabaseCache.Create(database, new DatabaseCache.Options()));
+		globalMapper.BeginReconstruction(reconstruction);
+		Require(globalMapper.RotationAveraging(options.RotationAveraging()));
+		globalMapper.EstablishTracks(options);
+		return reconstruction.NumPoints3D;
+	}
+
+	private static void Require(bool condition)
+	{
+		if (!condition)
+		{
+			throw new InvalidOperationException("Test precondition failed");
+		}
+	}
+
+	// C#-only: C++ compares the track options through static_cast<size_t>, so -1 wraps to the
+	// largest size: a minimum of -1 views per track keeps no track, and -1 required tracks per
+	// view never stops adding tracks.
+	[Test]
+	public async Task CSharpOnly_EstablishTracksNegativeOptionsWrapLikeSizeT()
+	{
+		int numDefault = EstablishTracksCount(new GlobalMapperOptions());
+		int numMinViewsNegative = EstablishTracksCount(new GlobalMapperOptions { TrackMinNumViewsPerTrack = -1 });
+		int numRequiredNegative = EstablishTracksCount(new GlobalMapperOptions { TrackRequiredTracksPerView = -1 });
+
+		await Assert.That(numDefault).IsGreaterThan(0);
+		await Assert.That(numMinViewsNegative).IsEqualTo(0);
+		await Assert.That(numRequiredNegative).IsEqualTo(numDefault);
+	}
 }

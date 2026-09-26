@@ -14,6 +14,7 @@
 // the controllers before its first await, collecting the largest errors to assert afterwards.
 
 using ColmapSharp.Controllers;
+using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Mathematics;
 using ColmapSharp.Scene;
@@ -189,6 +190,48 @@ public class RotationAveragingPipelineTests
 		await Assert.That(cancelledStages.Count).IsEqualTo(0);
 		await Assert.That(numPosed).IsEqualTo(5);
 		await Assert.That(completedStages).IsEquivalentTo([RotationAveragingPipeline.RotationAveragingStage]);
+	}
+
+	// C#-only: gravity priors seed the rotation of the image their corr_data_id names, not the
+	// image whose id equals the prior's pose_prior_id (docs/CPP_DIVERGENCES.md entry 102). The
+	// priors here have ids 101.. while the images have ids 1.., so a lookup by pose_prior_id
+	// finds no image.
+	[Test]
+	public async Task CSharpOnly_GravityPriorsSeedTheirCorrespondingImage()
+	{
+		RandomUtils.SetPRNGSeed(0);
+		using var database = new InMemoryDatabase();
+		var gtReconstruction = new Reconstruction();
+		Synthetic.SynthesizeDataset(
+			new SyntheticDatasetOptions
+			{
+				NumRigs = 1,
+				NumCamerasPerRig = 1,
+				NumFramesPerRig = 5,
+				NumPoints3D = 50,
+				PriorGravity = true,
+			},
+			gtReconstruction,
+			database);
+
+		List<PosePrior> posePriors = database.ReadAllPosePriors();
+		database.ClearPosePriors();
+		foreach (PosePrior posePrior in posePriors)
+		{
+			PosePrior renumbered = posePrior;
+			renumbered.PosePriorId = posePrior.PosePriorId + 100;
+			database.WritePosePrior(renumbered, usePosePriorId: true);
+		}
+
+		var options = new RotationAveragingPipelineOptions();
+		options.RotationEstimation.UseGravity = true;
+		Reconstruction reconstruction = RunController(database, options);
+
+		int numPosed = reconstruction.Images.Values.Count(image => image.HasPose);
+		double maxError = MaxRelativeRotationError(gtReconstruction, reconstruction);
+
+		await Assert.That(numPosed).IsEqualTo(5);
+		await Assert.That(maxError).IsLessThan(MathUtils.DegToRad(1e-2));
 	}
 
 	// Progress<T> posts to the thread pool; this one reports inline so the test sees every

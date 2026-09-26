@@ -166,6 +166,10 @@ public sealed partial class GlobalMapper
 		var trackLengths = new List<(int Length, ulong Point3DId)>();
 		ulong nextPoint3DId = 0;
 		double sqThreshold = options.TrackIntraImageConsistencyThreshold * options.TrackIntraImageConsistencyThreshold;
+		// C++ compares with static_cast<size_t> of the int options: a negative value wraps to
+		// a huge limit (a negative minimum views per track discards every track, a negative
+		// required tracks per view keeps adding tracks).
+		ulong minNumViewsPerTrack = unchecked((ulong)options.TrackMinNumViewsPerTrack);
 
 		foreach (List<(uint ImageId, uint Point2DIdx)> observations in trackMap.Values)
 		{
@@ -208,7 +212,7 @@ public sealed partial class GlobalMapper
 				continue;
 			}
 
-			if (imageIdSet.Count < options.TrackMinNumViewsPerTrack)
+			if ((ulong)imageIdSet.Count < minNumViewsPerTrack)
 			{
 				continue;
 			}
@@ -222,12 +226,11 @@ public sealed partial class GlobalMapper
 		// the (length, id) keys have no ties and the unstable sort is deterministic.
 		trackLengths.Sort((a, b) => b.CompareTo(a));
 
-		var tracksPerImage = new Dictionary<uint, long>();
+		var tracksPerImage = new Dictionary<uint, ulong>();
 		long imagesLeft = imageIdToKeypoints.Count;
-		// static_cast<size_t> of the int option: a negative value wraps to a huge limit, as
-		// in C++.
+		// static_cast<size_t> of the int options, as above.
 		ulong maxNumTracks = unchecked((ulong)options.KeepMaxNumTracks);
-		long requiredTracksPerView = options.TrackRequiredTracksPerView;
+		ulong requiredTracksPerView = unchecked((ulong)options.TrackRequiredTracksPerView);
 		foreach ((_, ulong point3DId) in trackLengths)
 		{
 			// Stop once the global track budget is exhausted. As tracks are sorted by
@@ -251,7 +254,7 @@ public sealed partial class GlobalMapper
 			// Update image counts.
 			foreach (TrackElement obs in point3D.Track.Elements)
 			{
-				long count = tracksPerImage.GetValueOrDefault(obs.ImageId);
+				ulong count = tracksPerImage.GetValueOrDefault(obs.ImageId);
 				if (count == requiredTracksPerView)
 				{
 					--imagesLeft;

@@ -10,10 +10,11 @@
 // Tests: ColmapSharp.Tests/Sfm/GlobalMapperTests.cs (global_mapper_test.cc 1:1).
 //
 // Translation notes:
-// - image_path is not ported: point colors are read through a host-supplied image source
-//   (docs/CPP_DIVERGENCES.md entry 82), which the global pipeline controller takes itself.
-// - The CUDA / Caspar settings (use_gpu, ba_gpu_index) are kept so option files carry over;
-//   the solver always runs on the CPU, as COLMAP does without CUDA.
+// - image_path is not ported: point colors are read through a host callback
+//   (docs/CPP_DIVERGENCES.md entry 68), GlobalPipelineOptions.ReadImage.
+// - use_gpu and ba_gpu_index are forwarded to the Ceres options like COLMAP does; the managed
+//   solver has no GPU path and ignores them. There are no Caspar (GPU) options, so
+//   BundleAdjustment() does not set caspar->gpu_index (docs/CPP_DIVERGENCES.md entry 66).
 // - The C++ accessors return by value; here each returns a fresh Clone().
 
 using ColmapSharp.Estimators;
@@ -191,6 +192,7 @@ public sealed class GlobalMapperOptions
 			opts.Ceres.GpuIndex = BaGpuIndex;
 		}
 
+		// COLMAP also sets caspar->gpu_index here; there is no Caspar backend (entry 66).
 		return opts;
 	}
 

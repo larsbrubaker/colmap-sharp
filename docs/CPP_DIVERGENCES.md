@@ -1416,6 +1416,8 @@ member, so `Controllers/IncrementalPipelineOptions.cs` fills only the Ceres opti
 rejects a Caspar backend exactly as a COLMAP build without `CASPAR_ENABLED` does, and
 `EffBa{Local,Global}MaxNumIterations` still return Caspar's default (200,
 `IncrementalPipelineOptions.CasparDefaultSolverIterMax`) for a Caspar configuration.
+The same holds for `GlobalMapperOptions::BundleAdjustment()` (`Sfm/GlobalMapperOptions.cs`),
+which in COLMAP also sets `caspar->gpu_index`; here it sets only the Ceres `gpu_index`.
 
 **Why.** Caspar is a GPU solver, out of scope for a managed library (PORTING_PLAN.md).
 
@@ -1436,9 +1438,10 @@ scope); the controller's behavior depends on nothing else in it.
 (option_manager.cc); `BundleAdjustmentControllerTests` (bundle_adjustment_test.cc 1:1) pass
 with `new BundleAdjustmentOptions()`.
 
-## 68. The incremental pipeline reads point colors through a host callback, not image_path
+## 68. The incremental and global pipelines read point colors through a host callback, not image_path
 
-**What differs.** COLMAP's `IncrementalPipelineOptions::image_path` names a folder that
+**What differs.** COLMAP's `IncrementalPipelineOptions::image_path` and
+`GlobalPipelineOptions::image_path` (with the unused copy in `GlobalMapperOptions`) name a folder that
 `Reconstruction::ExtractColorsForImage` reads `image_path / image.Name()` from with
 `Bitmap::Read`. ColmapSharp's options have `ReadImage`, a `Func<string, Bitmap?>` from image
 name to the decoded image, and `Reconstruction.ExtractColorsForImage(imageId, bitmap)` takes
@@ -1451,7 +1454,8 @@ hold the photos in memory rather than in a folder.
 **Evidence.** With the default (null) `ReadImage` the pipeline behaves like COLMAP's default
 empty `image_path`, which is what incremental_pipeline_test.cc runs; the C#-only
 `IncrementalPipeline_ExtractsColorsFromReadImage` checks every image is requested and every
-point takes the image color.
+point takes the image color. `GlobalPipeline` extracts colors only when `ReadImage` is set,
+as COLMAP extracts them only for a non-empty `image_path`.
 
 ## 69. ExtractColorsForAllImages sums colors per image and reduces in image-id order
 
@@ -1954,7 +1958,10 @@ track's root, the order of the elements inside each track and the 3D point id ea
 gets. The port (`Sfm/GlobalMapper.cs`) walks the valid edges in ascending pair id and the
 tracks in the order their first observation entered the union-find (insertion order,
 entry 2), so the ids and element order are deterministic but can differ from COLMAP's. The
-set of tracks, and which ones are kept (sorted by length, then id), is the same.
+candidate tracks are the same. With the default limits every candidate is kept, so the kept
+set is the same too; but tracks are selected by (length, id) descending, so when
+`KeepMaxNumTracks` or `TrackRequiredTracksPerView` cuts inside a group of equally long
+tracks, *which* of them are kept can differ from COLMAP.
 
 **Why.** CLAUDE.md requires hash iteration order that reaches results to be deterministic;
 the element order reaches global positioning and bundle adjustment as residual order.
@@ -1967,14 +1974,32 @@ noise-free cases.
 
 **What differs.** COLMAP's `RotationAveragingPipeline::Run` never calls `CheckIfStopped`. The
 port (`Controllers/RotationAveragingPipeline.cs`) checks `BaseController.CheckIfStopped`
-(the host's `CancellationToken` or stop function) before gravity refinement and before
-rotation averaging, and returns without estimating rotations when a stop was requested.
+(the host's `CancellationToken` or stop function) before seeding rotations from gravity
+priors, before gravity refinement and before rotation averaging, and returns when a stop was
+requested, so a cancelled run leaves no half-posed frames.
 Without a stop request it runs exactly COLMAP's steps.
 
 **Why.** CLAUDE.md requires long-running work to be cancellable from MatterCAD.
 
 **Evidence.** `RotationAveragingPipelineTests.CSharpOnly_CancellationStopsBeforeRotationAveraging`;
 the three ported cases run without a stop request and pass at COLMAP's tolerances.
+
+## 102. RotationAveragingPipeline seeds gravity rotations through the prior's corr_data_id
+
+**What differs.** COLMAP's `RotationAveragingPipeline::Run` looks up the image of a gravity
+prior with `reconstruction_->Image(pose_prior.pose_prior_id)`. A pose prior's id is its own
+row id; the image it belongs to is `corr_data_id`, which every other consumer uses, gated on
+a camera sensor (`rotation_averaging.cc`, `gravity_refinement.cc`). The port
+(`Controllers/RotationAveragingPipeline.cs`) uses `CorrDataId.Id` for camera priors and skips
+other priors.
+
+**Why.** A real upstream bug: whenever prior ids and image ids differ, COLMAP seeds the wrong
+frame or fails on an image id that does not exist. They coincide in COLMAP's tests, where
+every image has one prior written in image order.
+
+**Evidence.** `RotationAveragingPipelineTests.CSharpOnly_GravityPriorsSeedTheirCorrespondingImage`
+renumbers the priors to 101..105: the pose_prior_id lookup failed with "Image with ID 101 does
+not exist"; with the fix all five images are posed within 1e-2 degrees of the ground truth.
 
 ## 106. Poisson splatting runs sequentially in sample order
 

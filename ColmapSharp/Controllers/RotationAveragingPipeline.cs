@@ -15,13 +15,13 @@
 //
 // Translation notes:
 // - Cancellation: COLMAP's Run never checks CheckIfStopped. Here BaseController's
-//   CancellationToken (and SetCheckIfStoppedFunc) is checked before each stage, so a host can
-//   stop it between gravity refinement and rotation averaging.
+//   CancellationToken (and SetCheckIfStoppedFunc) is checked before gravity seeding, gravity
+//   refinement and rotation averaging (docs/CPP_DIVERGENCES.md entry 101).
 // - Progress (C#-only): Progress, when set, receives a ControllerProgress as each stage
 //   finishes, the way the incremental pipeline reports its milestones.
 // - LOG(ERROR) goes to Util/Log.cs; LOG(INFO) and the timer are dropped.
-// - As in COLMAP, the gravity prior initialization looks the image up by the prior's
-//   pose_prior_id.
+// - The gravity prior initialization looks the image up by the prior's corr_data_id (camera
+//   priors only), where COLMAP uses pose_prior_id (docs/CPP_DIVERGENCES.md entry 102).
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Geometry;
@@ -141,16 +141,23 @@ public sealed class RotationAveragingPipeline : BaseController
 		// Get a mutable copy of pose priors.
 		List<PosePrior> posePriors = [.. _databaseCache.PosePriors];
 
-		// Initialize frame rotations from gravity priors.
+		// Stop before any frame is seeded, so a cancelled run leaves no half-posed frames.
+		if (CheckIfStopped())
+		{
+			return;
+		}
+
+		// Initialize frame rotations from gravity priors. COLMAP looks the image up by
+		// pose_prior_id; the prior's image is its corr_data_id, as everywhere else (entry 102).
 		var unknownTranslation = new Vector3d(double.NaN, double.NaN, double.NaN);
 		foreach (PosePrior posePrior in posePriors)
 		{
-			if (!posePrior.HasGravity())
+			if (!posePrior.HasGravity() || posePrior.CorrDataId.SensorId.Type != SensorType.Camera)
 			{
 				continue;
 			}
 
-			Image image = _reconstruction.Image(posePrior.PosePriorId);
+			Image image = _reconstruction.Image((uint)posePrior.CorrDataId.Id);
 			if (!image.IsRefInFrame)
 			{
 				continue;
