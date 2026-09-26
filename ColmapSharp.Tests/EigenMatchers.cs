@@ -4,7 +4,8 @@
 // EigenMatchers: the EigenMatrixNear matcher of colmap/util/eigen_matchers.h, which the
 // ported geometry tests use as EXPECT_THAT(a, EigenMatrixNear(b, tol)). Test
 // infrastructure shared by every test file that ports such a check (first users:
-// Geometry/Rigid3dTests.cs, Sim3dTests.cs, GpsTests.cs, BboxTests.cs).
+// Geometry/Rigid3dTests.cs, Sim3dTests.cs, GpsTests.cs, BboxTests.cs; the VectorXd overload
+// serves Optim/SparseCholeskyTests.cs and LeastAbsoluteDeviationsTests.cs).
 //
 // Semantics, as in COLMAP: if rhs is zero (Eigen's isZero(), every coefficient within
 // dummy_precision = 1e-12 of 0), lhs matches when lhs.norm() <= tol, because isApprox is
@@ -37,6 +38,22 @@ internal static class EigenMatchers
 		Span<double> coefficients = stackalloc double[36];
 		rhs.CopyToColumnMajor(coefficients);
 		if (IsZero(coefficients))
+		{
+			return lhs.Norm() <= tol;
+		}
+
+		return lhs.IsApprox(rhs, tol);
+	}
+
+	/// <summary>EigenMatrixNear(rhs, tol) applied to lhs; a length mismatch never matches.</summary>
+	public static bool EigenMatrixNear(VectorXd lhs, VectorXd rhs, double tol = LinearAlgebraConstants.DummyPrecision)
+	{
+		if (lhs.Length != rhs.Length)
+		{
+			return false;
+		}
+
+		if (IsZero(rhs.AsSpan()))
 		{
 			return lhs.Norm() <= tol;
 		}

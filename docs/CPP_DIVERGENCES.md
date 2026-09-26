@@ -238,3 +238,31 @@ EQUIRECTANGULAR, and pins everything else at 2e-14 relative to max(1, |value|).
 `2.0 * EIGEN_PI * (...)` with EIGEN_PI a `long double` literal, so on x86-64 Linux (80-bit
 long double) its results may differ from both the macOS wheel (where long double is double)
 and ColmapSharp, which uses `Math.PI` in double.
+
+## 13. Sparse Cholesky: simplicial LLT/LDLT with our AMD instead of CHOLMOD and Eigen
+
+**What differs.** `SparseCholeskyWithFallbackSolver`'s first stage is CHOLMOD's supernodal
+LLT in COLMAP and the simplicial LLT of `LinearAlgebra/SimplicialCholesky.cs` here; its
+fallback and `LeastAbsoluteDeviationSolver`'s `SimplicialLLT` are Eigen's simplicial
+factorizations in COLMAP and ours here. `SolverType.SupernodalCholmodLLT` keeps its name but
+selects the managed fallback solver. The fill-reducing ordering is our AMD
+(`LinearAlgebra/AmdOrdering.cs`, from the Amestoy-Davis-Duff paper, without dense-row
+deferral, initial supervariable detection or mass elimination), so the permutation, and with
+it the order of floating-point operations and the last bits of every solution, differ from
+CHOLMOD's and Eigen's. Accept/reject decisions follow the same rules (LLT stops at the first
+pivot <= 0, LDLT at an exactly zero pivot), but a pivot within rounding of zero can land on
+the other side under a different ordering.
+
+Also, once the fallback solver has switched to LDLT, `AnalyzePattern`/`Compute` with a new
+pattern re-analyzes the LDLT stage here. COLMAP re-analyzes only the supernodal stage, so its
+next `ldlt_.factorize` runs on a stale symbolic analysis (an upstream bug with undefined
+results in Eigen); `ComputeNewPatternAfterFallback` pins the fix.
+
+**Why.** CHOLMOD and CSparse are GPL/LGPL and Eigen is MPL-2.0 (`docs/LICENSE_AUDIT.md`);
+none of them can be ported. A supernodal code is a performance refinement over the
+simplicial one, not a different result, and can replace it later behind the same API.
+
+**Evidence.** `sparse_cholesky_test.cc` and `least_absolute_deviations_test.cc` pass 1:1
+(`SparseCholeskyWithFallbackSolverTests`, `LeastAbsoluteDeviationsTests`), including the
+singular, indefinite and ridge cases whose outcome depends on the pivot rules. The C#-only
+`SimplicialCholeskyTests` pin the solutions to the dense LLT within 1e-10 relative error.

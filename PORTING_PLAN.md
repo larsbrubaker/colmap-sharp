@@ -64,8 +64,7 @@ COLMAP's API), `database_cache`, `scene_clustering`, `reconstruction_clustering`
 ### Phase 5 — Optimization primitives
 `optim/`: `ransac`, `loransac` (generic over `ISampler<TSelf>` / `ISupportMeasurer<TSupport>`;
 decide PROSAC's out-of-range index when k == N, cast `num_inliers - i` to ulong as C++ does;
-constrain samplers to `class` or drop the struct claim in Sampler.cs), `least_absolute_deviations`, `tiny_solver`,
-`sparse_cholesky` (own implementation with AMD ordering; CHOLMOD is LGPL).
+constrain samplers to `class` or drop the struct claim in Sampler.cs), `tiny_solver`.
 
 ### Phase 6 — Minimal solvers and estimators
 `estimators/solvers/*` (P3P, EPnP, 5-pt/7-pt/8-pt, homography, affine, similarity,
@@ -86,6 +85,9 @@ Build on `Solver/Scalar.cs`'s `IScalar<T>` (camera models are already generic ov
 (no const generics in C#), `in` parameters for large N (benchmark N=6/9/15), Ceres's
 mixed scalar operators (`T*double`, `double/T`, … — not the same as `FromDouble(s) op x`),
 Exp/Log/Pow/Acos/Asin/Hypot/IsFinite/Min/Max, and generic k-th-variable seeding.
+The simplicial sparse Cholesky (`LinearAlgebra/SimplicialCholesky.cs`) factors a 1000-camera
+Schur-like pattern in ~3.5 s (scalar, ~1.3 GFLOP/s): add a supernodal or 6x6-blocked numeric
+phase behind the same API before BA at that scale.
 
 ### Phase 8 — Bundle adjustment
 `estimators/bundle_adjustment*` (the non-GPU paths), `cost_functions/*`,
