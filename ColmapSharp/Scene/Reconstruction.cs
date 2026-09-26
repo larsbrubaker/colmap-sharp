@@ -11,10 +11,10 @@
 // Read/Write/ReadText/ReadBinary/WriteText/WriteBinary. Tests:
 // ColmapSharp.Tests/Scene/ReconstructionTests*.cs (reconstruction_test.cc).
 //
-// Load and TranscribeImageIdsToDatabase are in Reconstruction.Database.cs.
-// Not ported yet, each waiting on its own port: ConvertToPLY/ImportPLY (util/ply), and
-// ExtractColorsForImage/ExtractColorsForAllImages (they read image files through
-// Bitmap::Read, which is not ported: the host decodes images).
+// Load and TranscribeImageIdsToDatabase are in Reconstruction.Database.cs, ConvertToPLY and
+// ImportPLY in Reconstruction.Ply.cs.
+// Not ported yet: ExtractColorsForImage/ExtractColorsForAllImages (they read image files
+// through Bitmap::Read, which is not ported: the host decodes images).
 //
 // Design (later phases build on it):
 // - Ownership. The reconstruction owns every rig, camera, frame, image and 3D point.

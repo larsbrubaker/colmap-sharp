@@ -6,7 +6,7 @@
 // does. Written here, not a port of libc++: a value is one whitespace-separated token, parsed
 // with the invariant culture (so, like COLMAP's classic-locale streams, the decimal separator
 // is '.' whatever the process culture), and a failed extraction reports false, which is
-// where C++ sets failbit.
+// where C++ sets failbit. Util/Ply*.cs reads ASCII PLY bodies through it too.
 //
 // The spellings follow libc++'s num_get as probed with a libc++ harness (see
 // ColmapSharp.Tests/Scene/ReconstructionIORobustnessTests.cs):
@@ -14,6 +14,8 @@
 //   above the type's maximum fails;
 // - double: decimal and hexadecimal ("0x1p3" = 8) floats; "inf"/"nan" fail; a result that
 //   overflows, or underflows inexactly to a subnormal or zero, fails (strtod's ERANGE).
+// - float: the same rules in single precision (libc++ reads a float with strtof, rounding
+//   the token once to float, not through double).
 // A token is taken whole, so "12abc" fails where libc++ would read 12 into an integer and
 // leave "abc" for the next extraction (docs/CPP_DIVERGENCES.md, entry 25). Correctly rounded
 // parsing on both sides gives the same bits for the same token.
@@ -22,7 +24,7 @@ using System.Globalization;
 using System.Numerics;
 using System.Text;
 
-namespace ColmapSharp.Scene;
+namespace ColmapSharp.Util;
 
 /// <summary>Whitespace-separated tokens of one line, read the way <c>istream &gt;&gt;</c> reads them.</summary>
 internal sealed class CppLineTokens
@@ -35,6 +37,9 @@ internal sealed class CppLineTokens
 
 	// std::numeric_limits<double>::min(), the smallest normal double.
 	private const double MinNormal = 2.2250738585072014e-308;
+
+	// std::numeric_limits<float>::min(), the smallest normal float.
+	private const float MinNormalFloat = 1.17549435e-38f;
 
 	private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 	private static readonly UTF8Encoding LenientUtf8 = new(false, false);
@@ -94,6 +99,19 @@ internal sealed class CppLineTokens
 	{
 		value = 0;
 		if (_next >= _tokens.Length || !ParseDouble(_tokens[_next], out value))
+		{
+			return false;
+		}
+
+		_next++;
+		return true;
+	}
+
+	/// <summary><c>stream &gt;&gt; float</c>.</summary>
+	public bool TryReadFloat(out float value)
+	{
+		value = 0;
+		if (_next >= _tokens.Length || !ParseFloat(_tokens[_next], out value))
 		{
 			return false;
 		}
@@ -186,6 +204,12 @@ internal sealed class CppLineTokens
 		return true;
 	}
 
+	/// <summary>
+	/// <c>stream &gt;&gt; double</c> on one whitespace-free token that must be consumed whole
+	/// (COLMAP's StringToDouble on a column already split out of a line).
+	/// </summary>
+	public static bool TryParseDoubleToken(string token, out double value) => ParseDouble(token, out value);
+
 	private static bool ParseDouble(string token, out double value)
 	{
 		value = 0;
@@ -193,7 +217,8 @@ internal sealed class CppLineTokens
 		string body = negative || token.StartsWith('+') ? token[1..] : token;
 		if (body.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
 		{
-			if (!ParseHexMagnitude(body[2..], out value))
+			if (!ParseHexMagnitude(body[2..], 53, -1074, out value, out bool inexact) ||
+				double.IsInfinity(value) || (inexact && Math.Abs(value) < MinNormal))
 			{
 				return false;
 			}
@@ -215,10 +240,42 @@ internal sealed class CppLineTokens
 		return !double.IsInfinity(value) && !(nonZeroDigits && Math.Abs(value) < MinNormal);
 	}
 
-	// The magnitude after "0x": hex digits with an optional '.', then an optional binary
-	// exponent p[+-]digits. Rounded to nearest-even like strtod.
-	private static bool ParseHexMagnitude(string text, out double value)
+	// strtof: ParseDouble's rules with float's range and one rounding to float.
+	private static bool ParseFloat(string token, out float value)
 	{
+		value = 0;
+		bool negative = token.StartsWith('-');
+		string body = negative || token.StartsWith('+') ? token[1..] : token;
+		if (body.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+		{
+			if (!ParseHexMagnitude(body[2..], 24, -149, out double magnitude, out bool inexact))
+			{
+				return false;
+			}
+
+			// The magnitude already has at most 24 significant bits, so this cast is exact
+			// unless it overflows to infinity.
+			value = (float)(negative ? -magnitude : magnitude);
+			return !float.IsInfinity(value) && !(inexact && Math.Abs(value) < MinNormalFloat);
+		}
+
+		if (body.Length == 0 || !body.All(c => char.IsAsciiDigit(c) || c is '.' or 'e' or 'E' or '+' or '-') ||
+			!float.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+		{
+			return false;
+		}
+
+		bool nonZeroDigits = body.TakeWhile(c => c is not ('e' or 'E')).Any(c => c is >= '1' and <= '9');
+		return !float.IsInfinity(value) && !(nonZeroDigits && Math.Abs(value) < MinNormalFloat);
+	}
+
+	// The magnitude after "0x": hex digits with an optional '.', then an optional binary
+	// exponent p[+-]digits, rounded to nearest-even to `significandBits` bits with the lowest
+	// subnormal bit at 2^minExponent (53/-1074 for strtod, 24/-149 for strtof). `inexact`
+	// reports rounding, for the caller's underflow (ERANGE) check.
+	private static bool ParseHexMagnitude(string text, int significandBits, int minExponent, out double value, out bool inexact)
+	{
+		inexact = false;
 		value = 0;
 		int pIndex = text.IndexOfAny(['p', 'P']);
 		string mantissaText = pIndex < 0 ? text : text[..pIndex];
@@ -262,17 +319,17 @@ internal sealed class CppLineTokens
 			return true;
 		}
 
-		// value = mantissa * 2^exponent. Keep 53 significant bits, or fewer where the result
-		// is subnormal (its lowest bit is 2^-1074).
+		// value = mantissa * 2^exponent. Keep `significandBits` significant bits, or fewer
+		// where the result is subnormal (its lowest bit is 2^minExponent).
 		long bitLength = (long)mantissa.GetBitLength();
-		long shift = Math.Max(bitLength - 53, -1074 - exponent);
+		long shift = Math.Max(bitLength - significandBits, minExponent - exponent);
 		if (shift > bitLength)
 		{
 			// Below half the smallest subnormal: rounds to zero, an inexact underflow.
 			return false;
 		}
 
-		bool inexact = false;
+		inexact = false;
 		if (shift > 0)
 		{
 			BigInteger remainder = mantissa & ((BigInteger.One << (int)shift) - 1);
@@ -288,7 +345,7 @@ internal sealed class CppLineTokens
 		}
 
 		value = Math.ScaleB((double)mantissa, (int)Math.Clamp(exponent, int.MinValue, int.MaxValue));
-		return !double.IsInfinity(value) && !(inexact && Math.Abs(value) < MinNormal);
+		return true;
 	}
 }
 

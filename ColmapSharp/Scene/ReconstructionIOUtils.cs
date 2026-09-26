@@ -6,8 +6,8 @@
 // share: sorted id extraction for deterministic output, and the rig/frame synthesis that
 // lets a model written before COLMAP had rigs and frames (only cameras, images and
 // points3D) load as one trivial rig per camera and one frame per image. Also the
-// file-open/directory checks (THROW_CHECK_FILE_OPEN, THROW_CHECK_DIR_EXISTS) the path
-// overloads use. Tests: ColmapSharp.Tests/Scene/ReconstructionIOOracleTests.cs.
+// directory check (THROW_CHECK_DIR_EXISTS) the path overloads use; opening files is
+// Util/FileOpen.cs. Tests: ColmapSharp.Tests/Scene/ReconstructionIOOracleTests.cs.
 
 using ColmapSharp.Geometry;
 using ColmapSharp.Sensor;
@@ -126,44 +126,9 @@ public static class ReconstructionIOUtils
 		}
 	}
 
-	/// <summary>
-	/// std::ifstream + THROW_CHECK_FILE_OPEN: opens <paramref name="path"/> for reading, or
-	/// throws COLMAP's "Could not open" check failure.
-	/// </summary>
-	internal static FileStream OpenRead(string path)
-	{
-		try
-		{
-			return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-		}
-		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-		{
-			throw FileOpenFailure(path, ex);
-		}
-	}
-
-	/// <summary>
-	/// std::ofstream(path, std::ios::trunc) + THROW_CHECK_FILE_OPEN: creates or truncates
-	/// <paramref name="path"/> for writing, or throws COLMAP's "Could not open" check failure.
-	/// </summary>
-	internal static FileStream OpenWrite(string path)
-	{
-		try
-		{
-			return new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
-		}
-		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-		{
-			throw FileOpenFailure(path, ex);
-		}
-	}
-
 	/// <summary>THROW_CHECK_DIR_EXISTS(path).</summary>
 	internal static void CheckDirExists(string path)
 	{
 		Check.That(Directory.Exists(path), $"Directory \"{path}\" does not exist.", "colmap::ExistsDir(path_val)");
 	}
-
-	private static ArgumentException FileOpenFailure(string path, Exception inner) =>
-		new($"Check failed: (file).is_open() Could not open \"{path}\". Is the path a directory or does the parent dir not exist?", inner);
 }

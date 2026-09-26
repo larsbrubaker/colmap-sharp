@@ -60,7 +60,7 @@ public static class ReconstructionIOBinary
 	/// <summary>ReadRigsBinary from a file.</summary>
 	public static void ReadRigsBinary(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenRead(path);
+		using FileStream file = FileOpen.OpenRead(path);
 		ReadRigsBinary(reconstruction, file);
 	}
 
@@ -95,7 +95,7 @@ public static class ReconstructionIOBinary
 	/// <summary>ReadCamerasBinary from a file.</summary>
 	public static void ReadCamerasBinary(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenRead(path);
+		using FileStream file = FileOpen.OpenRead(path);
 		ReadCamerasBinary(reconstruction, file);
 	}
 
@@ -126,7 +126,7 @@ public static class ReconstructionIOBinary
 	/// <summary>ReadFramesBinary from a file.</summary>
 	public static void ReadFramesBinary(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenRead(path);
+		using FileStream file = FileOpen.OpenRead(path);
 		ReadFramesBinary(reconstruction, file);
 	}
 
@@ -216,7 +216,7 @@ public static class ReconstructionIOBinary
 	/// <summary>ReadImagesBinary from a file.</summary>
 	public static void ReadImagesBinary(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenRead(path);
+		using FileStream file = FileOpen.OpenRead(path);
 		ReconstructionIOUtils.NameFileInErrors(path, () => ReadImagesBinary(reconstruction, file));
 	}
 
@@ -253,7 +253,7 @@ public static class ReconstructionIOBinary
 	/// <summary>ReadPoints3DBinary from a file.</summary>
 	public static void ReadPoints3DBinary(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenRead(path);
+		using FileStream file = FileOpen.OpenRead(path);
 		ReadPoints3DBinary(reconstruction, file);
 	}
 
@@ -289,7 +289,7 @@ public static class ReconstructionIOBinary
 	/// <summary>WriteRigsBinary to a file (created or truncated).</summary>
 	public static void WriteRigsBinary(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenWrite(path);
+		using FileStream file = FileOpen.OpenWrite(path);
 		WriteRigsBinary(reconstruction, file);
 	}
 
@@ -317,7 +317,7 @@ public static class ReconstructionIOBinary
 	/// <summary>WriteCamerasBinary to a file (created or truncated).</summary>
 	public static void WriteCamerasBinary(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenWrite(path);
+		using FileStream file = FileOpen.OpenWrite(path);
 		WriteCamerasBinary(reconstruction, file);
 	}
 
@@ -349,7 +349,7 @@ public static class ReconstructionIOBinary
 	/// <summary>WriteFramesBinary to a file (created or truncated).</summary>
 	public static void WriteFramesBinary(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenWrite(path);
+		using FileStream file = FileOpen.OpenWrite(path);
 		WriteFramesBinary(reconstruction, file);
 	}
 
@@ -383,7 +383,7 @@ public static class ReconstructionIOBinary
 	/// <summary>WriteImagesBinary to a file (created or truncated).</summary>
 	public static void WriteImagesBinary(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenWrite(path);
+		using FileStream file = FileOpen.OpenWrite(path);
 		WriteImagesBinary(reconstruction, file);
 	}
 
@@ -418,7 +418,7 @@ public static class ReconstructionIOBinary
 	/// <summary>WritePoints3DBinary to a file (created or truncated).</summary>
 	public static void WritePoints3DBinary(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenWrite(path);
+		using FileStream file = FileOpen.OpenWrite(path);
 		WritePoints3DBinary(reconstruction, file);
 	}
 

@@ -71,7 +71,7 @@ public static partial class ReconstructionIOText
 	/// <summary>WriteRigsText to a file (created or truncated).</summary>
 	public static void WriteRigsText(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenWrite(path);
+		using FileStream file = FileOpen.OpenWrite(path);
 		WriteRigsText(reconstruction, file);
 	}
 
@@ -107,7 +107,7 @@ public static partial class ReconstructionIOText
 	/// <summary>WriteCamerasText to a file (created or truncated).</summary>
 	public static void WriteCamerasText(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenWrite(path);
+		using FileStream file = FileOpen.OpenWrite(path);
 		WriteCamerasText(reconstruction, file);
 	}
 
@@ -146,7 +146,7 @@ public static partial class ReconstructionIOText
 	/// <summary>WriteFramesText to a file (created or truncated).</summary>
 	public static void WriteFramesText(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenWrite(path);
+		using FileStream file = FileOpen.OpenWrite(path);
 		WriteFramesText(reconstruction, file);
 	}
 
@@ -195,7 +195,7 @@ public static partial class ReconstructionIOText
 	/// <summary>WriteImagesText to a file (created or truncated).</summary>
 	public static void WriteImagesText(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenWrite(path);
+		using FileStream file = FileOpen.OpenWrite(path);
 		WriteImagesText(reconstruction, file);
 	}
 
@@ -240,7 +240,7 @@ public static partial class ReconstructionIOText
 	/// <summary>WritePoints3DText to a file (created or truncated).</summary>
 	public static void WritePoints3DText(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenWrite(path);
+		using FileStream file = FileOpen.OpenWrite(path);
 		WritePoints3DText(reconstruction, file);
 	}
 

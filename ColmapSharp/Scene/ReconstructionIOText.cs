@@ -78,7 +78,7 @@ public static partial class ReconstructionIOText
 	/// <summary>ReadRigsText from a file.</summary>
 	public static void ReadRigsText(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenRead(path);
+		using FileStream file = FileOpen.OpenRead(path);
 		ReadRigsText(reconstruction, file);
 	}
 
@@ -118,7 +118,7 @@ public static partial class ReconstructionIOText
 	/// <summary>ReadCamerasText from a file.</summary>
 	public static void ReadCamerasText(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenRead(path);
+		using FileStream file = FileOpen.OpenRead(path);
 		ReadCamerasText(reconstruction, file);
 	}
 
@@ -160,7 +160,7 @@ public static partial class ReconstructionIOText
 	/// <summary>ReadFramesText from a file.</summary>
 	public static void ReadFramesText(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenRead(path);
+		using FileStream file = FileOpen.OpenRead(path);
 		ReadFramesText(reconstruction, file);
 	}
 
@@ -269,7 +269,7 @@ public static partial class ReconstructionIOText
 	/// <summary>ReadImagesText from a file.</summary>
 	public static void ReadImagesText(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenRead(path);
+		using FileStream file = FileOpen.OpenRead(path);
 		ReconstructionIOUtils.NameFileInErrors(path, () => ReadImagesText(reconstruction, file));
 	}
 
@@ -313,7 +313,7 @@ public static partial class ReconstructionIOText
 	/// <summary>ReadPoints3DText from a file.</summary>
 	public static void ReadPoints3DText(Reconstruction reconstruction, string path)
 	{
-		using FileStream file = ReconstructionIOUtils.OpenRead(path);
+		using FileStream file = FileOpen.OpenRead(path);
 		ReadPoints3DText(reconstruction, file);
 	}
 

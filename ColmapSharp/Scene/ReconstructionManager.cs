@@ -6,8 +6,8 @@
 // model. Tests: ColmapSharp.Tests/Scene/ReconstructionManagerTests.cs
 // (reconstruction_manager_test.cc 1:1).
 //
-// Not ported yet: Read and Write (they call Reconstruction.Read/Write, which wait on
-// scene/reconstruction_io). shared_ptr<Reconstruction> is a plain reference; C++'s
+// Write orders the models by point count with an index tie-break where COLMAP's std::sort
+// leaves ties unspecified (docs/CPP_DIVERGENCES.md, entry 34). shared_ptr<Reconstruction> is a plain reference; C++'s
 // non-const Get returns a reference to the shared_ptr so callers can swap the model, which
 // here is Set.
 
@@ -46,4 +46,41 @@ public sealed class ReconstructionManager
 
 	/// <summary>Deletes all reconstructions.</summary>
 	public void Clear() => _reconstructions.Clear();
+
+	/// <summary>Reads a model directory (Reconstruction.Read) into a new reconstruction and returns its index.</summary>
+	public int Read(string path)
+	{
+		int idx = Add();
+		_reconstructions[idx].Read(path);
+		return idx;
+	}
+
+	/// <summary>
+	/// Writes each reconstruction (binary) to the sub-directory "0", "1", ... of
+	/// <paramref name="path"/>, the one with the most 3D points first. Reconstructions with
+	/// the same number of points keep their order.
+	/// </summary>
+	public void Write(string path)
+	{
+		int[] order = new int[_reconstructions.Count];
+		for (int i = 0; i < order.Length; i++)
+		{
+			order[i] = i;
+		}
+
+		// std::sort by descending point count; the index tie-break makes equal counts
+		// deterministic (docs/CPP_DIVERGENCES.md, entry 34).
+		Array.Sort(order, (a, b) =>
+		{
+			int bySize = _reconstructions[b].NumPoints3D.CompareTo(_reconstructions[a].NumPoints3D);
+			return bySize != 0 ? bySize : a.CompareTo(b);
+		});
+
+		for (int i = 0; i < order.Length; ++i)
+		{
+			string reconstructionPath = Path.Combine(path, i.ToString(System.Globalization.CultureInfo.InvariantCulture));
+			Directory.CreateDirectory(reconstructionPath);
+			_reconstructions[order[i]].Write(reconstructionPath);
+		}
+	}
 }

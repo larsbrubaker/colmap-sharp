@@ -723,6 +723,21 @@ Reconstruction_TranscribeImageIdsToDatabase` pass with COLMAP's expectations;
 `ReconstructionPruningTests.CSharpOnly_SameTilePointIsRedundant` pin the filtering and the
 selection tie-break.
 
+## 34. ReconstructionManager.Write breaks point-count ties by index
+
+**What differs.** COLMAP's `ReconstructionManager::Write` orders the models with `std::sort` by
+descending `NumPoints3D` and writes them to `0/`, `1/`, ...; the order of models with the same
+point count is unspecified. `Scene/ReconstructionManager.cs` sorts with an index tie-break, so
+equal-sized models keep their manager order (a stable sort).
+
+**Why.** CLAUDE.md's stable-sort rule: the tie order decides which directory a model lands in.
+libc++'s `std::sort` uses insertion sort for short ranges, which also keeps equal elements in
+order, so for the handful of models a mapper produces the result is the same as COLMAP's; only
+a long run of equal counts could differ.
+
+**Evidence.** `ReconstructionManagerTests.CSharpOnly_WriteOrdersByPointCountThenIndex` writes
+models with point counts 1, 2, 1, 2 and reads back sources 1, 3, 0, 2.
+
 ## 40. ExtractTopScaleFeatures keeps equal-scale keypoints in input order
 
 **What differs.** COLMAP's `ExtractTopScaleFeatures` (feature/utils.cc) selects the largest
