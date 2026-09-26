@@ -2,8 +2,8 @@
 // Ported from COLMAP (BSD-3-Clause, see THIRD_PARTY_NOTICES.md).
 //
 // CamRayWithJac: the struct of that name from colmap/geometry/pose.h (the rest of pose.h is
-// a Phase 2 port). Scene/Camera.cs's CamRayFromImgWithJac returns it; the tangent Sampson
-// estimators (Phase 6) take a list of them. Tested through
+// Pose.cs). Scene/Camera.cs's CamRayFromImgWithJac returns it; the tangent Sampson
+// estimators (Phase 6) and EssentialMatrix.cs's tangent Sampson errors take them. Tested through
 // ColmapSharp.Tests/Scene/CameraTests.cs (camera_test.cc CamRayFromImgWithJac).
 
 using ColmapSharp.LinearAlgebra;

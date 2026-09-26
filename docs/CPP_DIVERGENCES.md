@@ -287,6 +287,22 @@ the pairs in this order (COLMAP's `PoseGraph::Load`, and through it the global m
 see them in load order; a pycolmap fixture for such a pipeline is then compared at Tier C,
 not Tier A.
 
+## 15. ComputeBoundingBoxAndCentroid sorts instead of std::nth_element
+
+**What differs.** `Geometry/Normalization.cs` fully sorts each coordinate list where COLMAP
+partitions it with two `std::nth_element` calls. The bounding box (the elements at the two
+percentile positions) is the same value, and so is the multiset of elements the centroid
+averages, but the order they are summed in differs: COLMAP's is whatever libc++'s
+`nth_element` leaves between the two positions. The centroid can therefore differ from
+COLMAP's in the last bits.
+
+**Why.** The element order after `nth_element` is an unspecified implementation detail of the
+C++ standard library; reproducing it would mean porting libc++'s introselect for one
+rounding-level effect. Sorting satisfies every `nth_element` postcondition.
+
+**Evidence.** `normalization_test.cc` passes 1:1 (`NormalizationTests`), including the exact
+bounding boxes and the 1e-6 centroid checks.
+
 ## 16. PROSAC's out-of-range sample index fails a Check instead of reading past the data
 
 **What differs.** COLMAP's `ProgressiveSampler` (ported faithfully in

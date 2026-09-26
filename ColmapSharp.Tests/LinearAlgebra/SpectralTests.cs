@@ -232,6 +232,30 @@ public class SpectralTests
 		await AssertConvergesWithNullSpace("zero column", a, 3);
 	}
 
+	// A zero column of A is an exact null vector, and it must come out exact: COLMAP's
+	// TriangulatePoint rejects parallel rays by testing that vector's last coordinate for
+	// == 0 (triangulation_test.cc TriangulatePoint.ParallelRays uses this very matrix).
+	// The general two-angle rotation left cos(pi/2) = 6.1e-17 there.
+	[Test]
+	public async Task Svd4d_ZeroColumnNullVectorIsExact()
+	{
+		var a = new Matrix4d(
+			-1, 0, 0, 0,
+			0, -1, 0, 0,
+			-1, 0, 0, -1,
+			0, -1, 0, 0);
+		Svd4d svd = Svd4d.Compute(a);
+		Vector4d nullVector = svd.MatrixV.Col(3);
+		using (Assert.Multiple())
+		{
+			await Assert.That(svd.SingularValues.W).IsEqualTo(0.0);
+			await Assert.That(nullVector.X).IsEqualTo(0.0);
+			await Assert.That(nullVector.Y).IsEqualTo(0.0);
+			await Assert.That(Math.Abs(nullVector.Z)).IsEqualTo(1.0);
+			await Assert.That(nullVector.W).IsEqualTo(0.0);
+		}
+	}
+
 	[Test]
 	public async Task JacobiSVD_RankOneOuterProductConverges()
 	{

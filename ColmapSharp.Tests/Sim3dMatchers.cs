@@ -3,7 +3,8 @@
 //
 // Sim3dMatchers: the Sim3dEq and Sim3dNear gmock matchers of colmap/geometry/sim3_matchers.h,
 // as predicates, next to Rigid3dMatchers.cs. First user:
-// Estimators/Solvers/SimilarityTransformTests.cs. sim3_matchers_test.cc is not ported yet.
+// Estimators/Solvers/SimilarityTransformTests.cs. Its own tests are
+// Geometry/Sim3dMatchersTests.cs (sim3_matchers_test.cc 1:1).
 //
 // Semantics, as in COLMAP: Eq compares scale, rotation coefficients and translation exactly
 // with !(a == b) so NaN never matches. Near requires |scale difference| <= stol, rotation

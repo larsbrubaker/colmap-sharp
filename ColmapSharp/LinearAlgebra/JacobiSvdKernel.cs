@@ -18,7 +18,10 @@
 // phi = (a2 - a1) / 2 gives Rot(theta)^T B Rot(phi) = diag(r1 + r2, r1 - r2). The angles
 // come from atan2, which neither overflows nor underflows. Every rotation is accumulated
 // into U and V, so both are orthogonal to working precision whatever the rank, which is
-// what COLMAP's null-space reads (the last column of V) rely on.
+// what COLMAP's null-space reads (the last column of V) rely on. A 2x2 block with an exactly
+// zero column (row) is instead diagonalized by the left (right) rotation alone, the right
+// (left) one being exactly the identity, so exact null vectors from zero columns stay exact
+// (TryOneSidedRotation).
 //
 // Convergence: the relative test of Demmel and Veselić, "Jacobi's method is more accurate
 // than QR", SIAM J. Matrix Anal. Appl. 13 (1992): the pair (i, j) is rotated while
@@ -155,14 +158,21 @@ internal static class JacobiSvdKernel
 		double x = a[j * n + i];
 		double y = a[i * n + j];
 		double z = a[j * n + j];
-		double rotationAngle = Math.Atan2(0.5 * y - 0.5 * x, 0.5 * w + 0.5 * z);
-		double reflectionAngle = Math.Atan2(0.5 * x + 0.5 * y, 0.5 * w - 0.5 * z);
-		double theta = 0.5 * (rotationAngle + reflectionAngle);
-		double phi = 0.5 * (reflectionAngle - rotationAngle);
-		double ct = Math.Cos(theta);
-		double st = Math.Sin(theta);
-		double cp = Math.Cos(phi);
-		double sp = Math.Sin(phi);
+		double ct;
+		double st;
+		double cp;
+		double sp;
+		if (!TryOneSidedRotation(w, x, y, z, out ct, out st, out cp, out sp))
+		{
+			double rotationAngle = Math.Atan2(0.5 * y - 0.5 * x, 0.5 * w + 0.5 * z);
+			double reflectionAngle = Math.Atan2(0.5 * x + 0.5 * y, 0.5 * w - 0.5 * z);
+			double theta = 0.5 * (rotationAngle + reflectionAngle);
+			double phi = 0.5 * (reflectionAngle - rotationAngle);
+			ct = Math.Cos(theta);
+			st = Math.Sin(theta);
+			cp = Math.Cos(phi);
+			sp = Math.Sin(phi);
+		}
 
 		// Rows i, j <- Rot(theta)^T rows.
 		for (int k = 0; k < n; k++)
@@ -190,6 +200,72 @@ internal static class JacobiSvdKernel
 		{
 			RotateColumns(v, n, i, j, cp, sp);
 		}
+	}
+
+	/// <summary>
+	/// The 2x2 block B = [w x; y z] with an exactly zero column (or row) is diagonalized by
+	/// a left (right) rotation alone: the rotation that folds the other column (row) onto
+	/// one axis. The right (left) rotation is then exactly the identity, so a zero column
+	/// of A is never mixed into V (a zero row never into U), and the null vector it stands
+	/// for stays an exact unit vector. The general two-angle step cannot promise that:
+	/// cos(pi/2) is 6.1e-17, not 0, and that residue lands in coordinates COLMAP tests for
+	/// exact zero (TriangulatePoint rejects parallel rays by V(3,3) == 0,
+	/// triangulation_test.cc TriangulatePoint.ParallelRays). Returns false when neither
+	/// case applies.
+	/// </summary>
+	private static bool TryOneSidedRotation(
+		double w, double x, double y, double z, out double ct, out double st, out double cp, out double sp)
+	{
+		ct = 1;
+		st = 0;
+		cp = 1;
+		sp = 0;
+		if (x == 0 && z == 0)
+		{
+			// Column j is zero: Rot(theta)^T (w, y) = (r, 0).
+			double r = Hypot(w, y);
+			ct = w / r;
+			st = y / r;
+			return true;
+		}
+
+		if (w == 0 && y == 0)
+		{
+			// Column i is zero: Rot(theta)^T (x, z) = (0, r).
+			double r = Hypot(x, z);
+			ct = z / r;
+			st = -x / r;
+			return true;
+		}
+
+		if (y == 0 && z == 0)
+		{
+			// Row j is zero: (w, x) Rot(phi) = (r, 0).
+			double r = Hypot(w, x);
+			cp = w / r;
+			sp = x / r;
+			return true;
+		}
+
+		if (w == 0 && x == 0)
+		{
+			// Row i is zero: (y, z) Rot(phi) = (0, r).
+			double r = Hypot(y, z);
+			cp = z / r;
+			sp = -y / r;
+			return true;
+		}
+
+		return false;
+	}
+
+	// sqrt(a^2 + b^2) of a nonzero pair without overflow or underflow.
+	private static double Hypot(double a, double b)
+	{
+		double largest = Math.Max(Math.Abs(a), Math.Abs(b));
+		double sa = a / largest;
+		double sb = b / largest;
+		return largest * Math.Sqrt(sa * sa + sb * sb);
 	}
 
 	/// <summary>Columns i, j of an n x n matrix times Rot = [c -s; s c].</summary>

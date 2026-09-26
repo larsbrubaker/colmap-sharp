@@ -22,16 +22,6 @@ only if exhaustive/sequential/spatial matching proves too slow for MatterCAD pho
 
 Each phase ends with its ported tests green. Test names follow COLMAP's.
 
-### Phase 1 — Math and linear algebra foundation
-- `random_eigen.h` + `random_eigen_test.cc` (then replace the draw helper in
-  `MatrixUtilsTests` with it).
-- Tests: the remaining `math/*_test.cc`, plus C#-only decomposition tests against oracle
-  fixtures (numpy in the oracle venv is fine for pure linear algebra checks).
-
-### Phase 2 — Geometry
-`geometry/`: `pose`, `essential_matrix`, `homography_matrix`, `triangulation`,
-`normalization`, `pose_prior`; `sim3_matchers_test.cc`.
-
 ### Phase 3 — Sensor
 Skipped `bitmap_test.cc` cases (the host decodes and encodes images, so OIIO file I/O is not
 ported; C# `Bitmap` is a reference type, so C++ move semantics have no counterpart):

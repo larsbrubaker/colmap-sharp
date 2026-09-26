@@ -6,10 +6,7 @@
 // Named MatrixUtilsTests rather than MatrixTests so it does not collide with the C#-only
 // LinearAlgebra.MatrixTests in a --treenode-filter.
 // Tier B (goes through Householder QR): the tolerances are COLMAP's.
-//
-// RandomEigenMatrixd<4, 4>() comes from colmap/math/random_eigen.h, which is not ported
-// yet (it is the next Phase 1 item); RandomMatrix4 below draws the same values in the same
-// order (RandomUniformReal(-1, 1) per coefficient, column-major linear index).
+// RandomEigenMatrixd<4, 4>() is RandomEigen.RandomEigenMatrixXd(4, 4) (same draw order).
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Mathematics;
@@ -22,24 +19,12 @@ namespace ColmapSharp.Tests.Mathematics;
 
 public class MatrixUtilsTests
 {
-	private static MatrixXd RandomMatrix4()
-	{
-		var matrix = new MatrixXd(4, 4);
-		Span<double> data = matrix.AsSpan();
-		for (int i = 0; i < data.Length; i++)
-		{
-			data[i] = RandomUtils.RandomUniformReal(-1.0, 1.0);
-		}
-
-		return matrix;
-	}
-
 	[Test]
 	public async Task DecomposeMatrixRQ_Nominal()
 	{
 		for (int i = 0; i < 10; ++i)
 		{
-			MatrixXd a = RandomMatrix4();
+			MatrixXd a = RandomEigen.RandomEigenMatrixXd(4, 4);
 
 			MatrixUtils.DecomposeMatrixRQ(a, out MatrixXd r, out MatrixXd q);
 

@@ -211,6 +211,44 @@ public readonly struct Quaterniond : IEquatable<Quaterniond>
 	}
 
 	/// <summary>
+	/// Spherical linear interpolation from this (t = 0) to <paramref name="other"/> (t = 1)
+	/// along the shorter arc (the documented behavior of Eigen's Quaternion::slerp, which
+	/// COLMAP's InterpolateCameraPoses calls). Written from the textbook form of Shoemake's
+	/// slerp (K. Shoemake, "Animating rotation with quaternion curves", SIGGRAPH 1985):
+	/// slerp(a, b; t) = [sin((1 - t) w) a + sin(t w) b] / sin(w), w the angle between a and b
+	/// on the unit 3-sphere. Tier B.
+	/// - Shortest arc: q and -q are the same rotation, so when a . b &lt; 0 the target is
+	///   replaced by -b before interpolating.
+	/// - The angle comes from w = 2 atan2(|a - b|, |a + b|) rather than acos(a . b): for unit
+	///   a, b, |a - b| = 2 sin(w/2) and |a + b| = 2 cos(w/2), and this form keeps full
+	///   relative accuracy for tiny w, where acos of a cosine within an ulp of 1 does not
+	///   (the angle-between-vectors formula in W. Kahan, "How Futile are Mindless Assessments
+	///   of Roundoff in Floating-Point Computation?", 2006).
+	/// - Small angles: sin(k w) / sin(w) = k (1 - (k^2 - 1) w^2 / 6 + O(w^4)), so the slerp
+	///   weights equal the linear weights 1 - t and t to within a relative w^2 / 6. Below
+	///   w = 1e-8 that is under 2e-17, less than half an ulp of 1, so plain linear
+	///   interpolation is the correctly rounded slerp there, and it avoids 0 / 0 at w = 0.
+	/// </summary>
+	public Quaterniond Slerp(double t, Quaterniond other)
+	{
+		const double LinearBelowAngle = 1e-8;
+
+		Vector4d from = Coeffs;
+		Vector4d to = Dot(other) < 0 ? -other.Coeffs : other.Coeffs;
+
+		double angle = 2.0 * Math.Atan2((from - to).Norm, (from + to).Norm);
+		if (angle < LinearBelowAngle)
+		{
+			return FromCoeffs((1.0 - t) * from + t * to);
+		}
+
+		double sinAngle = Math.Sin(angle);
+		double weightFrom = Math.Sin((1.0 - t) * angle) / sinAngle;
+		double weightTo = Math.Sin(t * angle) / sinAngle;
+		return FromCoeffs(weightFrom * from + weightTo * to);
+	}
+
+	/// <summary>
 	/// Eigen's isApprox on the coefficients:
 	/// ||a - b|| &lt;= precision * min(||a||, ||b||). Note q and -q are the same rotation
 	/// but are not approximately equal here, as in Eigen.
