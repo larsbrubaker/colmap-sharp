@@ -35,8 +35,6 @@ resize (Apache-2.0) would make it exact if a fixture ever needs that.
 
 ### Phase 4 — Scene
 - `scene_clustering`, `reconstruction_clustering`.
-- Before the pipeline phases, decide how the library surfaces COLMAP's `LOG(WARNING)`
-  messages (dropped for now).
 
 Skipped `util/types_test.cc` cases: `Span.SizeAndEmpty`, `FilterView.Empty/All/None/Nominal/
 RangeExpression` — COLMAP's `span`/`filter_view` are replaced by `System.Span<T>` and LINQ, so
