@@ -36,8 +36,8 @@ Each phase ends with its ported tests green. Test names follow COLMAP's.
   fixtures (numpy in the oracle venv is fine for pure linear algebra checks).
 
 ### Phase 2 — Geometry
-`geometry/`: `rigid3`, `sim3`, `pose`, `essential_matrix`, `homography_matrix`,
-`triangulation`, `normalization`, `bbox`, `gps`, `pose_prior`.
+`geometry/`: `pose`, `essential_matrix`, `homography_matrix`, `triangulation`,
+`normalization`, `pose_prior`; `rigid3_matchers_test.cc`, `sim3_matchers_test.cc`.
 
 ### Phase 3 — Sensor
 `sensor/models` (all camera models; Tier A, bit-exact projection/unprojection, including the

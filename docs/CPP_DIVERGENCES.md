@@ -96,10 +96,15 @@ equal the unique minimal sink-side min cut, which is the same for every maximum 
 for Boost too. MinSTGraphCutScalingTests checks, for a 200k-node float grid, that the labeled
 cut's capacity equals the returned flow within 1e-3 relative.
 
-## 6. FMA contraction in the macOS arm64 pycolmap wheel (quaternion-vector rotation)
+## 6. FMA contraction in the macOS arm64 pycolmap wheel (quaternion-vector rotation, small products, GPS)
 
 **What differs.** `Quaterniond * Vector3d` (Eigen's quaternion-vector rotation) differs from
-the pycolmap 4.2.0 macOS arm64 wheel by 1-2 ulps on about half of the inputs.
+the pycolmap 4.2.0 macOS arm64 wheel by 1-2 ulps on about half of the inputs. Downstream,
+so do the Rigid3d/Sim3d operations built on it (point transform, the translations of
+composition and inverse, `TgtOriginInSrc`), `Rigid3d.AdjointInverse` and
+`GetCovarianceForRigid3dInverse` (3x3 and 6x6 products), and the `GPSTransform`
+ellipsoid/ECEF/ENU/UTM conversions (last bit of the ECEF-scale coordinates, up to
+9.3e-10 m).
 
 **Why.** Same cause as entry 1: the wheel is built with contraction on, and it evaluates
 the cross products inside the rotation, `a1*b2 - a2*b1`, as `fma(a1, b2, -(a2*b1))`.
@@ -112,7 +117,12 @@ ColmapSharp's formula gives 69/138 mismatches against the wheel with plain cross
 and 0/138 with the cross products fused as above.
 `RotationOracleTests.ToleranceFields("rotated")` pins the C# result at 1e-14 relative.
 The other quaternion operations in that fixture are bit-identical
-(`RotationOracleTests.ExactFields`).
+(`RotationOracleTests.ExactFields`). For the geometry (`oracle/geometry_transforms.py`,
+`GeometryOracleTests`): the Rigid3d/Sim3d operations that do not rotate a vector are
+bit-identical, and in `EllipsoidToECEF` only the z coordinate, `(N * (1 - e2) + alt) * sin_lat`,
+differs; evaluating `N * (1 - e2) + alt` as one FMA takes it from 13/80 mismatches to
+3/80 (the script prints this), while x and y (no multiply-add) match on every case. `GeometryOracleTests.ToleranceFields`
+pins these at 1e-14 relative (1e-13 for the 6x6 covariance) and 1e-8 m for GPS coordinates.
 
 ## 7. sin(a/2) in the angle-axis to quaternion conversion
 
@@ -184,3 +194,19 @@ value) where COLMAP could return inf or NaN from a zero-denominator FocalLength.
 
 **Evidence.** Not verified against OIIO: no oracle fixture carries a zero-denominator tag.
 The reader's behavior is stated in its file header.
+
+## 11. UTMToEllipsoid latitude can differ by 1 ulp
+
+**What differs.** `GPSTransform.UTMToEllipsoid` returns a latitude one ulp away from the
+pycolmap 4.2.0 macOS arm64 wheel on 2 of the 80 points in `geometry_transforms.json`;
+longitude and altitude, and every other point, are bit-identical.
+
+**Why.** The cause is not established. Re-deriving the conversion in Python with the same
+libm (`math.sin`, `math.asin`, `math.cosh`, `math.sinh`) reproduces the C# result exactly,
+and fusing the multiply-adds of the xi'/eta' series or of the latitude series into FMAs does
+not remove the two mismatches, so it is neither a port bug nor the contraction of entry 6.
+It may be another compiler choice in the wheel (as in entry 7). We do not emulate it.
+
+**Evidence.** `GeometryOracleTests.ToleranceFields("gps", "utm_to_ellipsoid")` pins it at
+1e-14 relative; the observed gap is 1 ulp (about 7e-15 deg). The Python re-derivation was a
+scratch harness following gps.cc term for term.

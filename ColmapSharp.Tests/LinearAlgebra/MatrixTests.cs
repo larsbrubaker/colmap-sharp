@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // MatrixTests (C#-only; COLMAP has no test for Eigen itself): Matrix2d, Matrix3d,
-// Matrix3x4d and Matrix4d in ColmapSharp/LinearAlgebra. Covers the layout contract
+// Matrix3x4d, Matrix4d and Matrix6d in ColmapSharp/LinearAlgebra. Covers the layout contract
 // (row-major constructor like Eigen's comma initializer, column-major FromColumnMajor like
 // Eigen's memory), products, transpose, determinant and inverse (inverse * M = I within
 // isApprox), and the block helpers COLMAP's Rigid3d/Sim3d use.
@@ -163,6 +163,35 @@ public class MatrixTests
 			await Assert.That(A3.IsApprox(A3 * (1 + 1e-10))).IsFalse();
 			await Assert.That(Matrix3d.Zero.IsApprox(Matrix3d.Zero)).IsTrue();
 			await Assert.That(Matrix3d.Zero.IsApprox(Matrix3d.Identity * 1e-100)).IsFalse();
+		}
+	}
+
+	[Test]
+	public async Task Matrix6d_BlocksLayoutAndProduct()
+	{
+		Matrix3d b = A3.Transpose();
+		Matrix6d m = Matrix6d.FromBlocks(A3, Matrix3d.Identity, Matrix3d.Zero, b);
+		Span<double> columnMajor = stackalloc double[36];
+		m.CopyToColumnMajor(columnMajor);
+		double firstColumnSecondRow = columnMajor[1];
+		double fourthColumnFirstRow = columnMajor[3 * 6];
+
+		// [A, I; 0, B] * [A, I; 0, B] = [A*A, A + B; 0, B*B], all exact in these values.
+		Matrix6d square = m * m;
+		Matrix6d expected = Matrix6d.FromBlocks(A3 * A3, A3 + b, Matrix3d.Zero, b * b);
+		using (Assert.Multiple())
+		{
+			await Assert.That(m.Block3(0, 0) == A3).IsTrue();
+			await Assert.That(m.Block3(0, 3) == Matrix3d.Identity).IsTrue();
+			await Assert.That(m.Block3(3, 0) == Matrix3d.Zero).IsTrue();
+			await Assert.That(m.Block3(3, 3) == b).IsTrue();
+			await Assert.That(firstColumnSecondRow).IsEqualTo(A3[1, 0]);
+			await Assert.That(fourthColumnFirstRow).IsEqualTo(1.0);
+			await Assert.That(m.Transpose().Block3(3, 0) == Matrix3d.Identity).IsTrue();
+			await Assert.That(square == expected).IsTrue();
+			await Assert.That((Matrix6d.Identity * m) == m).IsTrue();
+			await Assert.That(m.IsApprox(m + Matrix6d.FromBlocks(Matrix3d.Identity * 1e-14, Matrix3d.Zero, Matrix3d.Zero, Matrix3d.Zero))).IsTrue();
+			await Assert.That((-m + m) == Matrix6d.Zero).IsTrue();
 		}
 	}
 }

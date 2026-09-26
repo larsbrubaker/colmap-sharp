@@ -8,8 +8,7 @@
 // LibcxxRandom.cs, because the pycolmap oracle is built against libc++ (PORTING_PLAN.md,
 // Phase 1). Named RandomUtils (like MathUtils) so it does not shadow System.Random.
 // Tests: ColmapSharp.Tests/Mathematics/RandomTests.cs (random_test.cc 1:1, plus the
-// C#-only oracle comparison). random_eigen.h is not ported yet: it needs the dynamic
-// matrix types of LinearAlgebra/.
+// C#-only oracle comparison). random_eigen.h's helpers are in RandomEigen.cs.
 //
 // Tier A (exact): the same seed gives the same draws as COLMAP on macOS, bit for bit
 // (see LibcxxRandom.cs for the one libm caveat in RandomGaussian).

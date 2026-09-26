@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // MatrixXd conversions to and from the fixed-size matrices (Matrix2d, Matrix3d,
-// Matrix3x4d, Matrix4d), the analogue of assigning between Eigen::MatrixXd and a
+// Matrix3x4d, Matrix4d, Matrix6d), the analogue of assigning between Eigen::MatrixXd and a
 // fixed-size Eigen::Matrix. Part of MatrixXd (see MatrixXd.cs). Both sides store
 // column-major, so the conversions are plain buffer copies.
 
@@ -39,6 +39,14 @@ public sealed partial class MatrixXd
 		return r;
 	}
 
+	/// <summary>Converts a Matrix6d.</summary>
+	public static MatrixXd From(in Matrix6d m)
+	{
+		var r = new MatrixXd(6, 6);
+		m.CopyToColumnMajor(r._data);
+		return r;
+	}
+
 	/// <summary>Converts to a Matrix2d; the shape must be 2x2.</summary>
 	public Matrix2d ToMatrix2d()
 	{
@@ -65,6 +73,13 @@ public sealed partial class MatrixXd
 	{
 		RequireShape(4, 4);
 		return Matrix4d.FromColumnMajor(_data);
+	}
+
+	/// <summary>Converts to a Matrix6d; the shape must be 6x6.</summary>
+	public Matrix6d ToMatrix6d()
+	{
+		RequireShape(6, 6);
+		return Matrix6d.FromColumnMajor(_data);
 	}
 
 	private void RequireShape(int rows, int cols)

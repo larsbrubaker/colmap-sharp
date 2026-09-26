@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // FixedBuffers: the inline, allocation-free coefficient storage behind the fixed-size
-// matrices in this folder (Matrix2d, Matrix3d, Matrix3x4d, Matrix4d). Not a port of
+// matrices in this folder (Matrix2d, Matrix3d, Matrix3x4d, Matrix4d, Matrix6d). Not a port of
 // anything; Eigen's fixed-size storage is replaced by .NET inline arrays, which are
 // trim- and AOT-clean and keep each matrix a plain value type.
 //
@@ -26,6 +26,12 @@ internal struct Buffer12
 
 [InlineArray(16)]
 internal struct Buffer16
+{
+	private double _element0;
+}
+
+[InlineArray(36)]
+internal struct Buffer36
 {
 	private double _element0;
 }
