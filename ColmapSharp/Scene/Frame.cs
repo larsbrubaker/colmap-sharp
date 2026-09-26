@@ -7,7 +7,7 @@
 // ColmapSharp.Tests/Scene/FrameTests.cs (frame_test.cc 1:1).
 //
 // Design (later phases build on it):
-// - Ownership. The Reconstruction (a later Phase 4 port) owns rigs, frames, images and
+// - Ownership. The Reconstruction (Reconstruction.cs) owns rigs, frames, images and
 //   cameras. C++'s raw `Rig* rig_ptr_` becomes a non-owning C# reference that the
 //   Reconstruction sets with SetRigPtr and clears with ResetRigPtr, under COLMAP's rules:
 //   whoever removes a rig resets the frames pointing at it. A stale reference keeps the old

@@ -24,7 +24,7 @@
 //   final positions agree within the tests' tolerances (docs/CPP_DIVERGENCES.md entry 48).
 // - The CUDA options (use_gpu, gpu_index, min_num_images_gpu_solver) are not ported: the
 //   solver runs on the CPU, as COLMAP does without CUDA.
-// - LOG/VLOG output is dropped (PORTING_PLAN.md).
+// - LOG(WARNING)/LOG(ERROR) go to Util/Log.cs; LOG(INFO)/VLOG output is dropped.
 
 using ColmapSharp.Estimators.CostFunctions;
 using ColmapSharp.Geometry;
@@ -147,9 +147,15 @@ public sealed class GlobalPositioner
 	/// </summary>
 	public bool Solve(PoseGraph poseGraph, Reconstruction reconstruction)
 	{
-		if (reconstruction.NumImages == 0 || reconstruction.NumPoints3D == 0)
+		if (reconstruction.NumImages == 0)
 		{
-			// COLMAP: LOG(ERROR) << "Number of images/tracks = 0".
+			Log.Error($"Number of images = {reconstruction.NumImages}");
+			return false;
+		}
+
+		if (reconstruction.NumPoints3D == 0)
+		{
+			Log.Error($"Number of tracks = {reconstruction.NumPoints3D}");
 			return false;
 		}
 
@@ -303,7 +309,9 @@ public sealed class GlobalPositioner
 			Vector3d? camRay = image.CameraPtr.CamRayFromImg(image.Point2DAt(observation.Point2DIdx).Xy);
 			if (camRay is null)
 			{
-				// COLMAP: LOG(WARNING) << "Ignoring feature because it failed to project".
+				Log.Warning(
+					$"Ignoring feature because it failed to project: point3D_id={point3DId}, image_id={observation.ImageId}, "
+					+ $"feature_id={observation.Point2DIdx}");
 				continue;
 			}
 

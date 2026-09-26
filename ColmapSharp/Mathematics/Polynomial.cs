@@ -9,7 +9,8 @@
 // ColmapSharp.Tests/Mathematics/PolynomialTests.cs (polynomial_test.cc 1:1).
 //
 // Tiers: EvaluatePolynomial (real) and the linear/quadratic roots are plain arithmetic in
-// COLMAP's order, Tier A. The cubic goes through cbrt/acos/cos (platform libm vs .NET),
+// COLMAP's order, Tier A. The cubic goes through cbrt/acos/cos (platform libm vs .NET,
+// docs/CPP_DIVERGENCES.md entry 114),
 // Durand-Kerner through std::complex division (libc++ scales by logb/scalbn, .NET's
 // Complex uses Smith's algorithm), and the companion matrix through EigenSolver (our
 // Francis QR, not Eigen's), so those are Tier B; polynomial_test.cc compares them with

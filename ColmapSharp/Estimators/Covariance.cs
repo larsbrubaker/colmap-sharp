@@ -15,8 +15,8 @@
 //   ArraySegment's (array, offset), as in Solver/Problem.cs. A default segment (null array)
 //   plays the part of nullptr.
 // - std::optional<MatrixXd> is a nullable MatrixXd.
-// - LOG(WARNING)/VLOG output is dropped (the library has no log sink yet); the functions
-//   return null where COLMAP warns and returns nullopt.
+// - LOG(WARNING) goes to Util/Log.cs and VLOG output is dropped; the functions return null
+//   where COLMAP warns and returns nullopt.
 // - GetOtherParams lists blocks in Problem.GetParameterBlocks order, which is insertion order
 //   here and address order in Ceres (docs/CPP_DIVERGENCES.md, entry 53).
 
@@ -144,15 +144,26 @@ public sealed class BACovariance
 	public MatrixXd? GetCam2CovFromCam1(uint imageId1, Rigid3d cam1FromWorld, uint imageId2, Rigid3d cam2FromWorld)
 	{
 		MatrixXd? cov11 = GetCamCovFromWorld(imageId1);
-		if (cov11 is null || cov11.Rows != 6)
+		if (cov11 is null)
 		{
-			// COLMAP warns when the pose is (partially) constant.
+			return null;
+		}
+
+		if (cov11.Rows != 6)
+		{
+			Log.Warning("cam1_from_world is not fully in the problem. This is likely due to the pose being set (partially) constant. ");
 			return null;
 		}
 
 		MatrixXd? cov22 = GetCamCovFromWorld(imageId2);
-		if (cov22 is null || cov22.Rows != 6)
+		if (cov22 is null)
 		{
+			return null;
+		}
+
+		if (cov22.Rows != 6)
+		{
+			Log.Warning("cam2_from_world is not fully in the problem. This is likely due to the pose being set (partially) constant. ");
 			return null;
 		}
 

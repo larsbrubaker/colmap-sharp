@@ -20,9 +20,8 @@
 //   order is unobservable.
 // - CorrespondenceRange (a [beg, end) pointer pair) becomes a ReadOnlySpan over the
 //   correspondence storage; it is valid until the graph is next modified.
-// - Invalid and duplicate matches are dropped as in COLMAP. COLMAP also prints a
-//   LOG(WARNING) for each; there is no logging sink in ColmapSharp yet, so they are dropped
-//   silently (the counts reflect them exactly as in COLMAP).
+// - Self-matches and invalid and duplicate matches are dropped as in COLMAP, each with
+//   COLMAP's LOG(WARNING) through Util/Log.cs (the counts reflect them exactly as in COLMAP).
 // - A missing image throws KeyNotFoundException (COLMAP's std::out_of_range from map::at),
 //   with COLMAP's message where it words one.
 
@@ -156,6 +155,7 @@ public sealed class CorrespondenceGraph
 		// Avoid self-matches - should only happen, if user provides custom matches.
 		if (imageId1 == imageId2)
 		{
+			Log.Warning($"Cannot use self-matches for image_id={imageId1}");
 			return;
 		}
 
@@ -209,6 +209,13 @@ public sealed class CorrespondenceGraph
 					image1.NumCorrespondences -= 1;
 					image2.NumCorrespondences -= 1;
 					imagePair.NumMatches -= 1;
+
+					// Here and in the out-of-range warnings below, the (int) casts match COLMAP's
+					// StringPrintf("%d") of uint32 values, so an index of kInvalidPoint2DIdx
+					// prints as -1, as in COLMAP.
+					Log.Warning(
+						$"Duplicate correspondence between point2D_idx={(int)match.Point2DIdx1} in image_id={(int)imageId1} "
+						+ $"and point2D_idx={(int)match.Point2DIdx2} in image_id={(int)imageId2}");
 				}
 				else
 				{
@@ -231,6 +238,15 @@ public sealed class CorrespondenceGraph
 				image1.NumCorrespondences -= 1;
 				image2.NumCorrespondences -= 1;
 				imagePair.NumMatches -= 1;
+				if (!validIdx1)
+				{
+					Log.Warning($"point2D_idx={(int)match.Point2DIdx1} in image_id={(int)imageId1} does not exist");
+				}
+
+				if (!validIdx2)
+				{
+					Log.Warning($"point2D_idx={(int)match.Point2DIdx2} in image_id={(int)imageId2} does not exist");
+				}
 			}
 		}
 

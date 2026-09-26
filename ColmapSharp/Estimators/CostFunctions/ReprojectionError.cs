@@ -15,7 +15,7 @@
 // 7), and every functor lists its blocks in the C++ order. Evaluate reads them from the
 // concatenated span IAutoDiffFunctor passes. The quaternion algebra is QuaternionT.cs.
 // Tier B: the arithmetic follows the C++ expression order, but Eigen's SIMD grouping on the
-// double path is not reproduced (see QuaternionT.cs).
+// double path is not reproduced (see QuaternionT.cs; docs/CPP_DIVERGENCES.md entry 115).
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;

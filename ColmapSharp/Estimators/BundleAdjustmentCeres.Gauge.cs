@@ -55,7 +55,7 @@ internal sealed partial class DefaultBundleAdjuster
 			}
 		}
 
-		// COLMAP logs "Failed to fix Gauge due to insufficient number of fixed points" here.
+		Log.Warning($"Failed to fix Gauge due to insufficient number of fixed points: {fixedGauge.NumFixedPoints}");
 	}
 
 	// Whether a sensor is either a reference sensor, or a non-reference sensor with
@@ -156,8 +156,7 @@ internal sealed partial class DefaultBundleAdjuster
 		// fix the Gauge differently.
 		if (image1 is null || image2 is null)
 		{
-			// COLMAP logs "Failed to fix Gauge with two cameras. Falling back to fixing Gauge
-			// with three points." here.
+			Log.Warning("Failed to fix Gauge with two cameras. Falling back to fixing Gauge with three points.");
 			FixGaugeWithThreePoints(reconstruction);
 			return;
 		}

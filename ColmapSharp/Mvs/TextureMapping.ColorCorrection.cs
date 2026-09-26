@@ -16,6 +16,7 @@
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Sensor;
+using ColmapSharp.Util;
 
 namespace ColmapSharp.Mvs;
 
@@ -175,8 +176,11 @@ public static partial class TextureMapping
 		solver.Factorize(a);
 		if (solver.Info != ComputationInfo.Success)
 		{
-			// COLMAP logs "Color correction: failed to factorize system" and leaves the
-			// atlas uncorrected.
+			// The atlas is left uncorrected, as in COLMAP. COLMAP's second check, "failed to
+			// solve system" after a successful factorization, cannot fire here: Solve has no
+			// failure state of its own once Factorize succeeded (Eigen's info() is the
+			// factorization's too).
+			Log.Warning("Color correction: failed to factorize system");
 			return;
 		}
 

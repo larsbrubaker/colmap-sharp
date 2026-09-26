@@ -54,8 +54,16 @@ public static partial class Synthetic
 		Check.Gt(options.NumFramesPerRig, 0);
 		Check.Ge(options.NumPoints3D, 0);
 		Check.That(options.TrackLength == -1 || options.TrackLength >= 2);
-		// COLMAP logs a warning when track_length exceeds the number of images (pruning then
-		// never triggers); warnings are not surfaced yet (PORTING_PLAN.md, Phase 4).
+		if (options.TrackLength > 0)
+		{
+			int numImages = options.NumRigs * options.NumCamerasPerRig * options.NumFramesPerRig;
+			if (options.TrackLength > numImages)
+			{
+				Log.Warning(
+					$"track_length ({options.TrackLength}) exceeds number of images ({numImages}), skipping observation pruning.");
+			}
+		}
+
 		Check.Ne((int)options.FeatureType, (int)FeatureExtractorType.Undefined);
 		Check.Ge(options.NumPoints2DWithoutPoint3D, 0);
 		Check.Ge(options.SensorFromRigTranslationStddev, 0.0);

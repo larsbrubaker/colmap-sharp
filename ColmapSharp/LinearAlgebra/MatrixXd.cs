@@ -20,7 +20,7 @@
 // Arithmetic order: the folder contract in Vector3d.cs. Every product coefficient is a
 // left-to-right sum over k seeded with the k = 0 term, no FMA. Eigen evaluates dynamic
 // products with a blocked, vectorized kernel, so dynamic products are Tier B against
-// COLMAP (rounding may differ in the last bits).
+// COLMAP (rounding may differ in the last bits; docs/CPP_DIVERGENCES.md entry 115).
 //
 // Inventory of Eigen decompositions COLMAP 4.2.0 calls (src/colmap outside ui/, exe/,
 // CUDA/Caspar and tests); all are provided in this folder. The dense ones:

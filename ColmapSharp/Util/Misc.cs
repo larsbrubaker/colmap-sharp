@@ -48,8 +48,8 @@ public static class Misc
 
 	/// <summary>
 	/// CSVToVector&lt;double&gt;: splits on ',' and ';', trims each element, skips empty ones
-	/// and parses the rest. Returns an empty list if any element fails to parse (COLMAP logs
-	/// the failure and returns {}).
+	/// and parses the rest. Returns an empty list if any element fails to parse, logging the
+	/// failure as COLMAP does.
 	/// </summary>
 	public static List<double> CsvToDoubleVector(string csv)
 	{
@@ -67,6 +67,7 @@ public static class Misc
 
 			if (!TryStringToDouble(elem, out double value))
 			{
+				Log.Error($"Failed to convert CSV element: {elem}");
 				return [];
 			}
 

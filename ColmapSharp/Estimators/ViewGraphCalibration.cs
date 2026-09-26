@@ -21,7 +21,7 @@
 // - ReestimateRelativePoses' ThreadPool becomes Parallel.For; each task writes its own
 //   pair. The matches are read up front instead of under a mutex inside the task, which
 //   only changes when they are read.
-// - LOG/VLOG output is dropped (PORTING_PLAN.md).
+// - LOG(WARNING)/LOG(ERROR) go to Util/Log.cs; LOG(INFO)/VLOG output is dropped.
 
 using ColmapSharp.Estimators.CostFunctions;
 using ColmapSharp.Feature;
@@ -160,7 +160,7 @@ public static class ViewGraphCalibration
 
 		if (pairs.Count == 0)
 		{
-			// COLMAP: LOG(WARNING) << "No image pairs to calibrate".
+			Log.Warning("No image pairs to calibrate");
 			return true;
 		}
 
@@ -524,7 +524,7 @@ public static class ViewGraphCalibration
 		SolverSummary summary = LeastSquaresSolver.Solve(solverOptions, problem);
 		if (!summary.IsSolutionUsable)
 		{
-			// COLMAP: LOG(ERROR) << "Ceres solver failed".
+			Log.Error("Ceres solver failed");
 			result.Success = false;
 			return result;
 		}

@@ -20,7 +20,7 @@
 // - COLMAP's outlier check after the solve compares each neighbor gravity with itself (the
 //   loop variable shadows the refined gravity), so the error is always 0 and every solved
 //   frame is accepted. Kept as is, since this is the behavior COLMAP's tests pin.
-// - LOG output is dropped (PORTING_PLAN.md).
+// - COLMAP logs only at INFO level here, and LOG(INFO) is dropped.
 
 using System.Runtime.InteropServices;
 

@@ -268,6 +268,21 @@ public static class CeresBundleAdjusters
 		return LeastSquaresSolver.Solve(solverOptions, problem, cancellationToken);
 	}
 
+	/// <summary>
+	/// Port of CreateSummaryAndLogFailure: wraps the solver summary and logs an error when
+	/// the solution is not usable.
+	/// </summary>
+	internal static CeresBundleAdjustmentSummary CreateSummaryAndLogFailure(SolverSummary ceresSummary, string context)
+	{
+		CeresBundleAdjustmentSummary summary = CeresBundleAdjustmentSummary.Create(ceresSummary);
+		if (!summary.IsSolutionUsable())
+		{
+			Util.Log.Error($"{context} failed: {ceresSummary.Message}");
+		}
+
+		return summary;
+	}
+
 	private sealed class CancellationCallback(Func<bool> checkIfStopped) : IIterationCallback
 	{
 		public CallbackReturnType Invoke(IterationSummary summary) =>

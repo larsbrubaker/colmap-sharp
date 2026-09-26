@@ -32,7 +32,7 @@
 // - CheckIfStopped becomes a CancellationToken checked where COLMAP checks: after loading
 //   and before each image. As in COLMAP (BaseController), a stop is not an error: Run
 //   returns normally with the points fused so far. Progress is reported after each image.
-// - Logging and timers are not ported (PORTING_PLAN.md Phase 4).
+// - LOG(WARNING) goes to Util/Log.cs; LOG(INFO) lines and timers are not ported.
 
 using System.Runtime.InteropServices;
 
@@ -186,7 +186,7 @@ public sealed class StereoFusion
 
 			if (!workspace.HasBitmap(imageIdx) || !workspace.HasDepthMap(imageIdx) || !workspace.HasNormalMap(imageIdx))
 			{
-				// COLMAP logs "Ignoring image <name>, because input does not exist."
+				Log.Warning($"Ignoring image {imageName}, because input does not exist.");
 				continue;
 			}
 
@@ -252,9 +252,12 @@ public sealed class StereoFusion
 			progress?.Report(new StereoFusionProgress(numFusedImages, numImages, fusedPoints.Count));
 		}
 
-		// COLMAP warns when no point was fused: "Could not fuse any points. This is likely
-		// caused by incorrect settings - filtering must be enabled for the last call to patch
-		// match stereo."
+		if (fusedPoints.Count == 0)
+		{
+			Log.Warning(
+				"Could not fuse any points. This is likely caused by incorrect settings - filtering must be enabled for "
+				+ "the last call to patch match stereo.");
+		}
 	}
 
 	/// <summary>

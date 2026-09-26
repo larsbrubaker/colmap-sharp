@@ -57,6 +57,7 @@ public static partial class ReconstructionIO
 			}
 			else
 			{
+				Log.Warning("Bundler only supports `SIMPLE_RADIAL`, `RADIAL`, and pinhole camera models.\n");
 				return false;
 			}
 

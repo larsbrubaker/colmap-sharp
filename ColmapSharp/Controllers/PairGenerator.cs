@@ -18,8 +18,8 @@
 // - std::pair<image_t, image_t> is a (uint, uint) tuple; Next() returns a new list.
 // - The constructors taking a std::shared_ptr<Database> take a Database and build a
 //   FeatureMatcherCache of options.CacheSize() images, like COLMAP.
-// - LOG(INFO) progress lines are not ported (there is no logging sink); LOG(ERROR) for an
-//   unknown image name in a pair list is dropped the same way: the line is skipped.
+// - LOG(INFO) progress lines are not ported; the LOG(ERROR) for an unknown image name in a
+//   pair list goes to Util/Log.cs, and the line is skipped as in COLMAP.
 // - VocabTreePairGenerator is not ported: vocabulary-tree retrieval (colmap/retrieval) is
 //   out of scope.
 
@@ -352,9 +352,15 @@ public sealed class ImportedPairGenerator : PairGenerator
 				imageName2 = CppLineTokens.Trim(space2 < 0 ? rest : rest[..space2]);
 			}
 
-			if (!imageNameToImageId.TryGetValue(imageName1, out uint imageId1)
-				|| !imageNameToImageId.TryGetValue(imageName2, out uint imageId2))
+			if (!imageNameToImageId.TryGetValue(imageName1, out uint imageId1))
 			{
+				Log.Error($"Image {imageName1} does not exist.");
+				continue;
+			}
+
+			if (!imageNameToImageId.TryGetValue(imageName2, out uint imageId2))
+			{
+				Log.Error($"Image {imageName2} does not exist.");
 				continue;
 			}
 

@@ -21,8 +21,8 @@
 //   deep-copies it (Model.Clone), because MaxImageSize downsizes the workspace's images
 //   and C++ holds its Model by value.
 // - COLMAP's ThreadPool in Load becomes Parallel.ForEach; each task writes only its own
-//   image's slots. The LOG(INFO)/LOG(WARNING) lines and the timer are not ported (the
-//   library does not log yet; PORTING_PLAN.md Phase 4).
+//   image's slots. The LOG(WARNING) for a missing input goes to Util/Log.cs; the LOG(INFO)
+//   lines and the timer are not ported.
 // - CachedWorkspace keeps COLMAP's locking: a cache lock around cache access and a lock per
 //   cached image around its lazy loads.
 
@@ -153,6 +153,10 @@ public class Workspace
 			if (HasBitmap(imageIdx) && HasDepthMap(imageIdx))
 			{
 				imageIdxs.Add(imageIdx);
+			}
+			else
+			{
+				Log.Warning($"Ignoring image {imageName}, because input does not exist.");
 			}
 		}
 

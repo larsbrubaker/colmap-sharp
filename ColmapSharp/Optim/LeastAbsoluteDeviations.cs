@@ -117,6 +117,13 @@ public sealed class LeastAbsoluteDeviationSolver
 			_fallback = new SparseCholeskyWithFallbackSolver();
 			Valid = _fallback.Compute(ata);
 		}
+
+		if (!Valid)
+		{
+			Log.Warning(
+				"LeastAbsoluteDeviationSolver: factorization of A^T A failed; system is rank deficient or not positive "
+				+ "definite. Solve() will return false.");
+		}
 	}
 
 	/// <summary>

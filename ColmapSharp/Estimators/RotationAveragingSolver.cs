@@ -16,11 +16,12 @@
 //   cap is raised through LeastAbsoluteDeviationSolver.MaxNumIterations.
 // - SupernodalCholmodLLT selects the managed LLT-with-LDLT-fallback solver
 //   (docs/CPP_DIVERGENCES.md, entry 13), as does the IRLS phase.
-// - LOG/VLOG messages are dropped (no logging sink yet, PORTING_PLAN.md).
+// - LOG(ERROR) messages go to Util/Log.cs; VLOG messages are dropped, like LOG(INFO).
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Mathematics;
 using ColmapSharp.Optim;
+using ColmapSharp.Util;
 
 namespace ColmapSharp.Estimators;
 
@@ -84,7 +85,7 @@ public sealed class RotationAveragingSolver
 		var l1Solver = new LeastAbsoluteDeviationSolver(l1SolverOptions, l1Matrix);
 		if (!l1Solver.Valid)
 		{
-			// COLMAP: LOG(ERROR) "L1 regression linear solver factorization failed".
+			Log.Error("L1 regression linear solver factorization failed");
 			return false;
 		}
 
@@ -100,7 +101,7 @@ public sealed class RotationAveragingSolver
 			step.AsSpan().Clear();
 			if (!l1Solver.Solve(problem.WeightedResiduals(), step) || HasNaN(step))
 			{
-				// COLMAP: LOG(ERROR) "L1 regression solve failed (iteration i)".
+				Log.Error($"L1 regression solve failed (iteration {iteration})");
 				return false;
 			}
 
@@ -165,7 +166,7 @@ public sealed class RotationAveragingSolver
 
 			if (double.IsNaN(w))
 			{
-				// COLMAP: LOG(ERROR) "nan weight!".
+				Log.Error("nan weight!");
 				return null;
 			}
 
@@ -243,14 +244,14 @@ public sealed class RotationAveragingSolver
 
 			if (!solver.Factorize(atWeightA))
 			{
-				// COLMAP: LOG(ERROR) "IRLS Cholesky factorization failed (iteration i)".
+				Log.Error($"IRLS Cholesky factorization failed (iteration {iteration})");
 				return false;
 			}
 
 			VectorXd atWeightResiduals = atWeight * problem.Residuals;
 			if (!solver.Solve(atWeightResiduals, out VectorXd step) || HasNaN(step))
 			{
-				// COLMAP: LOG(ERROR) "IRLS solve failed (iteration i)".
+				Log.Error($"IRLS solve failed (iteration {iteration})");
 				return false;
 			}
 

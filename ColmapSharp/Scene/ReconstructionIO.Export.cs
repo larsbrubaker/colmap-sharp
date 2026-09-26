@@ -11,8 +11,8 @@
 // default precision 6 (so observation coordinates are written with 6 significant digits),
 // and VRML files are never given a precision. Doubles go through Util/CppStreamFormat.cs,
 // Eigen matrices through Util/EigenStreamFormat.cs. An unsupported camera model makes an
-// exporter return false after it has already written what came before, as in COLMAP (its
-// LOG(WARNING) is dropped, PORTING_PLAN.md). COLMAP walks Points3D() (and, for VRML,
+// exporter return false after it has already written what came before, as in COLMAP, with
+// its LOG(WARNING) (trailing newline included where COLMAP's text has one) to Util/Log.cs. COLMAP walks Points3D() (and, for VRML,
 // Images()), which are hash maps; here they are walked in ascending id order
 // (docs/CPP_DIVERGENCES.md, entry 21, which already covers every Reconstruction walk).
 
@@ -63,6 +63,7 @@ public static partial class ReconstructionIO
 			}
 			else
 			{
+				Log.Warning("NVM only supports `SIMPLE_RADIAL` and pinhole camera models.\n");
 				return false;
 			}
 
@@ -164,6 +165,7 @@ public static partial class ReconstructionIO
 			}
 			else
 			{
+				Log.Warning("CAM only supports `SIMPLE_RADIAL`, `RADIAL`, and pinhole camera models.\n");
 				return false;
 			}
 
@@ -254,6 +256,7 @@ public static partial class ReconstructionIO
 			}
 			else
 			{
+				Log.Warning("Recon3D only supports `SIMPLE_RADIAL`, `RADIAL`, and pinhole camera models.");
 				return false;
 			}
 

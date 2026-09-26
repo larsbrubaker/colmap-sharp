@@ -340,7 +340,10 @@ public sealed class BundleAdjustmentOptions
 	/// </summary>
 	public bool ConstantRigFromWorldRotation { get; set; }
 
-	/// <summary>Whether to print a final summary (COLMAP logs it; the library has no log yet).</summary>
+	/// <summary>
+	/// Whether to print a final summary. COLMAP prints it with LOG(INFO), which the library does
+	/// not route (Util/Log.cs carries warnings and errors only), so this has no effect here.
+	/// </summary>
 	public bool PrintSummary { get; set; } = true;
 
 	/// <summary>Solver backend to use for bundle adjustment.</summary>

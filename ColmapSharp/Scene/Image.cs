@@ -7,7 +7,7 @@
 // ColmapSharp.Tests/Scene/ImageTests.cs (image_test.cc 1:1).
 //
 // Design (later phases build on it):
-// - Ownership. The Reconstruction (a later Phase 4 port) owns cameras, frames and images.
+// - Ownership. The Reconstruction (Reconstruction.cs) owns cameras, frames and images.
 //   C++'s raw `Camera* camera_ptr_` and `Frame* frame_ptr_` become non-owning C#
 //   references (CameraPtr, FramePtr) that the Reconstruction sets and resets under COLMAP's
 //   rules. The image has no pose of its own: CamFromWorld is the frame's rig_from_world

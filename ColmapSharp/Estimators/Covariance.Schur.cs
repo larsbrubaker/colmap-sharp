@@ -17,6 +17,7 @@
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Solver;
+using ColmapSharp.Util;
 
 namespace ColmapSharp.Estimators;
 
@@ -69,7 +70,7 @@ public static partial class BACovarianceEstimation
 		var jFullCrs = new CRSMatrix();
 		if (!problem.Evaluate(evalOptions, out _, null, null, jFullCrs))
 		{
-			// COLMAP: LOG(WARNING) << "Failed to evaluate Jacobian".
+			Log.Warning("Failed to evaluate Jacobian");
 			return false;
 		}
 
@@ -193,7 +194,7 @@ public static partial class BACovarianceEstimation
 		lltSOo.Compute(sOo);
 		if (lltSOo.Info != ComputationInfo.Success)
 		{
-			// COLMAP: LOG(WARNING) "Simplicial LLT for Schur elimination of other parameters failed".
+			Log.Warning("Simplicial LLT for Schur elimination of other parameters failed");
 			return false;
 		}
 
@@ -246,7 +247,7 @@ public static partial class BACovarianceEstimation
 		ldltS.Compute(s);
 		if (ldltS.Info != ComputationInfo.Success)
 		{
-			// COLMAP: LOG(WARNING) "Simplicial LDLT for computing L_inv failed".
+			Log.Warning("Simplicial LDLT for computing L_inv failed");
 			return false;
 		}
 
@@ -262,9 +263,10 @@ public static partial class BACovarianceEstimation
 
 		if (rank < n)
 		{
-			// COLMAP warns: the Schur complement on pose/other parameters is rank deficient,
-			// likely due to the pose/other parameters being underconstrained with Gauge
-			// ambiguity or other degeneracies.
+			Log.Warning(
+				"Unable to compute covariance. The Schur complement on pose/other parameters is rank deficient. "
+				+ $"Number of columns: {n}, rank: {rank}. This is likely due to the pose/other parameters being "
+				+ "underconstrained with Gauge ambiguity or other degeneracies.");
 			return false;
 		}
 

@@ -21,8 +21,9 @@
 //   and its FlatHashMap of per-point observation counts when choosing the three gauge
 //   points. Here the config's images and points are visited in ascending id order and the
 //   observation counts in first-seen order, so a run is reproducible.
-// - LOG(WARNING) on a failed gauge fix is dropped (the library has no log sink yet); the
-//   problem is left as COLMAP leaves it.
+// - The LOG(WARNING)s on a failed gauge fix and the LOG(ERROR) on an unusable solution go to
+//   Util/Log.cs; the "Bundle adjustment report" (print_summary, LOG(INFO)) is not printed.
+//   A failed gauge fix leaves the problem as COLMAP leaves it.
 
 using ColmapSharp.Estimators.CostFunctions;
 using ColmapSharp.Geometry;
@@ -107,7 +108,7 @@ internal sealed partial class DefaultBundleAdjuster : CeresBundleAdjuster
 		}
 
 		SolverSummary ceresSummary = CeresBundleAdjusters.Solve(OptionsInternal, ConfigInternal, problem, cancellationToken);
-		return CeresBundleAdjustmentSummary.Create(ceresSummary);
+		return CeresBundleAdjusters.CreateSummaryAndLogFailure(ceresSummary, "Bundle adjustment");
 	}
 
 	private bool SkipForTrackLength(Point3D point3D) =>

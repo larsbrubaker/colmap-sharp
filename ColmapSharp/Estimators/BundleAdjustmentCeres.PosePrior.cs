@@ -16,8 +16,8 @@
 // Tier C (outcome), like the default adjuster; the alignment is Tier C through LO-RANSAC.
 //
 // Translation notes:
-// - The VLOG(2) alignment error report and the LOG(WARNING) on a failed alignment are
-//   dropped (the library has no log sink yet); neither affects the result.
+// - The LOG(WARNING) on a failed alignment and the LOG(ERROR) on an unusable solution go to
+//   Util/Log.cs; the VLOG(2) alignment error report is dropped, like LOG(INFO).
 // - As in COLMAP, a problem without residuals returns an empty summary without undoing the
 //   normalization, so the reconstruction is left in the normalized frame in that case.
 
@@ -118,7 +118,7 @@ internal sealed class PosePriorBundleAdjuster : CeresBundleAdjuster
 
 		reconstruction.Transform(normalizedFromMetric.Inverse());
 
-		return CeresBundleAdjustmentSummary.Create(ceresSummary);
+		return CeresBundleAdjusters.CreateSummaryAndLogFailure(ceresSummary, "Pose prior bundle adjustment");
 	}
 
 	private void AddImagePosePriorToProblem(uint imageId, PosePrior posePrior, Reconstruction reconstruction)
@@ -194,6 +194,7 @@ internal sealed class PosePriorBundleAdjuster : CeresBundleAdjuster
 				priorOptions.PriorPositionFallbackStddev,
 				ref metricFromOrig))
 		{
+			Log.Warning("Alignment w.r.t. prior positions failed");
 			return false;
 		}
 

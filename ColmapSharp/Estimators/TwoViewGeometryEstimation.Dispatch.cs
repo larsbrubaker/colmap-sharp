@@ -10,11 +10,16 @@
 using ColmapSharp.Feature;
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Scene;
+using ColmapSharp.Util;
 
 namespace ColmapSharp.Estimators;
 
 public static partial class TwoViewGeometryEstimation
 {
+	// COLMAP's LOG_FIRST_N(WARNING, 1): each of these warnings is logged once per process.
+	private static int forceHUseNonPinholeWarned;
+	private static int fisheyeWithoutFocalPriorWarned;
+
 	// Whether a camera's intrinsics are known: it either carries a focal prior, or is
 	// spherical and has no focal length to estimate in the first place.
 	private static bool IsCameraCalibrated(Camera camera) => camera.IsSpherical || camera.HasPriorFocalLength;
@@ -60,9 +65,16 @@ public static partial class TwoViewGeometryEstimation
 			// In image coordinates, a homography relates two views of a plane only under a
 			// pinhole projection. Fisheye and spherical models map the plane non-linearly, so
 			// the estimated homography would be meaningless; such pairs are marked degenerate
-			// (COLMAP logs a warning once).
+			// (with a warning logged once, as in COLMAP).
 			if (!camera1.IsPerspectivePinhole || !camera2.IsPerspectivePinhole)
 			{
+				if (Interlocked.Exchange(ref forceHUseNonPinholeWarned, 1) == 0)
+				{
+					Log.Warning(
+						"Ignoring force_H_use for non-pinhole cameras, as a homography does not relate their images of a plane. "
+						+ "Such pairs are marked as degenerate.");
+				}
+
 				return new TwoViewGeometry { Config = TwoViewGeometry.ConfigurationType.Degenerate };
 			}
 
@@ -105,7 +117,14 @@ public static partial class TwoViewGeometryEstimation
 			// Without a focal-length prior, the only remaining option is the
 			// fundamental-matrix path below, which assumes a pinhole projection that a fisheye
 			// camera does not have. The calibrated path above does handle fisheye, as it works
-			// on bearing vectors. COLMAP logs a warning once and marks the pair degenerate.
+			// on bearing vectors. As in COLMAP, a warning is logged once and the pair is marked degenerate.
+			if (Interlocked.Exchange(ref fisheyeWithoutFocalPriorWarned, 1) == 0)
+			{
+				Log.Warning(
+					"Marking fisheye pairs without a focal length prior as degenerate, as their focal length cannot be "
+					+ "recovered from a fundamental matrix. Provide a focal length prior to register these pairs.");
+			}
+
 			return new TwoViewGeometry { Config = TwoViewGeometry.ConfigurationType.Degenerate };
 		}
 

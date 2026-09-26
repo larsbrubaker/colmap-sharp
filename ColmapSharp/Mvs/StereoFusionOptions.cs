@@ -2,8 +2,8 @@
 // Ported from COLMAP (BSD-3-Clause, see THIRD_PARTY_NOTICES.md).
 //
 // StereoFusionOptions: the options struct of colmap/mvs/fusion.h (StereoFusionOptions and
-// its Check). StereoFusion (Fusion.cs) runs with these. Print is not ported (the library does
-// not log yet; PORTING_PLAN.md Phase 4). Tests: ColmapSharp.Tests/Mvs/FusionTests.cs.
+// its Check). StereoFusion (Fusion.cs) runs with these. Print is not ported (it writes
+// LOG(INFO) lines, which the library does not route). Tests: ColmapSharp.Tests/Mvs/FusionTests.cs.
 //
 // Translation notes:
 // - The double-typed options whose C++ defaults are float literals (max_reproj_error = 2.0f,

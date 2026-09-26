@@ -21,7 +21,7 @@
 //   const and non-const CorrespondenceGraph() overloads are the one property.
 // - Add* take their argument by value in C++, so they store a Clone(); the caller's object
 //   stays independent. Objects read from the database are fresh and are stored directly.
-// - COLMAP's LOG(INFO) timing messages are dropped (PORTING_PLAN.md, Phase 4).
+// - COLMAP's LOG(INFO) timing messages are dropped, like LOG(INFO) everywhere in the library.
 
 using ColmapSharp.Feature;
 using ColmapSharp.Geometry;

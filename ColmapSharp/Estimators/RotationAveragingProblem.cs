@@ -26,7 +26,7 @@
 //   invalidate such pairs first (PoseGraph.InvalidatePairsOutsideActiveImageIds); here the
 //   constructor throws KeyNotFoundException for them instead of corrupting the layout.
 // - std::variant<GravityAligned1DOF, Full3DOF> is the RotationConstraint record hierarchy.
-// - VLOG messages are dropped (no logging sink yet, PORTING_PLAN.md).
+// - VLOG messages are dropped, like LOG(INFO) everywhere in the library.
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;

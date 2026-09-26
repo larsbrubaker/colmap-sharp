@@ -20,7 +20,7 @@
 // - `Sim3d* tgt_from_src` becomes `ref Sim3d`, left unchanged on failure as in C++ (as
 //   SimilarityTransform.EstimateSim3dRobust does). AlignReconstructionToLocations accepts a
 //   null pointer in C++; no caller passes one, so there is no pointer-free overload.
-// - COLMAP's LOG(INFO)/LOG(WARNING)/VLOG lines have no logging counterpart here.
+// - COLMAP's LOG(WARNING)/LOG(ERROR) lines go to Util/Log.cs; LOG(INFO)/VLOG lines are dropped.
 // - AlignReconstructionsViaPoints picks, per source point, the target point seen most often
 //   along its track; std::max_element over a hash map breaks ties by hash order, the port by
 //   first appearance along the track (docs/CPP_DIVERGENCES.md, entry 49).
@@ -217,7 +217,7 @@ public static partial class Alignment
 
 		if (src.Count < 3)
 		{
-			// Not enough valid pose priors for alignment.
+			Log.Warning("Not enough valid pose priors for alignment");
 			return false;
 		}
 
@@ -225,7 +225,7 @@ public static partial class Alignment
 		{
 			if (rmsVars.Count == 0)
 			{
-				// No pose priors with valid covariance found.
+				Log.Warning("No pose priors with valid covariance found.");
 				rmsVars.Add(priorPositionFallbackStddev * priorPositionFallbackStddev);
 			}
 

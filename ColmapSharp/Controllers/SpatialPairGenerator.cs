@@ -55,6 +55,13 @@ public sealed class SpatialPairGenerator : PairGenerator
 			return;
 		}
 
+		if (numPositions <= options.MinNumNeighbors)
+		{
+			Log.Warning(
+				$"min_num_neighbors ({options.MinNumNeighbors}) exceeds number of images with location data "
+				+ $"({numPositions}), this may limit the number of matched pairs.");
+		}
+
 		knn = Math.Min(options.MaxNumNeighbors + 1, numPositions);
 		indexMatrix = new int[numPositions * knn];
 		distanceSquaredMatrix = new float[numPositions * knn];
@@ -146,8 +153,12 @@ public sealed class SpatialPairGenerator : PairGenerator
 			}
 			else
 			{
-				// UNDEFINED (and anything else) is assumed to be Cartesian, as in COLMAP
-				// (which logs a warning).
+				// UNDEFINED (and anything else) is assumed to be Cartesian, as in COLMAP.
+				if (posePrior.CoordinateSystem != PosePriorCoordinateSystem.Cartesian)
+				{
+					Log.Warning($"Unknown coordinate system for image {imageIds[i]}, assuming cartesian.");
+				}
+
 				positions.Add(new Vector3d(position.X, position.Y, z));
 			}
 		}

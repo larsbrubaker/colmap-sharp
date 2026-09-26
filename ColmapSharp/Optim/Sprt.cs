@@ -9,8 +9,9 @@
 //
 // Tier: Evaluate is exact given the decision threshold (it multiplies the same doubles in
 // the same order). The threshold itself goes through log, which is the platform libm's in
-// C++ and Math.Log here, so it can differ from COLMAP's in the last ulp (Tier B); only a
-// likelihood ratio landing within that ulp of the threshold could change a decision.
+// C++ and Math.Log here, so it can differ from COLMAP's in the last ulp (Tier B,
+// docs/CPP_DIVERGENCES.md entry 114); only a likelihood ratio landing within that ulp of the
+// threshold could change a decision.
 //
 // Translation notes:
 // - Options is a struct because COLMAP copies it by value into the SPRT (`options_ =

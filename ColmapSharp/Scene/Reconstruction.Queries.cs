@@ -25,64 +25,111 @@ public sealed partial class Reconstruction
 {
 	/// <summary>
 	/// Whether the reconstruction is internally consistent: rig, frame, image and camera
-	/// references and ids agree, and the 2D-3D links match in both directions. COLMAP logs a
-	/// warning naming the first inconsistency; that message is dropped here.
+	/// references and ids agree, and the 2D-3D links match in both directions. Like COLMAP,
+	/// logs a warning (Util/Log.cs) naming the first inconsistency.
 	/// </summary>
 	public bool IsValid()
 	{
 		// Check object associations: rig-frame-image-camera references and pointers.
-		foreach (Rig rig in _rigs.Values)
+		foreach (var (rigId, rig) in _rigs)
 		{
 			foreach (SensorId sensorId in rig.SensorIds())
 			{
 				// Only camera sensors are currently supported.
 				if (sensorId.Type == SensorType.Camera && !ExistsCamera(sensorId.Id))
 				{
-					return false;
+					return Invalid($"Rig {rigId} has sensor (camera) {sensorId.Id} which does not exist");
 				}
 			}
 		}
 
-		foreach (Frame frame in _frames.Values)
+		foreach (var (frameId, frame) in _frames)
 		{
-			if (!frame.HasRigId || !ExistsRig(frame.RigId) || !frame.HasRigPtr
-				|| !ReferenceEquals(frame.RigPtr, _rigs[frame.RigId]))
+			if (!frame.HasRigId)
 			{
-				return false;
+				return Invalid($"Frame {frameId} has no rig_id");
+			}
+
+			if (!ExistsRig(frame.RigId))
+			{
+				return Invalid($"Frame {frameId} references non-existent rig {frame.RigId}");
+			}
+
+			if (!frame.HasRigPtr)
+			{
+				return Invalid($"Frame {frameId} has no rig pointer");
+			}
+
+			if (!ReferenceEquals(frame.RigPtr, _rigs[frame.RigId]))
+			{
+				return Invalid($"Frame {frameId} rig pointer does not match rig_id");
 			}
 
 			foreach (DataId dataId in frame.DataIds)
 			{
-				if (!frame.RigPtr.HasSensor(dataId.SensorId))
+				if (!frame.RigPtr!.HasSensor(dataId.SensorId))
 				{
-					return false;
+					return Invalid($"Frame {frameId} has data with sensor_id {dataId.SensorId.Id} that does not exist in rig {frame.RigId}");
 				}
 
 				// Only camera data is currently supported.
 				if (dataId.SensorId.Type == SensorType.Camera && !ExistsImage((uint)dataId.Id))
 				{
-					return false;
+					return Invalid($"Frame {frameId} references image {dataId.Id} which does not exist");
 				}
 			}
 		}
 
-		foreach (Image image in _images.Values)
+		foreach (var (imageId, image) in _images)
 		{
-			if (!image.HasCameraId || !ExistsCamera(image.CameraId) || !image.HasCameraPtr
-				|| !ReferenceEquals(image.CameraPtr, _cameras[image.CameraId]))
+			if (!image.HasCameraId)
 			{
-				return false;
+				return Invalid($"Image {imageId} has no camera_id");
 			}
 
-			if (!image.HasFrameId || !ExistsFrame(image.FrameId) || !image.HasFramePtr
-				|| !ReferenceEquals(image.FramePtr, _frames[image.FrameId])
-				|| !image.FramePtr.HasDataId(image.DataId))
+			if (!ExistsCamera(image.CameraId))
 			{
-				return false;
+				return Invalid($"Image {imageId} references non-existent camera {image.CameraId}");
+			}
+
+			if (!image.HasCameraPtr)
+			{
+				return Invalid($"Image {imageId} has no camera pointer");
+			}
+
+			if (!ReferenceEquals(image.CameraPtr, _cameras[image.CameraId]))
+			{
+				return Invalid($"Image {imageId} camera pointer does not match camera_id");
+			}
+
+			if (!image.HasFrameId)
+			{
+				return Invalid($"Image {imageId} has no frame_id");
+			}
+
+			if (!ExistsFrame(image.FrameId))
+			{
+				return Invalid($"Image {imageId} references non-existent frame {image.FrameId}");
+			}
+
+			if (!image.HasFramePtr)
+			{
+				return Invalid($"Image {imageId} has no frame pointer");
+			}
+
+			if (!ReferenceEquals(image.FramePtr, _frames[image.FrameId]))
+			{
+				return Invalid($"Image {imageId} frame pointer does not match frame_id");
+			}
+
+			if (!image.FramePtr!.HasDataId(image.DataId))
+			{
+				return Invalid($"Image {imageId} data_id not found in frame {image.FrameId}");
 			}
 
 			// Check 2D-3D associations: point2D -> point3D direction.
 			uint actualNumPoints3D = 0;
+			uint point2DIdx = 0;
 			foreach (Point2D point2D in image.Points2D)
 			{
 				if (point2D.HasPoint3D)
@@ -90,14 +137,16 @@ public sealed partial class Reconstruction
 					++actualNumPoints3D;
 					if (!ExistsPoint3D(point2D.Point3DId))
 					{
-						return false;
+						return Invalid($"Image {imageId} point2D {point2DIdx} references non-existent point3D {point2D.Point3DId}");
 					}
 				}
+
+				++point2DIdx;
 			}
 
 			if (image.NumPoints3D != actualNumPoints3D)
 			{
-				return false;
+				return Invalid($"Image {imageId} NumPoints3D()={image.NumPoints3D} does not match actual count={actualNumPoints3D}");
 			}
 		}
 
@@ -106,16 +155,31 @@ public sealed partial class Reconstruction
 		{
 			foreach (TrackElement trackEl in point3D.Track.Elements)
 			{
-				if (!_images.TryGetValue(trackEl.ImageId, out Image? image)
-					|| trackEl.Point2DIdx >= image.NumPoints2D)
+				if (!_images.TryGetValue(trackEl.ImageId, out Image? image))
 				{
-					return false;
+					return Invalid($"Point3D {point3DId} track references image {trackEl.ImageId} which does not exist");
+				}
+
+				if (trackEl.Point2DIdx >= image.NumPoints2D)
+				{
+					return Invalid(
+						$"Point3D {point3DId} track references point2D {trackEl.Point2DIdx} in image {trackEl.ImageId} "
+						+ $"which only has {image.NumPoints2D} points");
 				}
 
 				Point2D point2D = image.Point2DAt(trackEl.Point2DIdx);
-				if (!point2D.HasPoint3D || point2D.Point3DId != point3DId)
+				if (!point2D.HasPoint3D)
 				{
-					return false;
+					return Invalid(
+						$"Point3D {point3DId} track references point2D {trackEl.Point2DIdx} in image {trackEl.ImageId} "
+						+ "which has no point3D set");
+				}
+
+				if (point2D.Point3DId != point3DId)
+				{
+					return Invalid(
+						$"Point3D {point3DId} track references point2D {trackEl.Point2DIdx} in image {trackEl.ImageId} "
+						+ $"which points to different point3D {point2D.Point3DId}");
 				}
 			}
 		}
@@ -123,13 +187,25 @@ public sealed partial class Reconstruction
 		// Check registered frames exist and have poses.
 		foreach (uint frameId in _regFrameIds)
 		{
-			if (!ExistsFrame(frameId) || !Frame(frameId).HasPose)
+			if (!ExistsFrame(frameId))
 			{
-				return false;
+				return Invalid($"Registered frame {frameId} does not exist");
+			}
+
+			if (!Frame(frameId).HasPose)
+			{
+				return Invalid($"Registered frame {frameId} has no pose");
 			}
 		}
 
 		return true;
+	}
+
+	// IsValid's LOG(WARNING) << message; return false.
+	private static bool Invalid(string message)
+	{
+		Log.Warning(message);
+		return false;
 	}
 
 	/// <summary>

@@ -62,8 +62,12 @@ public sealed class CovariantSiftCpuFeatureExtractor : FeatureExtractor
 	{
 		Util.Check.That(options.Check());
 
-		// COLMAP logs that darkness adaptivity is only available for GLSL SiftGPU; it has no
-		// effect here either.
+		if (options.Sift.DarknessAdaptivity)
+		{
+			// It has no effect here either.
+			Util.Log.Warning("Darkness adaptivity only available for GLSL SiftGPU.");
+		}
+
 		this.options = options.Sift.Clone();
 	}
 

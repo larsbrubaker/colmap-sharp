@@ -12,8 +12,8 @@
 // Its parameterless constructor sets COLMAP's defaults (NaN position, covariance and
 // gravity; invalid ids; UNDEFINED coordinate system); default(PosePrior) skips that
 // constructor and has zeros, so always create one with new PosePrior().
-// COLMAP's LOG(WARNING)/LOG(ERROR) for unsupported EXIF orientations have no logging
-// counterpart here; the returned null carries the outcome.
+// COLMAP's LOG(WARNING)/LOG(ERROR) for mirrored and unknown EXIF orientations go to
+// Util/Log.cs; the returned null carries the outcome.
 
 using System.Text;
 
@@ -166,8 +166,23 @@ public struct PosePrior : IEquatable<PosePrior>
 		3 => new Vector3d(0, -1, 0), // Rotate 180
 		6 => new Vector3d(1, 0, 0), // Rotate 90 CW
 		8 => new Vector3d(-1, 0, 0), // Rotate 270 CW
-		_ => null,
+		2 or 4 or 5 or 7 => LogAndReturnNull(LogLevel.Warning, $"Unsupported EXIF orientation: {orientation}"),
+		_ => LogAndReturnNull(LogLevel.Error, $"Unknown EXIF orientation: {orientation}"),
 	};
+
+	private static Vector3d? LogAndReturnNull(LogLevel level, string message)
+	{
+		if (level == LogLevel.Warning)
+		{
+			Log.Warning(message);
+		}
+		else
+		{
+			Log.Error(message);
+		}
+
+		return null;
+	}
 
 	/// <summary>
 	/// The number of 90 degree counter-clockwise rotations (0-3) that make an image

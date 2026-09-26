@@ -18,7 +18,7 @@
 // against COLMAP's limits (2^32), and the lists grow as data is actually read instead of
 // reserving the declared count up front. Where the C++ reads past the end of a binary file
 // without checking (a face's texcoord count and UVs, which is undefined behavior there), this
-// port throws "Unexpected end of PLY file" instead.
+// port throws "Unexpected end of PLY file" instead (docs/CPP_DIVERGENCES.md, entry 113).
 
 using System.Buffers.Binary;
 
@@ -88,7 +88,7 @@ public static partial class Ply
 				}
 				else if (Stoll(lineElems[2]) > 0)
 				{
-					// LOG(WARNING) "Only vertex elements supported; ignoring ..." is dropped.
+					Log.Warning($"Only vertex elements supported; ignoring {lineElems[1]}");
 				}
 			}
 
@@ -245,10 +245,13 @@ public static partial class Ply
 				}
 				catch (FormatException)
 				{
-					// LOG(WARNING) "Malformed face element line in PLY header" is dropped.
+					// e.what() of libc++'s std::invalid_argument from std::stoll.
+					Log.Warning("Malformed face element line in PLY header: stoll: no conversion");
 				}
 				catch (OverflowException)
 				{
+					// e.what() of libc++'s std::out_of_range from std::stoll.
+					Log.Warning("Malformed face element line in PLY header: stoll: out of range");
 				}
 			}
 		}

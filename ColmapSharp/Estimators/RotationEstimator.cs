@@ -18,7 +18,8 @@
 // - COLMAP's cams_from_world[parent] default-constructs the root's entry (identity rotation,
 //   zero translation) the first time a child of the root is visited; the root's entry is
 //   seeded the same way here.
-// - LOG(INFO)/LOG(ERROR) messages are dropped (no logging sink yet, PORTING_PLAN.md).
+// - LOG(INFO) messages are dropped (rotation_averaging.cc's LOG(ERROR)s are all in
+//   RotationAveraging.cs, which sends them to Util/Log.cs).
 
 using ColmapSharp.Geometry;
 using ColmapSharp.Mathematics;

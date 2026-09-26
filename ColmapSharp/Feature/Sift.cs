@@ -170,6 +170,11 @@ public sealed class SiftCpuFeatureExtractor : FeatureExtractor
 		Util.Check.That(!this.options.EstimateAffineShape);
 		Util.Check.That(!this.options.DomainSizePooling);
 		Util.Check.That(!this.options.ForceCovariantExtractor);
+		if (this.options.DarknessAdaptivity)
+		{
+			// It has no effect here either.
+			Util.Log.Warning("Darkness adaptivity only available for GLSL SiftGPU.");
+		}
 	}
 
 	/// <summary>

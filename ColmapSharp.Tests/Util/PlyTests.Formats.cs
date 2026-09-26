@@ -3,7 +3,8 @@
 // PlyTests.Formats: C#-only tests (no ply_test.cc case covers them) of ColmapSharp/Util/Ply*.cs
 // on inputs COLMAP's writers never produce: big-endian binary files for the point and mesh
 // readers, a 1M-point ASCII cloud read with bounded work (the buffered line reader), and ASCII
-// texture coordinates parsed with libc++'s `>> float` rules (CppLineTokens.TryReadFloat).
+// texture coordinates parsed with libc++'s `>> float` rules (CppLineTokens.TryReadFloat), and a
+// binary mesh truncated inside its texcoord lists (docs/CPP_DIVERGENCES.md, entry 113).
 //
 // The 1M-point test guards against a pathological reader, not a slow machine. It used to
 // assert wall-clock time and failed under heavy load (12-19 s against 10 s), so it now counts
@@ -208,5 +209,49 @@ public partial class PlyTests
 			await Assert.That(() => Ply.ReadPlyMesh(new MemoryStream(Encoding.ASCII.GetBytes(file))))
 				.Throws<ArgumentException>().WithMessageContaining("line_stream >> uv");
 		}
+	}
+
+	/// <summary>
+	/// A binary mesh cut off inside a face's texcoord list throws, where COLMAP reads the
+	/// count and the UVs without checking (entry 113).
+	/// </summary>
+	[Test]
+	public async Task CSharpOnly_TruncatedBinaryTexcoordsThrow()
+	{
+		var stream = new MemoryStream();
+		stream.Write(Encoding.ASCII.GetBytes(
+			"ply\nformat binary_little_endian 1.0\nelement vertex 3\n" +
+			"property float x\nproperty float y\nproperty float z\nelement face 1\n" +
+			"property list uchar int vertex_indices\nproperty list uchar float texcoord\nend_header\n"));
+		var value = new byte[4];
+		for (int i = 0; i < 9; i++)
+		{
+			BinaryPrimitives.WriteSingleLittleEndian(value, i);
+			stream.Write(value);
+		}
+
+		stream.WriteByte(3);
+		for (int i = 0; i < 3; i++)
+		{
+			BinaryPrimitives.WriteInt32LittleEndian(value, i);
+			stream.Write(value);
+		}
+
+		// The texcoord count is missing.
+		byte[] noCount = stream.ToArray();
+		await Assert.That(() => Ply.ReadPlyMesh(new MemoryStream(noCount)))
+			.Throws<ArgumentException>().WithMessageContaining("Unexpected end of PLY file at face 0");
+
+		// The count is there, but only two of the six UVs are.
+		stream.WriteByte(6);
+		for (int i = 0; i < 2; i++)
+		{
+			BinaryPrimitives.WriteSingleLittleEndian(value, 0.5f);
+			stream.Write(value);
+		}
+
+		byte[] fewUvs = stream.ToArray();
+		await Assert.That(() => Ply.ReadPlyMesh(new MemoryStream(fewUvs)))
+			.Throws<ArgumentException>().WithMessageContaining("Unexpected end of PLY file at face 0");
 	}
 }

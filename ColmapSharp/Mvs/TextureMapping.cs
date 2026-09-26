@@ -146,7 +146,7 @@ public static partial class TextureMapping
 
 		if (!viewPerFace.Any(v => v >= 0))
 		{
-			// COLMAP logs "No faces were assigned to any view".
+			Log.Warning("No faces were assigned to any view");
 			result.FaceUvs = new float[numFaces * 6];
 			return result;
 		}

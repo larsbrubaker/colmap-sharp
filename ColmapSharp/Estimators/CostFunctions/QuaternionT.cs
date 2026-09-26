@@ -15,7 +15,8 @@
 // rotation of v as q v q* assuming a unit q.
 // - The product is the textbook four-term sum per coefficient, left to right. Eigen uses
 //   that form for Jets; for plain doubles it pairs the terms for SIMD (Quaterniond's
-//   operator *), so on the residual-only path the two may differ in the last ulp (Tier B).
+//   operator *), so on the residual-only path the two may differ in the last ulp (Tier B,
+//   docs/CPP_DIVERGENCES.md entry 115).
 // - The rotation is t = 2 (u x v), v' = v + w t + u x t (F. Giesen, "Rotating a vector by a
 //   unit quaternion", 2015), the form Quaterniond uses, with t formed as uv + uv.
 // - Inverse is conjugate / squared norm (0 for the zero quaternion), the squared norm summed

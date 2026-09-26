@@ -10,7 +10,7 @@
 //
 // Design (later phases build on it):
 // - A class, because images hold references to a shared camera (C++ Camera*), which the
-//   Reconstruction (a later Phase 4 port) owns. C++ copies cameras by value
+//   Reconstruction (Reconstruction.cs) owns. C++ copies cameras by value
 //   (`Camera other = camera;`); here that is Clone(), and assigning a reference shares the
 //   camera. Equality is COLMAP's value equality (operator==), as for Sensor/Rig.cs.
 // - Params is a plain double[] that callers may replace or write into. Phase 8's bundle

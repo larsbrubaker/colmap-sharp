@@ -10,7 +10,8 @@
 // Layout and arithmetic follow Matrix3d.cs: column-major storage, left-to-right product
 // sums starting from the first term, no FMA. Tier B for products: Eigen evaluates a 6x6
 // product with its vectorized coefficient-based kernel, which the pycolmap wheel may
-// contract into FMAs, and no pycolmap binding exposes a 6x6 product to pin it.
+// contract into FMAs, and no pycolmap binding exposes a 6x6 product to pin it
+// (docs/CPP_DIVERGENCES.md entry 115).
 
 using System.Globalization;
 

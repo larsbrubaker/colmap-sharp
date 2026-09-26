@@ -1963,6 +1963,86 @@ order to match. The single-threaded order is the one reproducible reference.
 density6) matches a single-threaded run of the vendored C++ bit for bit: the normal field,
 the sample depth/weight sums, the colour field and the node numbering.
 
+## 113. Reading a truncated binary PLY mesh throws inside the texcoord lists
+
+**What differs.** COLMAP's `ReadPlyMesh` (util/ply.cc) checks `file.good()` after every vertex,
+face count and face index it reads from a binary file, but not after a face's texcoord count
+or its six UVs. What a truncation there does in COLMAP depends on where the file ends:
+- Cut before the count: the count is left indeterminate (the failed read does not write it),
+  so it is usually not 6 and the file fails with "Expected 6 texture coordinates per
+  triangular face".
+- Cut inside the UVs of a face that is not the last: the missing UVs are indeterminate, and
+  the next face's count read fails with "Unexpected end of PLY file at face i + 1".
+- Cut inside the UVs of the last face: nothing reads after them, so the mesh loads with
+  indeterminate UVs and no error.
+`Util/Ply.Mesh.cs` checks the count and every UV read and throws "Unexpected end of PLY file
+at face i" for the face whose texcoords are cut, in all three cases. Every other truncation
+throws in both, with the same message.
+
+**Why.** The same upstream robustness gap as entry 62: in the last case a half-written mesh
+would load with garbage texture coordinates, and in the other two the error names the wrong
+cause or the wrong face. Well-formed files read identically.
+
+**Evidence.** Reading of ply.cc (the unchecked `file.read` calls for `num_texcoords` and
+`uv`). `PlyTests.CSharpOnly_TruncatedBinaryTexcoordsThrow` (C#-only) cuts a one-face textured
+binary mesh before the texcoord count and after two of the six UVs (the last-face case), and
+expects "Unexpected end of PLY file at face 0" both times; the ported ply_test.cc cases, which
+read complete files, pass unchanged.
+
+## 114. libm and MathF results can differ from COLMAP's in the last ulp
+
+**What differs.** Wherever COLMAP calls a transcendental function (`std::log`, `std::exp`,
+`std::sin`/`cos`/`atan2`, `std::cbrt`, `std::acos`, their float overloads), the port calls
+.NET's `Math`/`MathF` counterpart. .NET forwards most of these to the platform C runtime, but
+neither side promises correct rounding, and a C++ build may inline or substitute its own
+versions (a vectorized routine, a `sincos` pair), so a result can differ by one ulp. Sites
+where this is stated and the tier set accordingly:
+- `Optim/Sprt.cs`: the SPRT decision threshold goes through `log`.
+- `Feature/FeatureKeypoint.cs`: the scale/orientation constructor, `FromShapeParameters`,
+  `ComputeScale*`, `ComputeOrientation` and `ComputeShear` go through `MathF.Sin/Cos/Atan2`.
+- `Mathematics/MathUtils.cs`: `Sigmoid`/`ScaleSigmoid` go through `exp`.
+- `Mathematics/Polynomial.cs`: the cubic roots go through `cbrt`/`acos`/`cos`.
+- `Mathematics/LibcxxRandom.cs`: `NormalDistribution` calls `log` (on macOS both sides call
+  the system libm and agree bit for bit).
+Entries 7 (sin(a/2) in the angle-axis conversion) and 11 (the UTM latitude) are the cases an
+oracle fixture actually caught; entry 12 covers the camera models, where the observed
+differences are FMA contraction rather than libm.
+
+**Why.** Reproducing another library's transcendental functions bit for bit would mean
+porting that library (and choosing which one: Apple's libm, glibc and MSVC's CRT differ), for
+last-ulp effects. .NET's own functions keep ColmapSharp's results the same for a given
+runtime and platform.
+
+**Evidence.** The ported tests that cover these sites compare with COLMAP's own tolerances
+and pass: `SprtTests`, `FeatureTypesTests`, `MathTests.Sigmoid_Nominal` /
+`ScaleSigmoid_Nominal`, `PolynomialTests.FindCubicPolynomialRoots_*` and `RandomTests`.
+
+## 115. Eigen's SIMD evaluation order is not reproduced in norms, reductions and products
+
+**What differs.** Eigen vectorizes fixed- and dynamic-size expressions: a norm or dot product
+is summed in packet lanes and then reduced horizontally, a quaternion product on doubles pairs
+its terms for SIMD, and matrix products use blocked, vectorized kernels. The port evaluates
+these as left-to-right sums in coefficient order, except where an oracle showed Eigen's order
+and the port copies it (`LinearAlgebra/Vector4d.cs` reductions, `Quaterniond`'s product,
+`Feature/FeatureUtils.cs`' descriptor normalization, `Feature/CovariantSift.cs`' DSP mean).
+The remaining sites can differ from COLMAP in the last bits:
+- `Solver/Manifolds.cs`: the vector norms in the sphere and quaternion manifolds. Tier C,
+  like the solver that consumes them.
+- `Estimators/CostFunctions/QuaternionT.cs` and `ReprojectionError.cs`: the quaternion product
+  on the residual-only (plain double) path, where Eigen pairs terms for SIMD. Tier B.
+- `LinearAlgebra/Matrix6d.cs` and `MatrixXd.cs`: 6x6 and dynamic-size products. Tier B.
+The Schur solvers' CG reductions are entry 35, item 4.
+
+**Why.** Eigen is MPL-2.0 and not ported (CLAUDE.md contract 2), and its packet order depends
+on the target's SIMD width and the compiler (NEON, SSE and AVX builds reduce differently), so
+there is no single order to match; `System.Numerics.Vector<T>` is also banned in math paths
+("No FMA"). A plain sequential order gives the same result on every platform.
+
+**Evidence.** `ManifoldTests` (C#-only, the invariants of Ceres' manifold_test_utils.h) and
+`ReprojectionErrorTests` (reprojection_error_test.cc 1:1) pass with their tolerances, and the Jet (autodiff) path of the cost
+functions already evaluates the product term by term, as Eigen does for Jets. No oracle
+fixture exposes a 6x6 or dynamic product directly.
+
 ## 116. PoissonRecon's log( float ) is the double logarithm rounded to float
 
 **What differs.** `_getSampleDepthAndWeight` calls `log` on float ratios, which resolves to

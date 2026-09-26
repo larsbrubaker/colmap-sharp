@@ -31,7 +31,7 @@
 //   21). RegFrameIds is COLMAP's vector, in registration order, exactly as in C++.
 // - C++ copy construction/assignment is Clone(). As in C++, the copied frames are not
 //   finalized (Frame's copy constructor resets the flag).
-// - LOG(WARNING) messages are dropped (PORTING_PLAN.md, Phase 4).
+// - LOG(WARNING) messages go to Util/Log.cs.
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
@@ -565,7 +565,7 @@ public sealed partial class Reconstruction
 	{
 		if (!_regFrameIds.Contains(frameId))
 		{
-			// COLMAP logs "Ignoring de-registration of frame ..., which is not registered."
+			Log.Warning($"Ignoring de-registration of frame {frameId}, which is not registered.");
 			return;
 		}
 

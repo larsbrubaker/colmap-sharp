@@ -24,8 +24,9 @@
 // Translation notes:
 // - size_t inlier counts are ints here (RansacReport's Support.NumInliers); the size_t casts
 //   of `min_num_inliers` are kept through ToSizeT so a negative option compares as in C++.
-// - LOG(INFO)/LOG(WARNING) messages are dropped until the library decides how to surface
-//   them (PORTING_PLAN.md); the Timer in MaybeDecomposeRelativePoses only fed the log.
+// - LOG(WARNING) messages go to Util/Log.cs (the two LOG_FIRST_N ones are in
+//   TwoViewGeometryEstimation.Dispatch.cs); LOG(INFO) messages are dropped, and so is the
+//   Timer in MaybeDecomposeRelativePoses, which only fed the log.
 
 using ColmapSharp.Estimators.Solvers;
 using ColmapSharp.Feature;

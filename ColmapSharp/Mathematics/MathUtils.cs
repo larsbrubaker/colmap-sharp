@@ -13,7 +13,7 @@
 // bit-identical to COLMAP for the same input. Two exceptions:
 // - Sigmoid/ScaleSigmoid go through exp, which is the platform libm's in C++ and .NET's
 //   Math.Exp here; they can differ in the last ulp, so they are Tier B (math_test.cc
-//   compares them with a tolerance).
+//   compares them with a tolerance; docs/CPP_DIVERGENCES.md entry 114).
 // - Percentile/Median/MedianAbsoluteDeviation are exact for ordinary input, but with NaN
 //   in the data, or -0.0 and +0.0 tied at the selected rank, this quickselect may pick a
 //   different element than libc++'s nth_element (a NaN, or the other signed zero).

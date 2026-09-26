@@ -264,6 +264,7 @@ public sealed partial class IncrementalMapper
 		// global bundle adjustment is not possible.
 		if (baConfig.NumImages < 2)
 		{
+			Log.Warning("At least two images must be registered for global bundle-adjustment");
 			return false;
 		}
 

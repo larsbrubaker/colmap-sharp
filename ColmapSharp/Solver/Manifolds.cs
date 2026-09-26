@@ -15,7 +15,7 @@
 // Jacobians are row-major, as Ceres': PlusJacobian is AmbientSize x TangentSize,
 // MinusJacobian is TangentSize x AmbientSize. Vector norms sum squares left to right; Eigen
 // may reassociate a fixed-size norm under vectorization, so these are Tier C (outcome)
-// like the solver that consumes them.
+// like the solver that consumes them (docs/CPP_DIVERGENCES.md entry 115).
 
 using ColmapSharp.Util;
 

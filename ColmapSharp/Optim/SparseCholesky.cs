@@ -16,10 +16,11 @@
 // - Solve's Eigen::VectorXd* out-parameter becomes `out VectorXd`. After a failed
 //   factorization Eigen's solve() has no defined result; here x is a zero vector and Solve
 //   returns false.
-// - COLMAP's LOG(WARNING) on fallback has no logging counterpart here; the fallback is
-//   visible through UsesLdlt.
+// - COLMAP's LOG(WARNING) on fallback goes to Util/Log.cs; the fallback is also visible
+//   through UsesLdlt.
 
 using ColmapSharp.LinearAlgebra;
+using ColmapSharp.Util;
 
 namespace ColmapSharp.Optim;
 
@@ -73,6 +74,7 @@ public sealed class SparseCholeskyWithFallbackSolver
 				return true;
 			}
 
+			Log.Warning("Supernodal Cholesky factorization failed; falling back to simplicial LDLT for ill-conditioned system.");
 			_ldlt.AnalyzePattern(a);
 			_useLdlt = true;
 		}

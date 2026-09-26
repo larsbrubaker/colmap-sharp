@@ -59,10 +59,10 @@ public static partial class Alignment
 				string tgtName = tgtReconstruction.Image(imageId).Name;
 				if (srcName != tgtName)
 				{
-					// COLMAP logs: Cannot merge reconstructions: image_id refers to different
-					// images in the source and the target. MergeReconstructions requires both
-					// reconstructions to share a consistent image_id<->name mapping (i.e., be
-					// derived from the same database).
+					Log.Error(
+						$"Cannot merge reconstructions: image_id={imageId} refers to \"{srcName}\" in the source reconstruction "
+						+ $"but \"{tgtName}\" in the target. MergeReconstructions requires both reconstructions to share a "
+						+ "consistent image_id<->name mapping (i.e., be derived from the same database).");
 					return false;
 				}
 

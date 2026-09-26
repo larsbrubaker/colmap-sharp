@@ -18,7 +18,7 @@
 //   frame's ordered data ids) in it (docs/CPP_DIVERGENCES.md, entry 44).
 // - NodeHashMap<image_t, Rigid3d> is IReadOnlyDictionary<uint, Rigid3d>; FlatHashSet<image_t>
 //   is HashSet<uint> / IReadOnlySet<uint>.
-// - LOG(INFO)/LOG(ERROR) messages are dropped (no logging sink yet, PORTING_PLAN.md).
+// - LOG(ERROR) messages go to Util/Log.cs; LOG(INFO) messages are dropped.
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
@@ -41,18 +41,21 @@ public static class RotationAveraging
 		options.UseGravity && HasGravityPriors(posePriors);
 
 	/// <summary>
-	/// False if any rig has a sensor with unknown sensor_from_rig (COLMAP logs "Please specify
-	/// the rig calibration" for each).
+	/// False if any rig has a sensor with unknown sensor_from_rig (logged as an error for
+	/// each, as in COLMAP).
 	/// </summary>
 	internal static bool AllSensorsFromRigKnown(Reconstruction reconstruction)
 	{
 		bool allKnown = true;
-		foreach (Rig rig in reconstruction.Rigs.Values)
+		foreach ((uint rigId, Rig rig) in reconstruction.Rigs)
 		{
-			foreach (Rigid3d? sensorFromRig in rig.NonRefSensors.Values)
+			foreach ((SensorId sensorId, Rigid3d? sensorFromRig) in rig.NonRefSensors)
 			{
 				if (sensorFromRig is null)
 				{
+					Log.Error(
+						$"Rig {rigId} with unknown sensor_from_rig for sensor {sensorId.Id}, but gravity aligned rotation is "
+						+ "requested. Please specify the rig calibration.");
 					allKnown = false;
 				}
 			}
@@ -262,7 +265,7 @@ public static class RotationAveraging
 	{
 		if (activeImageIds.Count == 0)
 		{
-			// COLMAP: LOG(ERROR) "No connected components found".
+			Log.Error("No connected components found");
 			return false;
 		}
 
@@ -279,6 +282,7 @@ public static class RotationAveraging
 			poseGraph, reconExpanded, options.FilterUnregistered);
 		if (expandedActiveImageIds.Count == 0)
 		{
+			Log.Error("No connected components found");
 			return false;
 		}
 
@@ -306,6 +310,7 @@ public static class RotationAveraging
 			poseGraph, reconstruction, options.FilterUnregistered);
 		if (finalActiveImageIds.Count == 0)
 		{
+			Log.Error("No connected components found");
 			return false;
 		}
 
@@ -476,7 +481,7 @@ public static class RotationAveraging
 				poseGraph, reconstruction, filterUnregistered: true);
 			if (filteredActiveImageIds.Count == 0)
 			{
-				// COLMAP: LOG(ERROR) "No connected components found after filtering".
+				Log.Error("No connected components found after filtering");
 				return false;
 			}
 

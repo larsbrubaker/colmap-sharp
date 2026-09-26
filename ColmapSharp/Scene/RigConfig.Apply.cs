@@ -14,8 +14,7 @@
 //   std::unordered_map or boost::unordered_node_map, util/hash_containers.h), which sets the
 //   registration order of the frames and is implementation-defined per build and standard
 //   library. Here they go in ascending id order (docs/CPP_DIVERGENCES.md #81).
-// - COLMAP's LOG(INFO)/LOG(WARNING) lines are dropped, like the rest of the library's logs
-//   (PORTING_PLAN.md Phase 4).
+// - COLMAP's LOG(WARNING) goes to Util/Log.cs; its LOG(INFO) lines are dropped.
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
@@ -255,8 +254,9 @@ public sealed partial class RigConfig
 
 			if (!rigFromCams.TryGetValue((uint)sensorId.Id, out var entry))
 			{
-				// COLMAP logs a warning: "Failed to derive sensor_from_rig transformation for
-				// camera ..., because the image was not registered in the given reconstruction."
+				Log.Warning(
+					$"Failed to derive sensor_from_rig transformation for camera {sensorId.Id}, because the image was not "
+					+ "registered in the given reconstruction.");
 				continue;
 			}
 
