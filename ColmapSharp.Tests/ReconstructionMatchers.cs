@@ -12,8 +12,8 @@
 //
 // Not ported yet: ReconstructionNear, which aligns the reconstructions with
 // AlignReconstructionsViaProjCenters and ComputeImageAlignmentError
-// (estimators/alignment, Phase 6). reconstruction_matchers_test.cc (Reconstruction.Eq,
-// Reconstruction.Near) needs SynthesizeDataset and lands with scene/synthetic.
+// (estimators/alignment, Phase 6). Tests: Scene/ReconstructionMatchersTests.cs
+// (reconstruction_matchers_test.cc; Reconstruction.Near waits for ReconstructionNear).
 
 using ColmapSharp.Scene;
 

@@ -211,6 +211,67 @@ public readonly struct Quaterniond : IEquatable<Quaterniond>
 	}
 
 	/// <summary>
+	/// The shortest-arc rotation that maps the direction of <paramref name="a"/> onto the
+	/// direction of <paramref name="b"/> (the documented behavior of Eigen's
+	/// Quaternion::FromTwoVectors, which COLMAP's SynthesizeDataset aims its synthetic frames
+	/// with). Zero-length inputs are normalized like Eigen's normalized() (left as zero).
+	/// - General case, written from S. Melax, "The Shortest Arc Quaternion", Game Programming
+	///   Gems 1 (2000): with unit u, v and c = u . v, s = sqrt(2 (1 + c)),
+	///   q = (s / 2, (u x v) / s). The vector part multiplies by the reciprocal 1 / s; with
+	///   that rounding the synthesized frame rotations match pycolmap bit for bit
+	///   (SyntheticOracleTests).
+	/// - Nearly opposite vectors, 1 + c &lt; 1e-8: s is then computed from 1 + c, whose
+	///   absolute rounding error (~1e-16) becomes a relative error above ~5e-9 in s, and at
+	///   c = -1 the axis u x v vanishes. Instead the rotation is split into two well-defined
+	///   ones: a half turn about an axis p perpendicular to u (maps u to -u; quaternion
+	///   (0, p)), then the short arc from -u to v by the formula above, where
+	///   (-u) . v = -c is close to 1 and well conditioned. p = normalize(u x e), with e the
+	///   coordinate axis least aligned with u (|u_k| smallest), so |u x e| &gt;= sqrt(2/3). The
+	///   composition is exact, so the result stays accurate to rounding for every input.
+	///   Written here; results can differ from Eigen's in this branch
+	///   (docs/CPP_DIVERGENCES.md entry 28).
+	/// </summary>
+	public static Quaterniond FromTwoVectors(Vector3d a, Vector3d b)
+	{
+		Vector3d v0 = a.Normalized();
+		Vector3d v1 = b.Normalized();
+		double c = v1.Dot(v0);
+
+		if (1 + c < NearlyOppositeThreshold)
+		{
+			Quaterniond halfTurn = HalfTurnPerpendicularTo(v0);
+			return ShortestArcUnit(-v0, v1, -c) * halfTurn;
+		}
+
+		return ShortestArcUnit(v0, v1, c);
+	}
+
+	// Below this 1 + c, FromTwoVectors composes a half turn with a short arc (see its doc).
+	private const double NearlyOppositeThreshold = 1e-8;
+
+	// Melax's shortest-arc quaternion for unit u, v with c = u . v, valid away from c = -1.
+	private static Quaterniond ShortestArcUnit(Vector3d u, Vector3d v, double c)
+	{
+		Vector3d axis = u.Cross(v);
+		double s = Math.Sqrt((1 + c) * 2);
+		double invS = 1 / s;
+		return new Quaterniond(s * 0.5, axis.X * invS, axis.Y * invS, axis.Z * invS);
+	}
+
+	// A rotation by pi about a unit axis perpendicular to the unit vector u.
+	private static Quaterniond HalfTurnPerpendicularTo(Vector3d u)
+	{
+		double ax = Math.Abs(u.X);
+		double ay = Math.Abs(u.Y);
+		double az = Math.Abs(u.Z);
+		Vector3d leastAligned = ax <= ay && ax <= az ? new Vector3d(1, 0, 0)
+			: ay <= az ? new Vector3d(0, 1, 0)
+			: new Vector3d(0, 0, 1);
+		Vector3d p = u.Cross(leastAligned).Normalized();
+		return new Quaterniond(0, p.X, p.Y, p.Z);
+	}
+
+	/// <summary>
 	/// Spherical linear interpolation from this (t = 0) to <paramref name="other"/> (t = 1)
 	/// along the shorter arc (the documented behavior of Eigen's Quaternion::slerp, which
 	/// COLMAP's InterpolateCameraPoses calls). Written from the textbook form of Shoemake's

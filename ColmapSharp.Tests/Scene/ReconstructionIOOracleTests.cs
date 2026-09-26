@@ -7,8 +7,8 @@
 // and re-writing (through both the Stream and the path APIs) reproduces pycolmap's files byte
 // for byte. The rig1cam model's cameras/images/points3D files double as a legacy (pre-rig)
 // model, as in reconstruction_io_test.cc's LegacyWithoutRigsAndFrames. COLMAP's own
-// reconstruction_io_test.cc cases all need scene/synthetic's SynthesizeDataset and are not
-// ported yet; these tests do not stand in for them.
+// reconstruction_io_test.cc cases are ReconstructionIOTests.cs; these tests do not stand in
+// for them.
 
 using System.Globalization;
 using System.Text.Json;

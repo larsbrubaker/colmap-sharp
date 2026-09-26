@@ -15,12 +15,10 @@
 // COLMAP's gtest_main seeds the PRNG with 0 before every test, so tests that draw call
 // RandomUtils.SetPRNGSeed(0) and draw before their first await.
 //
-// Not ported yet (they need scene/synthetic's SynthesizeDataset,
-// scene/reconstruction_io or util/ply, none of which is ported): ConstructCopy,
-// AssignCopy, Print, SetRigsAndFrames, SetRigsAndFramesResetsNumRegImages,
-// DeleteAllPoints2DAndPoints3D, TearDown, ConvertToPLY,
-// ImportPLYFromVector, ReadWriteTextRoundtrip, ReadWriteBinaryRoundtrip,
-// ReadAutoDetectFormat, ExtractColorsForAllImages.
+// Not ported yet (they need util/ply or image decoding, neither of which is ported):
+// ConvertToPLY, ImportPLYFromVector, ExtractColorsForAllImages. The SynthesizeDataset
+// cases are ReconstructionTests.Synthetic.cs, TranscribeImageIdsToDatabase is
+// ReconstructionTests.Database.cs.
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;

@@ -599,6 +599,31 @@ root can be kept on one side and dropped on the other.
 Sampson residuals below 1e-5) passes 1:1, as do the over-determined (20, 1000) and LO-RANSAC
 cases that sit on the same solver. Not compared against C++ PoseLib intermediates.
 
+## 28. FromTwoVectors handles nearly opposite vectors with its own half-turn construction
+
+**What differs.** `Quaterniond.FromTwoVectors` (the replacement for Eigen's
+`Quaternion::FromTwoVectors`, used by `Synthetic.SynthesizeDataset` to aim frames) uses
+Melax's shortest-arc formula like Eigen does in general, but when the two directions are
+nearly opposite (1 + c < 1e-8, c the cosine between them) it composes a half turn about an
+axis perpendicular to the first vector (built from the least-aligned coordinate axis) with the
+well-conditioned short arc from the negated first vector to the second. Eigen switches branch
+at a different threshold (1 + c < 1e-12) and picks its perpendicular axis another way, so for
+1 + c < 1e-8 the returned rotation can differ from COLMAP's: for exactly opposite vectors any
+half turn about a perpendicular axis is correct and the two libraries pick different ones; for
+nearly opposite vectors both map the first direction onto the second, but COLMAP's general
+formula there carries errors up to ~1e-8 that ours does not.
+
+**Why.** Eigen is MPL-2.0 and not ported (contract rule 2), so this branch is written here
+from first principles; the threshold is where Melax's formula loses more than ~5e-9 relative
+accuracy (s = sqrt(2 (1 + c)) with 1 + c known only to ~1e-16 absolute). The general branch,
+where all practical inputs land, is unchanged.
+
+**Evidence.** `QuaternionTests.CSharpOnly_FromTwoVectorsOpposite` checks exactly opposite
+and nearly opposite inputs (1 + c from 0 to ~5e-9, every least-aligned axis) map the first
+direction onto the second within 8e-16 with unit norm. `SyntheticOracleTests` still matches
+pycolmap's frame rotations bit for bit (none of those inputs is nearly opposite; view
+directions are uniform random, so 1 + c < 1e-8 has probability ~5e-9 per frame).
+
 ## 29. re3q3_rotation's pre-rotation uses a fixed-seed mt19937, not std::rand
 
 **What differs.** PoseLib's `re3q3_rotation` (used by `gp3p`, which COLMAP's
@@ -626,6 +651,51 @@ agreeing to about 1e-10 across seeds; the port returns the same four poses to 1e
 on R0). The 1:1 `GeneralizedAbsolutePoseTests.ParameterizedGP3PEstimatorTests_Nominal` cases
 pass with COLMAP's tolerances.
 each satisfies the original system to 1e-8. Not compared against C++ PoseLib.
+
+## 31. SynthesizeDataset visits points, images and chained pairs in ascending id order
+
+**What differs.** `Synthetic.SynthesizeDataset` / `SynthesizeNoise` / `SynthesizeImages`
+(`ColmapSharp/Scene/Synthetic*.cs`) iterate the reconstruction's 3D points and images in
+ascending id order (IdMap, entry 21), and the CHAINED match config writes its pairs in
+ascending pair id order. COLMAP iterates `NodeHashMap`s there (Boost unordered hash order).
+The PRNG draw sequence is identical; what differs is (a) the order of each image's projected
+2D points before the shuffle, so which 3D point ends up at which 2D index (and the
+`point2D_idx` of track elements); (b) which 3D point / pair / image receives which draws in
+the track-length pruning, the chained-match shuffles, `SynthesizeNoise`'s 2D and 3D point
+noise and `SynthesizeImages`' descriptor seeds for points without a 3D point.
+Separately, frame translations and 2D projections differ from the macOS pycolmap wheel in
+the last ulp: the wheel contracts the quaternion rotation `rotation * -proj_center` into FMAs
+(CLAUDE.md, "No FMA"), ColmapSharp does not. The rotations themselves match bit for bit.
+
+**Why.** Reproducing Boost.Unordered's bucket order would mean porting Boost's container
+layout and hash mixing (not ported, entry 2/21); the order is not part of synthetic.h's
+contract, and no COLMAP test depends on it. Contraction is a compiler choice (entry 1).
+
+**Evidence.** `oracle/fixture_synthetic.py` records pycolmap 4.2.0's output for two seeded
+option sets; `SyntheticOracleTests` matches camera parameters, ids, names, 3D point positions
+and frame rotations exactly, the index and position of every 2D point without a 3D point
+exactly (so the shuffle permutation is the same), the set of 2D indices holding a 3D point
+exactly, sensor-from-rig poses to 1e-12, frame translations to 1e-14 (observed: at most
+1.3e-15, about one ulp of |t| = 5) and every 3D point's projection to 1e-9 px (observed:
+one ulp). A third fixture case prunes tracks (track_length) and runs `synthesize_noise`:
+`CSharpOnly_TrackLengthAndNoiseMatchPycolmap` finds the same track lengths and 3D point ids,
+the same frame poses after noise (1e-12), and the per-image and per-point noise chunks as the
+same multiset, which shows the pruning consumed exactly COLMAP's number of draws and only
+their assignment differs. All 17 `synthetic_test.cc` cases pass 1:1.
+
+## 32. SynthesizeImages hands bitmaps to a sink instead of writing image files
+
+**What differs.** COLMAP's `SynthesizeImages(options, reconstruction, image_path)` writes
+each image to `image_path / image.Name()` via `Bitmap::Write` (OpenImageIO). ColmapSharp's
+`Synthetic.SynthesizeImages(options, reconstruction, writeImage)` calls
+`writeImage(image.Name, bitmap)` for each rendered image; the pixels are the same.
+
+**Why.** Image file encoding/decoding is not ported: the host (MatterCAD) owns image I/O
+(PORTING_PLAN.md, the skipped `bitmap_test.cc` file cases). A sink lets a caller write files
+with its own encoder or keep the bitmaps in memory.
+
+**Evidence.** `SyntheticTests.SynthesizeImages_Nominal` checks every image reaches the sink
+with the camera's width and height (COLMAP's test reads the PNG back and checks the same).
 
 ## 33. DatabaseCache iterates its objects in ascending id order
 

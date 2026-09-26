@@ -6,7 +6,8 @@
 // ColmapSharp/Scene/Reconstruction.Queries.cs. Helpers and translation notes are in
 // ReconstructionTests.cs. The last cases are C#-only (labeled): they pin Clone's pointer
 // rewiring and the ascending-id iteration order that docs/CPP_DIVERGENCES.md entry 21
-// documents, until the synthetic-dataset copy tests (ConstructCopy, AssignCopy) land.
+// documents (the ported ConstructCopy/AssignCopy in ReconstructionTests.IO.cs cover copies
+// of a synthetic dataset).
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;

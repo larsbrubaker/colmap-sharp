@@ -34,22 +34,19 @@ resampler matching OIIO within 1 grey level, `docs/CPP_DIVERGENCES.md`); porting
 resize (Apache-2.0) would make it exact if a fixture ever needs that.
 
 ### Phase 4 — Scene
-- `synthetic` (the synthetic dataset generator most downstream tests use).
 - `ReconstructionManager.Read`/`Write` (reconstruction_io is now on main; `Write`'s
   `std::sort` on point counts needs an index tie-break).
-- `rig` (scene/rig: `ReadRigConfig`/`ApplyRigConfig` + `rig_test.cc`; needs synthetic).
+- `rig` (scene/rig: `ReadRigConfig`/`ApplyRigConfig` + `rig_test.cc`).
 - `pose_graph` (+ `pose_graph_test.cc`; component functions take a `Reconstruction`).
 - `util/ply` (+ `ply_test.cc`), `Reconstruction.ConvertToPLY`/`ImportPLY`, and
   `reconstruction_io.cc`'s exporters (ExportNVM/Cam/Recon3D/Bundler/PLY/VRML).
 - `Reconstruction.ExtractColors*` (the host decodes images; take a Bitmap provider).
 - `scene_clustering`, `reconstruction_clustering`.
-- Deferred tests: all of `reconstruction_io_test.cc` (needs synthetic); `reconstruction_test.cc`
-  ConstructCopy, AssignCopy, Print, SetRigsAndFramesResetsNumRegImages,
-  DeleteAllPoints2DAndPoints3D, TearDown, SetRigsAndFrames, ConvertToPLY, ImportPLYFromVector,
-  ReadWriteTextRoundtrip, ReadWriteBinaryRoundtrip, ReadAutoDetectFormat,
-  ExtractColorsForAllImages; `reconstruction_matchers_test.cc` Eq/Near (Near needs alignment);
-  `reconstruction_pruning_test.cc` VaryingCoverageGain, VaryingTrackLength,
-  VaryingSpatialDistribution (need synthetic); an IdMap test that reaches `Compact()`.
+- Deferred tests: `reconstruction_io_test.cc` Export* (ExportNVM, ExportCam, ExportRecon3D,
+  ExportBundler, ExportPLY, ExportVRML; with the exporters); `reconstruction_test.cc`
+  ConvertToPLY, ImportPLYFromVector, ExtractColorsForAllImages;
+  `reconstruction_matchers_test.cc` Near (needs alignment); an IdMap test that reaches
+  `Compact()`.
 - Before the pipeline phases, decide how the library surfaces COLMAP's `LOG(WARNING)`
   messages (dropped for now).
 

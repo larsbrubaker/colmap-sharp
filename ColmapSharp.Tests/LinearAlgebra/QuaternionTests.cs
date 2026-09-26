@@ -165,4 +165,62 @@ public class QuaternionTests
 			await Assert.That(new Quaterniond(0, 0, 0, 0).Inverse()).IsEqualTo(new Quaterniond(0, 0, 0, 0));
 		}
 	}
+
+	/// <summary>
+	/// C#-only: FromTwoVectors maps the first direction onto the second. (The general branch is
+	/// pinned bit for bit against pycolmap by SyntheticOracleTests' frame rotations.)
+	/// </summary>
+	[Test]
+	public async Task CSharpOnly_FromTwoVectors()
+	{
+		var a = new Vector3d(1, 2, 3);
+		var b = new Vector3d(-2, 0.5, 1);
+		Quaterniond q = Quaterniond.FromTwoVectors(a, b);
+		await Assert.That((q * a.Normalized() - b.Normalized()).Norm).IsLessThan(1e-15);
+		await Assert.That(Math.Abs(q.Norm - 1)).IsLessThan(1e-15);
+		// Shortest arc: the rotation angle is the angle between the vectors.
+		double c = a.Normalized().Dot(b.Normalized());
+		await Assert.That(Math.Abs(q.W - Math.Sqrt((1 + c) / 2))).IsLessThan(1e-15);
+	}
+
+	/// <summary>
+	/// C#-only: exactly and nearly opposite vectors take the half-turn branch of
+	/// FromTwoVectors (1 + c &lt; 1e-8, docs/CPP_DIVERGENCES.md entry 28), which must still map
+	/// the first direction onto the second to rounding accuracy and return a unit quaternion.
+	/// Covers every choice of the least-aligned coordinate axis and both sides of the
+	/// threshold.
+	/// </summary>
+	[Test]
+	public async Task CSharpOnly_FromTwoVectorsOpposite()
+	{
+		Vector3d[] directions =
+		[
+			new(1, 0, 0), new(0, -1, 0), new(0, 0, 1), new(1, 2, 3), new(-3, 0.5, 0.25), new(0.1, -4, 2),
+		];
+		// Perpendicular offsets giving 1 + c = 0, ~5e-13, ~5e-11 and ~5e-9 (inside the branch)
+		// and ~2e-8 (just outside it).
+		double[] offsets = [0, 1e-6, 1e-5, 1e-4, 2e-4];
+		var failures = new List<string>();
+		foreach (Vector3d direction in directions)
+		{
+			Vector3d u = direction.Normalized();
+			Vector3d perpendicular = u.Cross(new Vector3d(0.3, -0.7, 0.2)).Normalized();
+			foreach (double offset in offsets)
+			{
+				Vector3d target = -u + offset * perpendicular;
+				Quaterniond q = Quaterniond.FromTwoVectors(direction, target);
+				double error = (q * u - target.Normalized()).Norm;
+				// Outside the branch Melax's formula (the same one COLMAP's Eigen uses there) loses
+				// accuracy as 1 + c shrinks, ~1e-8 at 1 + c = 2e-8 (the reason for the branch), so
+				// the bound there is looser.
+				double tolerance = offset < 2e-4 ? 1e-15 * 8 : 1e-7;
+				if (error > tolerance || Math.Abs(q.Norm - 1) > tolerance)
+				{
+					failures.Add($"{direction} offset {offset}: error {error}, norm {q.Norm}");
+				}
+			}
+		}
+
+		await Assert.That(failures).IsEmpty();
+	}
 }
