@@ -109,7 +109,7 @@ VocabTreePairGenerator.DoesNotDeadlockOnFailedQuery, SequentialPairGenerator.Loo
 `patch_match_cuda.cu` (parallel over pixels/rows, deterministic), `fusion`,
 `poisson_meshing` (PoissonRecon MIT port, add notice), `delaunay_meshing` (tetrahedralization
 via MIConvexHull (MIT) or MatterCAD's own; graph-cut surface extraction is COLMAP's own code),
-`mesh_simplification`, `texture_mapping` (in scope: MatterCAD shows the textured model so
+`texture_mapping` (in scope: MatterCAD shows the textured model so
 the user can relate it to their photos; CGAL's AABB tree for occlusion is replaced by a
 managed BVH written here).
 

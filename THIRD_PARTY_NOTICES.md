@@ -237,12 +237,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ## LLVM libc++ (Apache-2.0 WITH LLVM-exception)
 
 Source: https://github.com/llvm/llvm-project (`libcxx/include/__random/*`,
-`libcxx/include/__algorithm/shuffle.h`)
+`libcxx/include/__algorithm/shuffle.h`, and the heap algorithms `make_heap.h`,
+`push_heap.h`, `pop_heap.h` and `sift_down.h` in `libcxx/include/__algorithm/`)
 
 Ported in `ColmapSharp/Mathematics/LibcxxRandom.cs`: the algorithms of
 `std::uniform_int_distribution` (with `__independent_bits_engine`), `generate_canonical`,
 `uniform_real_distribution`, `normal_distribution` and `std::shuffle`, so seeded draws
-match the libc++-built pycolmap oracle. Copyright the LLVM Project contributors.
+match the libc++-built pycolmap oracle. Ported in `ColmapSharp/Mvs/CollapseHeap.cs`:
+`std::priority_queue`'s heap (`__sift_down`, `__floyd_sift_down`, `__sift_up`), so mesh
+simplification pops tied candidates in the wheel's order. Copyright the LLVM Project
+contributors.
 
 ```
 ==============================================================================

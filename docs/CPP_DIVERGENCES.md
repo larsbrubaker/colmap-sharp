@@ -1446,6 +1446,52 @@ two-view geometries; with the reseed removed, the test fails.
 `CSharpOnly_MatchAndVerifyLeaveCallerPrngUntouched`: the caller's next draw after `Match` and
 `Verify` is the same as without them, with 1 and 4 threads. `FeatureMatchingTests` pass.
 
+## 72. SimplifyMesh collapse costs can differ from COLMAP's in the last bits
+
+**What differs.** COLMAP's `ComputeEdgeCollapse` (mvs/mesh_simplification.cc) solves the
+4x4 system for the optimal position with Eigen's closed-form 4x4 `determinant()` and
+`inverse()` (vectorized, and possibly contracted into FMAs by Apple clang). The port
+(`Mvs/MeshSimplifier.Candidates.cs`) uses the Laplace expansion over 2x2 minors of
+`LinearAlgebra/Matrix4d.cs`. When the system is non-singular, which happens at the corners
+and along the boundary when boundary_weight > 0 and on curved surfaces, the position and
+cost can differ in the last bits. Two costs that are equal in C++ can then differ here (or
+the reverse), so the heap can pop them in a different order and the meshes diverge from
+that collapse on. The heap is a port of libc++'s (`Mvs/CollapseHeap.cs`) with COLMAP's
+cost-only comparator, so ties that are exact on both sides pop in the same order. Tier C.
+
+**Why.** Eigen is not ported (docs/LICENSE_AUDIT.md), and reproducing its SIMD evaluation
+order and the compiler's contraction choices is not possible from C#. See CLAUDE.md, "No FMA".
+
+**Evidence.** `MeshSimplificationOracleTests` (fixture `oracle/fixture_mesh_simplification.py`):
+- On flat grids with boundary_weight 0, every system is singular. The fallback uses only
+  quadric evaluations, and every cost is exactly 0. The output is byte-identical to
+  pycolmap's in 8 of 8 cases (grids 4 to 100 at ratios 0.1 to 0.5), and those tests assert
+  exact equality.
+- On a curved 30x30 grid under six option sets (boundary_weight 0, 1000 and 1e6, and
+  max_error 0, 1e-6 and 1e-3), the output was byte-identical when generated. The tests
+  allow 1e-5 on positions.
+- On a curved 1,002,528-face grid, the faces are identical, and one of the 50,518 vertices
+  differs by 9.3e-10 (one float ulp).
+
+## 73. SimplifyMesh visits boundary edges in vertex-index order
+
+**What differs.** COLMAP collects the edges that have a single face into a `NodeHashMap`
+(`boost::unordered_node_map` with its `PairHash`). It adds each edge's boundary quadric to
+the edge's two vertices in the map's iteration order, and that order sets the order of the
+floating-point sums into each vertex's quadric. The port (`Mvs/MeshSimplifier.cs`,
+`AddBoundaryQuadrics`) visits the edges by (smaller, larger) vertex index, taking them from
+the vertex adjacency instead of a hash map.
+
+**Why.** COLMAP's order is deterministic too, but reproducing it would mean porting Boost's
+table layout and growth policy (hash-to-bucket mapping and group iteration). The effect is
+limited to the last bits of a boundary vertex's quadric, since each boundary vertex receives
+only two or three boundary quadrics. With boundary_weight 0 no boundary quadrics are added,
+so on flat grids the effect is provably zero.
+
+**Evidence.** The curved-grid oracle cases with boundary_weight 1000 and 1e6, and the color
+cases (boundary_weight 1000), match pycolmap's positions and faces byte for byte
+(`MeshSimplificationOracleTests`).
+
 ## 77. ComputeNormalizedMinGraphCut partitions with our own multilevel bisection, not METIS
 
 **What differs.** COLMAP's `ComputeNormalizedMinGraphCut` (math/graph_cut.cc) calls
