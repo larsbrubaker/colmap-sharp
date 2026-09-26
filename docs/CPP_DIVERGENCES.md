@@ -1945,6 +1945,24 @@ sequential and parallel runs to agree, and for cancellation through `Cancellatio
 `CSharpOnly_CancellationTokenStopsWithoutThrowing`, `CSharpOnly_ThreadCountDoesNotChangeImages`
 and `BaseControllerTests.BaseController_CancellationTokenStops` pass.
 
+## 100. GlobalMapper::EstablishTracks builds tracks in a deterministic order
+
+**What differs.** COLMAP's `GlobalMapper::EstablishTracks` walks the pose graph's valid edges
+and then the union-find's parents and the root-to-observations map, all hash maps
+(`std::unordered_map` / `NodeHashMap`). That order decides which observation becomes each
+track's root, the order of the elements inside each track and the 3D point id each track
+gets. The port (`Sfm/GlobalMapper.cs`) walks the valid edges in ascending pair id and the
+tracks in the order their first observation entered the union-find (insertion order,
+entry 2), so the ids and element order are deterministic but can differ from COLMAP's. The
+set of tracks, and which ones are kept (sorted by length, then id), is the same.
+
+**Why.** CLAUDE.md requires hash iteration order that reaches results to be deterministic;
+the element order reaches global positioning and bundle adjustment as residual order.
+
+**Evidence.** `GlobalMapperTests` (all four `GlobalMapper_*` cases) match the ground truth
+through `ReconstructionNear` at COLMAP's bounds, with the exact observation count in the
+noise-free cases.
+
 ## 106. Poisson splatting runs sequentially in sample order
 
 **What differs.** PoissonRecon splats the samples' normals (`setInterpolatedDataField`) in a
