@@ -81,8 +81,22 @@ public static class Normalization
 	public static (Vector2d[] NormedPoints, Matrix3d NormedFromOrig) CenterAndNormalizeImagePoints(
 		IReadOnlyList<Vector2d> points)
 	{
-		int numPoints = points.Count;
+		Vector2d[] source = points as Vector2d[] ?? points.ToArray();
+		var normedPoints = new Vector2d[source.Length];
+		Matrix3d normedFromOrig = CenterAndNormalizeImagePoints(source, normedPoints);
+		return (normedPoints, normedFromOrig);
+	}
+
+	/// <summary>
+	/// <see cref="CenterAndNormalizeImagePoints(IReadOnlyList{Vector2d})"/> writing the
+	/// normalized points into a caller-provided span of the same length (allocation-free, for
+	/// solvers that run once per RANSAC hypothesis). Returns normed_from_orig.
+	/// </summary>
+	public static Matrix3d CenterAndNormalizeImagePoints(ReadOnlySpan<Vector2d> points, Span<Vector2d> normedPoints)
+	{
+		int numPoints = points.Length;
 		Check.Gt(numPoints, 0);
+		Check.Eq(normedPoints.Length, numPoints);
 
 		// Calculate centroid.
 		Vector2d centroid = Vector2d.Zero;
@@ -110,13 +124,12 @@ public static class Normalization
 			0, 0, 1);
 
 		// Apply normalization matrix.
-		var normedPoints = new Vector2d[numPoints];
 		for (int i = 0; i < numPoints; ++i)
 		{
 			normedPoints[i] = (normedFromOrig * points[i].Homogeneous()).HNormalized();
 		}
 
-		return (normedPoints, normedFromOrig);
+		return normedFromOrig;
 	}
 
 	private static double[] SortedCopy(IReadOnlyList<double> values)

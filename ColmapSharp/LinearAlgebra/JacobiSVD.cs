@@ -7,9 +7,14 @@
 // allocation-free Svd3d / Svd4d (SvdFixed.cs) instead; both run JacobiSvdKernel.
 //
 // Rectangular input is reduced first (Golub & Van Loan, "Matrix Computations", 4th ed.,
-// §8.6.3, the R-SVD idea): for rows > cols, A = Q R with HouseholderQR, the kernel
-// decomposes the square top of R = Ur S V^T, and U = Q blockdiag(Ur, I), so the full U
-// falls out of Q without any basis completion. Q is never formed: the stored reflectors are
+// §8.6.3, the R-SVD idea): for rows > cols, A P = Q R with ColPivHouseholderQR, the kernel
+// decomposes the square top of R = Ur S Vr^T, U = Q blockdiag(Ur, I) and V = P Vr, so the
+// full U falls out of Q without any basis completion. The column pivoting is Eigen's
+// documented default preconditioner (ColPivHouseholderQRPreconditioner) and it matters:
+// it makes R graded (decreasing diagonal), which two-sided Jacobi resolves to high
+// relative accuracy (Demmel and Veselić 1992, cited in JacobiSvdKernel.cs). Unpivoted QR
+// lost the null vector of badly column-scaled DLT systems (homography_matrix_test's
+// NumericalStability, pixel coordinates of 1e6 next to a column of ones). Q is never formed: the stored reflectors are
 // applied to just the requested columns of blockdiag(Ur, I), so a thin U of an N x 3
 // system costs O(N) memory, not O(N^2). rows < cols decomposes A^T and
 // swaps the factors. Written from those sources; Eigen (MPL-2.0) is not ported.
@@ -81,11 +86,11 @@ public sealed class JacobiSVD
 		bool wantV = (options & (SvdOptions.ComputeThinV | SvdOptions.ComputeFullV)) != 0;
 		_singularValues = new double[n];
 
-		HouseholderQR? qr = null;
+		ColPivHouseholderQR? qr = null;
 		MatrixXd square;
 		if (m > n)
 		{
-			qr = new HouseholderQR(a);
+			qr = new ColPivHouseholderQR(a);
 			square = qr.MatrixR().TopRows(n);
 		}
 		else
@@ -98,6 +103,22 @@ public sealed class JacobiSVD
 		Info = JacobiSvdKernel.Decompose(
 			square.AsSpan(), n, ur is null ? default : ur.AsSpan(), v is null ? default : v.AsSpan(), _singularValues, out int sweeps);
 		Sweeps = sweeps;
+		if (v is not null && qr is not null)
+		{
+			// V = P Vr: row j of Vr belongs to column ColsPermutationIndices()[j] of A.
+			int[] permutation = qr.ColsPermutationIndices();
+			var permuted = new MatrixXd(n, n);
+			for (int j = 0; j < n; j++)
+			{
+				for (int c = 0; c < n; c++)
+				{
+					permuted[permutation[j], c] = v[j, c];
+				}
+			}
+
+			v = permuted;
+		}
+
 		_v = v;
 
 		if (ur is not null)

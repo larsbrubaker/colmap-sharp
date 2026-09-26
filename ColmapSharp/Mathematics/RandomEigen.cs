@@ -26,6 +26,17 @@ namespace ColmapSharp.Mathematics;
 public static class RandomEigen
 {
 	/// <summary>
+	/// Random 2-vector with each entry uniformly distributed in [-1, 1).
+	/// Port of colmap::RandomEigenVectord&lt;2&gt;.
+	/// </summary>
+	public static Vector2d RandomEigenVector2d()
+	{
+		double x = RandomUtils.RandomUniformReal(-1.0, 1.0);
+		double y = RandomUtils.RandomUniformReal(-1.0, 1.0);
+		return new Vector2d(x, y);
+	}
+
+	/// <summary>
 	/// Random 3-vector with each entry uniformly distributed in [-1, 1).
 	/// Port of colmap::RandomEigenVectord&lt;3&gt;.
 	/// </summary>
@@ -100,6 +111,21 @@ public static class RandomEigen
 		}
 
 		return matrix;
+	}
+
+	/// <summary>
+	/// Random 2x3 matrix with each entry uniformly distributed in [-1, 1), filled in
+	/// column-major order. Port of colmap::RandomEigenMatrixd&lt;2, 3&gt;.
+	/// </summary>
+	public static Matrix2x3d RandomEigenMatrix2x3d()
+	{
+		double m00 = RandomUtils.RandomUniformReal(-1.0, 1.0);
+		double m10 = RandomUtils.RandomUniformReal(-1.0, 1.0);
+		double m01 = RandomUtils.RandomUniformReal(-1.0, 1.0);
+		double m11 = RandomUtils.RandomUniformReal(-1.0, 1.0);
+		double m02 = RandomUtils.RandomUniformReal(-1.0, 1.0);
+		double m12 = RandomUtils.RandomUniformReal(-1.0, 1.0);
+		return new Matrix2x3d(m00, m01, m02, m10, m11, m12);
 	}
 
 	/// <summary>

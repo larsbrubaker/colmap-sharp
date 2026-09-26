@@ -28,21 +28,8 @@ public sealed class HouseholderQR
 	public HouseholderQR(MatrixXd a)
 	{
 		_qr = a.Clone();
-		int m = a.Rows;
-		int n = a.Cols;
-		int k = Math.Min(m, n);
-		_hCoeffs = new double[k];
-		for (int j = 0; j < k; j++)
-		{
-			Span<double> column = _qr.ColumnSpan(j)[j..];
-			double tau = Householder.MakeInPlace(column);
-			_hCoeffs[j] = tau;
-			ReadOnlySpan<double> essential = column[1..];
-			for (int c = j + 1; c < n; c++)
-			{
-				Householder.ApplyLeft(essential, tau, _qr.ColumnSpan(c)[j..]);
-			}
-		}
+		_hCoeffs = new double[Math.Min(a.Rows, a.Cols)];
+		Householder.FactorInPlace(_qr.AsSpan(), a.Rows, a.Cols, _hCoeffs);
 	}
 
 	/// <summary>

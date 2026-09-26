@@ -38,13 +38,23 @@ public sealed class PartialPivLU
 		int n = a.Rows;
 		_lu = a.Clone();
 		_permutation = new int[n];
+		_determinantSign = FactorInPlace(_lu.AsSpan(), n, _permutation);
+	}
+
+	/// <summary>
+	/// The factorization kernel over a column-major n x n span, factorized in place into the
+	/// packed L\U form; <paramref name="permutation"/> (length n) receives the row order.
+	/// Returns the permutation's sign. Allocation-free, so the minimal solvers
+	/// (Estimators/Solvers) can run it on stackalloc buffers once per RANSAC hypothesis.
+	/// </summary>
+	internal static int FactorInPlace(Span<double> lu, int n, Span<int> permutation)
+	{
 		for (int i = 0; i < n; i++)
 		{
-			_permutation[i] = i;
+			permutation[i] = i;
 		}
 
 		int sign = 1;
-		Span<double> lu = _lu.AsSpan();
 		for (int k = 0; k < n; k++)
 		{
 			int pivot = k;
@@ -66,7 +76,7 @@ public sealed class PartialPivLU
 					(lu[c * n + k], lu[c * n + pivot]) = (lu[c * n + pivot], lu[c * n + k]);
 				}
 
-				(_permutation[k], _permutation[pivot]) = (_permutation[pivot], _permutation[k]);
+				(permutation[k], permutation[pivot]) = (permutation[pivot], permutation[k]);
 				sign = -sign;
 			}
 
@@ -91,7 +101,44 @@ public sealed class PartialPivLU
 			}
 		}
 
-		_determinantSign = sign;
+		return sign;
+	}
+
+	/// <summary>
+	/// Solves A x = b for one right-hand side from the packed factors of
+	/// <see cref="FactorInPlace"/>. Allocation-free.
+	/// </summary>
+	internal static void SolveInPlace(
+		ReadOnlySpan<double> lu, int n, ReadOnlySpan<int> permutation, ReadOnlySpan<double> b, Span<double> x)
+	{
+		for (int i = 0; i < n; i++)
+		{
+			x[i] = b[permutation[i]];
+		}
+
+		// Forward substitution with the unit lower-triangular L.
+		for (int i = 1; i < n; i++)
+		{
+			double sum = x[i];
+			for (int k = 0; k < i; k++)
+			{
+				sum -= lu[k * n + i] * x[k];
+			}
+
+			x[i] = sum;
+		}
+
+		// Back substitution with U.
+		for (int i = n - 1; i >= 0; i--)
+		{
+			double sum = x[i];
+			for (int k = i + 1; k < n; k++)
+			{
+				sum -= lu[k * n + i] * x[k];
+			}
+
+			x[i] = sum / lu[i * n + i];
+		}
 	}
 
 	/// <summary>
@@ -181,39 +228,9 @@ public sealed class PartialPivLU
 		}
 
 		var x = new MatrixXd(n, b.Cols);
-		ReadOnlySpan<double> lu = _lu.AsSpan();
 		for (int j = 0; j < b.Cols; j++)
 		{
-			Span<double> xj = x.ColumnSpan(j);
-			ReadOnlySpan<double> bj = b.ColumnSpan(j);
-			for (int i = 0; i < n; i++)
-			{
-				xj[i] = bj[_permutation[i]];
-			}
-
-			// Forward substitution with the unit lower-triangular L.
-			for (int i = 1; i < n; i++)
-			{
-				double sum = xj[i];
-				for (int k = 0; k < i; k++)
-				{
-					sum -= lu[k * n + i] * xj[k];
-				}
-
-				xj[i] = sum;
-			}
-
-			// Back substitution with U.
-			for (int i = n - 1; i >= 0; i--)
-			{
-				double sum = xj[i];
-				for (int k = i + 1; k < n; k++)
-				{
-					sum -= lu[k * n + i] * xj[k];
-				}
-
-				xj[i] = sum / lu[i * n + i];
-			}
+			SolveInPlace(_lu.AsSpan(), n, _permutation, b.ColumnSpan(j), x.ColumnSpan(j));
 		}
 
 		return x;

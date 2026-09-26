@@ -67,4 +67,25 @@ internal sealed class ExpectationLog
 			Failures.Add(string.Create(CultureInfo.InvariantCulture, $"{what}: expected {expected:R} +- {tolerance}, got {actual:R}"));
 		}
 	}
+
+	/// <summary>EXPECT_LT: actual &lt; bound.</summary>
+	public void Less(double actual, double bound, string what)
+	{
+		if (!(actual < bound))
+		{
+			Failures.Add(string.Create(CultureInfo.InvariantCulture, $"{what}: expected < {bound:R}, got {actual:R}"));
+		}
+	}
+
+	/// <summary>EXPECT_GT: actual &gt; bound.</summary>
+	public void Greater(double actual, double bound, string what)
+	{
+		if (!(actual > bound))
+		{
+			Failures.Add(string.Create(CultureInfo.InvariantCulture, $"{what}: expected > {bound:R}, got {actual:R}"));
+		}
+	}
+
+	/// <summary>ADD_FAILURE() &lt;&lt; message.</summary>
+	public void Fail(string message) => Failures.Add(message);
 }

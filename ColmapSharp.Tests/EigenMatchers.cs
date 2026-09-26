@@ -69,6 +69,17 @@ internal static class EigenMatchers
 		return lhs.IsApprox(rhs, tol);
 	}
 
+	/// <summary>EigenMatrixNear(rhs, tol) applied to lhs (Solvers/AffineTransformTests).</summary>
+	public static bool EigenMatrixNear(Matrix2x3d lhs, Matrix2x3d rhs, double tol = LinearAlgebraConstants.DummyPrecision)
+	{
+		if (IsZero([rhs[0, 0], rhs[1, 0], rhs[0, 1], rhs[1, 1], rhs[0, 2], rhs[1, 2]]))
+		{
+			return lhs.Norm() <= tol;
+		}
+
+		return lhs.IsApprox(rhs, tol);
+	}
+
 	/// <summary>EigenMatrixNear(rhs, tol) applied to lhs.</summary>
 	public static bool EigenMatrixNear(Matrix6d lhs, Matrix6d rhs, double tol = LinearAlgebraConstants.DummyPrecision)
 	{

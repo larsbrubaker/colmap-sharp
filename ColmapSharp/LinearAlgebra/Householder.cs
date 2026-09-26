@@ -94,6 +94,41 @@ internal static class Householder
 		return q;
 	}
 
+	/// <summary>
+	/// Unblocked Householder QR of a column-major m x n span in place (HouseholderQR's
+	/// factorization, the same operations in the same order): afterwards R is on and above
+	/// the diagonal and reflector j's essential part below it; <paramref name="tau"/>
+	/// (length min(m, n)) receives the coefficients. Allocation-free, for the minimal solvers
+	/// in Estimators/Solvers that run once per RANSAC hypothesis.
+	/// </summary>
+	public static void FactorInPlace(Span<double> a, int m, int n, Span<double> tau)
+	{
+		int k = Math.Min(m, n);
+		for (int j = 0; j < k; j++)
+		{
+			Span<double> column = a.Slice(j * m + j, m - j);
+			double t = MakeInPlace(column);
+			tau[j] = t;
+			ReadOnlySpan<double> essential = column[1..];
+			for (int c = j + 1; c < n; c++)
+			{
+				ApplyLeft(essential, t, a.Slice(c * m + j, m - j));
+			}
+		}
+	}
+
+	/// <summary>
+	/// Applies Q = H_0 H_1 ... H_{k-1} to a vector in place, for a factor packed by
+	/// <see cref="FactorInPlace"/> with m rows. Q e_j is column j of householderQ().
+	/// </summary>
+	public static void ApplyQ(ReadOnlySpan<double> packed, int m, ReadOnlySpan<double> tau, Span<double> x)
+	{
+		for (int j = tau.Length - 1; j >= 0; j--)
+		{
+			ApplyLeft(packed.Slice(j * m + j + 1, m - j - 1), tau[j], x[j..]);
+		}
+	}
+
 	/// <summary>Applies Q^T = H_{k-1} ... H_0 to a vector in place.</summary>
 	public static void ApplyQTranspose(MatrixXd packed, ReadOnlySpan<double> tau, Span<double> x)
 	{
