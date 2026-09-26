@@ -89,10 +89,15 @@ Vector128 lanes in `Jet` (IEEE-exact, no FMA) need a CLAUDE.md rule clarificatio
 `ceres_loss_function`, `covariance`.
 
 ### Phase 9 — Features
-`feature/sift` (VLFeat CPU SIFT port, BSD-2, add its notice; DSP-SIFT and domain-size
-pooling options), `feature/utils`, `feature/matcher` (brute force + managed
-kd-tree for approximate NN, cross-check, ratio test, guided matching), `feature/extractor`,
-`feature/index`.
+`feature/sift` covariant extractor (`CovariantSiftCPUFeatureExtractor`: affine shape, DSP-SIFT
+/ domain-size pooling, force_covariant — needs VLFeat `covdet.c`, `vl_sift_calc_raw_descriptor`,
+`vl_imgradient_polar_f`; then the five pending `SiftCpuExtraction` rows CovariantSift,
+CovariantAffineSift, CovariantAffineSiftUpright, CovariantDSPSift, CovariantAffineDSPSift),
+`feature/matcher` (brute force + managed kd-tree for approximate NN, cross-check, ratio test,
+guided matching) + sift_test.cc's matcher cases, `feature/extractor`, `feature/index`.
+Skipped: `sift_test.cc` ExtractSiftFeaturesGPU.Nominal (SiftGPU is excluded).
+Memory: VLFeat's scale space for a 6400×4800 upsampled first octave is multi-GB (as in COLMAP);
+MatterCAD (esp. wasm32) must cap `max_image_size` accordingly.
 
 ### Phase 10 — Incremental SfM
 `sfm/observation_manager`, `incremental_triangulator`, `incremental_mapper(_impl)`,

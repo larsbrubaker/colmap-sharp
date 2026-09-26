@@ -722,3 +722,50 @@ Reconstruction_TranscribeImageIdsToDatabase` pass with COLMAP's expectations;
 `DatabaseCacheTests.CSharpOnly_CreateFromCacheKeepsWholeFrames` and
 `ReconstructionPruningTests.CSharpOnly_SameTilePointIsRedundant` pin the filtering and the
 selection tie-break.
+
+## 40. ExtractTopScaleFeatures keeps equal-scale keypoints in input order
+
+**What differs.** COLMAP's `ExtractTopScaleFeatures` (feature/utils.cc) selects the largest
+scales with `std::partial_sort`, which leaves keypoints of equal scale in an unspecified,
+implementation-defined order (libc++'s heap-based selection). The port
+(`Feature/FeatureUtils.cs`) sorts by scale, largest first, with the input index as the
+tie-break.
+
+**Why.** Equal scales are common: the SIFT extractor emits one keypoint per orientation, and
+all of them share the scale. Reproducing libc++'s heap order exactly would tie the result to
+one standard library; the index tie-break is deterministic and stable. Only the order among
+equal scales differs, and *which* keypoints are kept differs only when a tie straddles the
+cut, where COLMAP's choice is arbitrary too.
+
+**Evidence.** `FeatureUtilsTests.ExtractTopScaleFeatures_Nominal` (utils_test.cc 1:1, distinct
+scales) passes unchanged.
+
+## 41. The macOS arm64 wheel's VLFeat fuses multiply-adds; the SIFT port does not
+
+**What differs.** COLMAP compiles VLFeat's C with the platform compiler's default
+floating-point contraction. On macOS arm64, Apple clang's default is `-ffp-contract=on`, so
+expressions such as the Gaussian convolution's `acc += v * c` (imopv.c), the descriptor's
+bin weights and the fast atan2/resqrt polynomials become fused multiply-adds that round once.
+The port (`Feature/VLFeat/`) evaluates every `a*b + c` as a rounded product plus a rounded
+sum (CLAUDE.md "No FMA"), which is what VLFeat computes with contraction off and on any
+target without FMA contraction. The scale space therefore differs from the wheel's in the
+last bits, and those differences propagate to keypoint positions, scales and orientations
+(about 1e-3 at most on the fixtures) and, rarely, to a descriptor byte (by one gray level).
+A detection threshold could in principle flip on some image, adding or dropping a keypoint.
+
+**Why.** Emulating contraction would mean choosing, per expression, whatever the C compiler
+chose - which is compiler- and flag-specific (x86 builds, Linux wheels and older compilers
+do not fuse) - and `Math.FusedMultiplyAdd` is banned in math paths so results are identical
+on every platform. VLFeat's source defines the algorithm; the unfused evaluation is its
+literal semantics.
+
+**Evidence.** `oracle/sift_harness.c` drives cpp-reference's VLFeat the way COLMAP does. Built
+with `-ffp-contract=off` (and without SSE2, like COLMAP's arm64 build), its keypoints,
+orientations and raw float descriptors match the port bit for bit on all six fixture cases
+(`VlSiftFilterTests.CSharpOnly_MatchesUnfusedVLFeatExactly`: upsampling by one and two
+octaves, direct copy, downsampling, upright). Built with the default flags, the same harness
+prints the first keypoint of the sift_test.cc square image at x = 98.7666931, exactly the
+wheel's value, while the unfused build prints 98.7667007, exactly the port's. Against the
+wheel (`SiftOracleTests.CSharpOnly_MatchesPycolmapWithinFmaTolerance`, nine option sets) the
+keypoint counts and order agree exactly, values within 1.03e-3, descriptor bytes within 1 on
+at most 0.05% of the bytes.
