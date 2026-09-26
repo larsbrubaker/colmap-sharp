@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>ColmapSharp</RootNamespace>
+    <AssemblyName>ColmapSharp</AssemblyName>
+    <!-- The whole point of this assembly is that it is pure managed code: no
+         P/Invoke, no native artifact, no reflection. That is what lets it run on
+         browser-wasm with no emcc link step, so keep it trim- and AOT-clean. -->
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <!-- No package references. docs/LICENSE_AUDIT.md allows only the .NET base class
+       library for now; adding a package needs a row there first (permissive license,
+       pure managed, pinned version). -->
+
+  <!--
+    Pack settings. The package is one managed assembly: no native staging, no
+    runtimes/<rid> folders, which is the whole reason this port exists.
+  -->
+  <PropertyGroup>
+    <PackageId>ColmapSharp</PackageId>
+    <!-- 0.x is the README's "in progress" stated in the one place a consumer's
+         package manager will show it: no API-stability promise yet. -->
+    <Version>0.1.0</Version>
+    <Authors>Lars Brubaker</Authors>
+    <Company>Lars Brubaker</Company>
+    <Copyright>Copyright 2026 Lars Brubaker</Copyright>
+    <Description>A pure managed C# port of COLMAP (Structure-from-Motion and Multi-View Stereo): photos to camera poses, a sparse point cloud, dense depth maps and a mesh. No native library, no P/Invoke, so it runs anywhere .NET does including browser-wasm.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/larsbrubaker/colmap-sharp</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/larsbrubaker/colmap-sharp</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>colmap;sfm;structure-from-motion;mvs;photogrammetry;3d-reconstruction;wasm</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The repository README is the package README; nuget.org requires it at the
+         root of the package. The upstream notices travel with the binary because
+         COLMAP's BSD-3 license requires them in binary redistributions. -->
+    <None Include="..\README.md" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="..\THIRD_PARTY_NOTICES.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- COLMAP's tests are in-tree and see its internals; ported helpers that are not
+         public API here are internal, and the 1:1 test port needs to reach them. -->
+    <InternalsVisibleTo Include="ColmapSharp.Tests" />
+  </ItemGroup>
+
+</Project>

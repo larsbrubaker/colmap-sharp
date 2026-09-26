@@ -1,0 +1,46 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Warnings are errors across every project here, and the reason is numeric:
+         this port's failure mode is a silent conversion, not a crash. A narrowing
+         cast, a sign-extended operand in a bitwise or (CS0675) or a nullable slip in
+         a hot path changes a result without failing a build, and the maintenance
+         contract in CLAUDE.md cannot survive warnings that scroll past. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!--
+    The browser (wasm) compile gate, repeated here because this file BLOCKS the one that
+    would otherwise supply it.
+
+    MSBuild walks up from a project directory and stops at the first Directory.Build.props
+    it finds. This repo is a submodule of MatterCAD (at Submodules/colmap-sharp), so this
+    file is that first hit and MatterCAD's root Directory.Build.props never evaluates for
+    anything under here. MatterCAD's file expects to cover every project under its root, and
+    it is what carries the browser gate; without this block the walk would stop one level
+    short of the reconstruction library.
+
+    What that would cost: MatterCAD's browser build runs the library chain with
+    -p:BrowserCompatGate=true so that CA1416 becomes an error and any API annotated
+    [UnsupportedOSPlatform("browser")] that is reached unguarded fails in CI rather than
+    when the wasm head is built. Global -p: properties DO flow into this project (they
+    reach the whole graph), but SupportedPlatform is an ItemGroup, and items do not - so
+    the property would arrive and the item would not, and the analyzer would have no
+    browser platform to check against. This library is meant to run in a browser like
+    manifold-sharp does, and IsAotCompatible in ColmapSharp.csproj is the promise it keeps
+    there, so it cannot be the one link in the chain nobody polices.
+
+    Deliberately a copy rather than an import of the outer file: this repo builds standalone
+    from its own solution too, where there is no outer file to import, and a conditional
+    import on a path that only exists in one checkout layout is worse than eight lines.
+    Everything is conditioned on the property, so a normal build is unchanged.
+  -->
+  <PropertyGroup Condition="'$(BrowserCompatGate)' == 'true'">
+    <WarningsAsErrors>$(WarningsAsErrors);CA1416</WarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(BrowserCompatGate)' == 'true'">
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+</Project>

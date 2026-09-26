@@ -23,27 +23,32 @@ only if exhaustive/sequential/spatial matching proves too slow for MatterCAD pho
 Each phase ends with its ported tests green. Test names follow COLMAP's.
 
 ### Phase 0 — Scaffold and oracle
-- `ColmapSharp.sln`, `ColmapSharp/` (net10.0, `IsAotCompatible`, warnings as errors,
-  nullable), `ColmapSharp.Tests/` (TUnit, same versions as manifold-sharp), `global.json`,
-  `Directory.Build.props` (including the browser compat gate block from manifold-sharp),
-  `.gitignore`.
-- `scripts/fetch-reference.sh` — clone COLMAP at `REFERENCE` into `cpp-reference/`.
-- `oracle/requirements.txt` (`pycolmap==4.2.0`), `oracle/setup.sh` (venv), and a first
-  fixture script to prove the loop works.
-- Resolve: which `std::` distribution implementation the pycolmap macOS arm64 wheel uses
-  (libc++), so Phase 1's `Random` port targets the right one.
+- A first fixture script under `oracle/` that writes inputs and outputs to
+  `ColmapSharp.Tests/TestData/oracle/`, plus a C# test that reads them, to prove the
+  oracle loop end to end.
 
 ### Phase 1 — Math and linear algebra foundation
 - `LinearAlgebra/`: fixed-size `Vector2d/3d/4d`, `Matrix2d/3d/3x4d/4d`, `Quaterniond`,
   `AngleAxis`; dynamic `VectorXd`/`MatrixXd`; decompositions: Householder QR, Jacobi and
   Golub–Kahan SVD, symmetric eigen, LU with partial pivoting, LLᵀ/LDLᵀ. Written from
   textbook algorithms — **Eigen is MPL-2.0 and must not be transcribed.**
-- `Math/`: `math.h` (DegToRad, Clamp, SignOfNumber, NChooseK, Median/Percentile, etc.),
-  `random` (mt19937 + distributions, exact), `polynomial` (companion-matrix and
+- `Math/`: `random` (mt19937 + distributions, exact), `polynomial` (companion-matrix and
   Durand–Kerner roots), `union_find`, `connected_components`, `spanning_tree`, `graph_cut`
   (max-flow; COLMAP's own BSD code), `matrix.h` helpers.
-- Tests: `math/*_test.cc`, plus C#-only decomposition tests against oracle fixtures (numpy
-  in the oracle venv is fine for pure linear algebra checks).
+- **Random targets libc++.** `oracle/probe_random.py` shows the pycolmap 4.2.0 wheel
+  (`cp314-macosx_14_0_arm64`) links `/usr/lib/libc++.1.dylib` and imports 333 `std::__1`
+  symbols and no `__cxx11`/`GLIBCXX` ones. pycolmap binds only `set_random_seed`, and
+  `RandomUniformInteger/Real/Gaussian` are header templates inlined into `_core`, so the
+  distributions are LLVM libc++'s: `uniform_int_distribution` via
+  `__independent_bits_engine` with rejection, `uniform_real_distribution` via
+  `generate_canonical`, `normal_distribution` via the Marsaglia polar method with a cached
+  second value. Port those from libc++'s `<__random/*>` headers (Apache-2.0 WITH
+  LLVM-exception: permissive, but add a `docs/LICENSE_AUDIT.md` row and a
+  `THIRD_PARTY_NOTICES.md` section in the same change) and say so in `Random.cs`. Oracle
+  fixtures that depend on the PRNG must come from the macOS wheel; the Linux manylinux
+  wheel uses libstdc++ and would give different numbers.
+- Tests: the remaining `math/*_test.cc`, plus C#-only decomposition tests against oracle
+  fixtures (numpy in the oracle venv is fine for pure linear algebra checks).
 
 ### Phase 2 — Geometry
 `geometry/`: `rigid3`, `sim3`, `pose`, `essential_matrix`, `homography_matrix`,

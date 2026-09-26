@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>ColmapSharp.Tests</RootNamespace>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="TUnit" Version="1.63.0" />
+    <PackageReference Include="TUnit.Engine" Version="1.63.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ColmapSharp\ColmapSharp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Checked-in fixtures, including the pycolmap oracle outputs under
+         TestData/oracle (CLAUDE.md, "Verification nets"). Test content only, never
+         packaged; a glob so adding a fixture is a copy and not also a project edit. -->
+    <Content Include="TestData/**" Exclude="TestData/**/.gitkeep">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>
