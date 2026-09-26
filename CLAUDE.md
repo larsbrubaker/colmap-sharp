@@ -75,7 +75,10 @@ function *and everything it calls* before porting it.
   implementation-defined; we match **libc++**, which the macOS pycolmap wheel links. So
   PRNG-dependent fixtures must be generated on macOS (the Linux wheel uses libstdc++).
 - **No FMA.** Never introduce `Math.FusedMultiplyAdd` or `System.Numerics.Vector<T>` in math
-  paths, so results are identical on every platform. Watch out: Apple clang defaults to
+  paths, so results are identical on every platform. Explicit fixed-width `Vector128<T>` lanes
+  are allowed when each lane repeats the scalar IEEE operations in the same order (add, sub,
+  mul, div, sqrt; no `FusedMultiplyAdd`, no horizontal sums that reorder a reduction), with a
+  test that pins the result bit-identical to the scalar path. Watch out: Apple clang defaults to
   `-ffp-contract=on`, so the macOS arm64 pycolmap wheel *may* fuse `a*b + c` where we don't.
   When a Tier A oracle diff lands exactly on a multiply-add, suspect contraction on the C++
   side before chasing a port bug, and record the case in `docs/CPP_DIVERGENCES.md`.

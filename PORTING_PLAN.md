@@ -56,8 +56,7 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
 - Fusion is single-threaded (divergence 87): per-image parallel precompute of per-pixel
   world points/normals first, then a speculative band-parallel traversal with in-order commit,
   which reproduces the one-thread result.
-- Optional: Vector128 lanes in `Jet` (IEEE-exact, no FMA) need a CLAUDE.md rule
-  clarification first.
+- Optional: Vector128 lanes in `Jet` (allowed under CLAUDE.md's lane rule).
 - Evaluate a faithful port of libc++ `std::sort` (sort3/4/5, insertion sort below 24, pdqsort
   above) so tie-sensitive sorts match COLMAP instead of carrying divergence entries.
 
