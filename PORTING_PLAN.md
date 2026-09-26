@@ -62,7 +62,8 @@ focal) use `Optim/TinySolver.cs` with `TinyProductManifold<…, TinyEuclideanMan
 Estimators implement `IEstimator<TX,TY,TModel>` (+ `ILocalEstimator` for LO-RANSAC) as
 `readonly struct`s — see `Optim/Estimator.cs` and `Estimators/Solvers/SimilarityTransform.cs`.
 `LoRansac.Estimate` hides (does not override) `Ransac.Estimate`: call it on the LoRansac type.
-Open estimators: `two_view_geometry` (partly ported, branch pending), `pose`, `generalized_pose`, `triangulation`, `alignment`,
+Open estimators: `two_view_geometry`'s `EstimateRigTwoViewGeometries` (+ its `Nominal` test;
+needs `generalized_pose`), `pose`, `generalized_pose`, `triangulation`, `alignment`,
 `rotation_averaging`, `global_positioning`,
 `gravity_refinement`, `view_graph_calibration`.
 
