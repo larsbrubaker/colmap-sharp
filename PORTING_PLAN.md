@@ -27,8 +27,6 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
 `MeshTextureMapping`'s result into a textured mesh.
 
 ### Phase 12 — Dense reconstruction (MVS)
-- `patch_match`: CPU port of `patch_match_cuda.cu` in progress (slices 3–5: kernel math,
-  sweep/run, controller + synthetic-scene accuracy test).
 - `poisson_meshing`: PoissonRecon port in progress (slices 3–8: weighted samples, finalize,
   FEM system, solver, level set, trimmer + public API + `poisson_meshing_test.cc`).
 - `delaunay_meshing`: 3D Delaunay tetrahedralization written here (CGAL excluded), then

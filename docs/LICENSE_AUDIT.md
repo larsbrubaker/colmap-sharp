@@ -44,7 +44,7 @@ The modules that exist only because of an excluded dependency are listed below.
 | Boost, gflags, glog | BSL / BSD | Utilities, CLI, logging | Not ported; BCL replacements. |
 | Qt | LGPL / commercial | GUI | **Excluded.** No GUI in this library. |
 | ONNX Runtime + models (ALIKED, LightGlue, LoMa, AnyCalib) | MIT runtime; model weights vary | Learned features | Out of scope. Check each model's weights license separately if this is ever revisited. |
-| CUDA / HIP | Proprietary toolchains | PatchMatch stereo, GPU SIFT | Not used. PatchMatch stereo is ported to managed CPU code from `mvs/patch_match_cuda.cu` (COLMAP's own BSD code). |
+| CUDA / HIP | Proprietary toolchains | PatchMatch stereo, GPU SIFT | Not used. PatchMatch stereo is ported to managed CPU code from `mvs/patch_match_cuda.cu` (COLMAP's own BSD code). cuRAND (per-pixel random numbers) is replaced by `Mvs/PatchMatchRandom.cs`, a counter-based generator written here from SplitMix64's published output function (Steele, Lea and Flood, OOPSLA 2014; public-domain constants); no cuRAND code was read. CUDA texture sampling is reimplemented from the CUDA Programming Guide's documented filtering rules (`Mvs/PatchMatchTextures.cs`). |
 
 ## Package references allowed in `ColmapSharp` (the library)
 

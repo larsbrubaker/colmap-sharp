@@ -37,7 +37,7 @@ namespace ColmapSharp.Mvs;
 /// Port of colmap::mvs::Mat: a width x height x depth array stored as depth contiguous
 /// width x height planes (see the file header for the layout and the .bin format).
 /// </summary>
-public class Mat<T>
+public partial class Mat<T>
 	where T : unmanaged
 {
 	/// <summary>Width in pixels (columns).</summary>

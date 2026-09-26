@@ -1731,6 +1731,77 @@ the batch in reader order, so the ids always equal COLMAP's single-threaded run.
 **Evidence.** `FeatureExtractionTests.CSharpOnly_ThreadCountIndependentAndReportsProgress`:
 1 and 3 threads give identical image ids, keypoints and descriptors.
 
+## 84. PatchMatchController's "__auto__" source images order equal counts by image index
+
+**What differs.** For a `__auto__, N` line of patch-match.cfg,
+`PatchMatchController::ReadProblems` (patch_match.cc) ranks the reference image's
+overlapping images by shared-point count with `std::partial_sort`, which leaves equal
+counts in an implementation-defined order. The port (`Mvs/PatchMatchController.cs`) breaks
+ties by ascending image index, the order the candidates come out of COLMAP's `std::map`.
+When a tie straddles the cut-off at N, the chosen source images can differ from COLMAP's,
+and tied images can be listed in a different order (the order of the source images is
+the layer order of the PatchMatch kernel, so it reaches the depth maps through the
+Monte Carlo sampling of source images).
+
+**Why.** The same rule and reasoning as entry 64: libc++'s heap-based `partial_sort` is
+not part of COLMAP's contract, and the index order is deterministic on every platform.
+
+**Evidence.** `PatchMatchControllerTests.ReadProblems_AutoTiesGoToLowerImageIndex` and
+`ReadProblems_AutoRanksBySharedPoints` (C#-only; COLMAP has no patch_match_test.cc) pin
+the order, with the shared-point counts they rely on asserted first.
+
+## 85. PatchMatch problems list their source images in configured order
+
+**What differs.** `PatchMatchController::ProcessProblem` collects a problem's used images
+(reference plus sources) in a `FlatHashSet<int>` (Boost `unordered_flat_set`) and rebuilds
+the source image list by iterating it, so the sources the kernel sees come in hash order.
+The port (`PatchMatchController.SetUpProblem`) iterates the reference image, then the
+configured source images in their configured order, each once. The source order is the
+kernel's layer order, which changes which source image a Monte Carlo draw picks, so the
+computed depth and normal maps can differ (PatchMatch is Tier C, so this is within its
+bar).
+
+**Why.** Reproducing Boost.Unordered's bucket layout and hash mixing is out of reach (Boost
+is not ported, entry 2), and the configured order is deterministic and what a reader of
+patch-match.cfg expects.
+
+**Evidence.** `PatchMatchControllerTests.SetUpProblem_Photometric` and
+`SetUpProblem_MissingFiles` (C#-only) pin the order.
+
+## 86. PatchMatch runs on the CPU: no GPU index, and its own random numbers
+
+**What differs.** COLMAP's PatchMatch stereo runs only on CUDA: `PatchMatchOptions` has a
+`gpu_index` string ("-1" for all devices), `PatchMatch::Check` requires exactly one index
+>= -1, and `PatchMatchController` runs one problem per GPU (`ReadGpuIndices`). The port has
+no GPU: `gpu_index` and `ReadGpuIndices` are not ported, and `PatchMatch.Check` skips the
+index checks. `num_threads` bounds the CPU parallelism instead.
+
+**Why.** The library is pure managed code (CLAUDE.md, contract 1); the CUDA kernel
+(`patch_match_cuda.cu`) is ported to CPU code, where a device index has no meaning.
+
+**Evidence.** `PatchMatchTests` (C#-only) pins every other `PatchMatchOptions::Check` bound
+and `PatchMatch::Check` condition.
+
+**Addendum: random numbers.** COLMAP draws PatchMatch's random numbers from cuRAND XORWOW
+states kept in a map (`GpuMatPRNG`), each seeded with `curand_init(id, 0, 0)` where `id` is
+the thread's position in the CUDA launch grid, and rotated with the other maps after each
+sweep. `FillWithRandomNumbers` (the initial depths) and `InitNormalMap` draw from one state
+per pixel. The sweep (`SweepFromTopToBottom`, patch_match_cuda.cu) instead takes one state per
+column of the current rotated frame (`rand_state_map.Get(0, col)`), draws from it in order
+down the whole column, and stores it back at row 0. The port draws from
+`Mvs/PatchMatchRandom.cs`, a counter-based generator (SplitMix64's mixer over a Weyl
+sequence) whose every draw is a function of (seed, pixel of the original reference image,
+phase, draw index); the phase is the initial depth, the initial normal, or sweep s of
+iteration i, and the sweep keys each pixel's draws on that pixel rather than continuing a
+per-column stream. Draws map to (0, 1] with curand_uniform's formula. The random values, and
+so the depth and normal maps, differ from any GPU run; PatchMatch is Tier C, and cuRAND's
+sequence depends on the CUDA launch layout, so no run of COLMAP is a fixed target either.
+What the port adds is independence from threads: the same seed gives the same draws for any
+thread count or scheduling, and no generator state has to be stored or rotated. Evidence:
+`PatchMatchInputsTests.PatchMatchRandom_*` and `ToOriginalPixel_UndoesMatRotate`
+(C#-only); `GpuMatTests` (gpu_mat_test.cu 1:1) fill its matrices from this generator instead
+of `GpuMatPRNG`.
+
 ## 87. StereoFusion traverses on one thread
 
 **What differs.** COLMAP's `mvs::StereoFusion::Run` (fusion.cc) splits each image into 10-row
@@ -1907,6 +1978,63 @@ with smallest id 1 stays ahead of a child of size 3 with smallest id 5 (neither 
 **Evidence.** `SceneClusteringTests.CSharpOnly_FlatChildClustersOrderedBySizeThenSmallestId`
 pins the order; `SceneClustering_ThreeFlatClusters` and `_ThreeFlatClustersTwoOverlap`
 (1:1, order-insensitive as in COLMAP) pass.
+
+## 95. PatchMatch samples source images with exact float bilinear weights
+
+**What differs.** `PatchMatchCuda::InitSourceImages` binds the source images to a layered
+CUDA texture with linear filtering. NVIDIA hardware computes the bilinear weights in 9-bit
+fixed point (8 fractional bits), so a sample is quantized to steps of 1/256 of a texel. The
+port (`Mvs/PatchMatchTextures.cs`) interpolates with exact float weights, using the formula of
+COLMAP's own gfx9 emulation, `SampleLayeredBilinear` (patch_match_cuda.cu), with the same
+texel-centre offset (+0.5) and zero border. Photo-consistency costs can differ from a GPU run
+in their low bits.
+
+**Why.** There is no texture unit on the CPU; exact weights are what COLMAP itself uses on
+AMD gfx9, and the difference is below the NCC's sensitivity. PatchMatch is Tier C.
+
+**Evidence.** `PatchMatchInputsTests.SourceImages_BilinearWithZeroBorder` (C#-only) pins
+texel centres, midpoints, the zero border and padding of smaller layers.
+
+## 96. PatchMatch float math uses .NET's MathF and no contraction
+
+**What differs.** COLMAP's PatchMatch kernels (`gpu_mat_ref_image.cu`'s prefilter and
+`patch_match_cuda.cu`) call CUDA's `expf`, `sqrtf`, `rsqrtf`, `sinf`/`cosf` and `erff`, and
+nvcc contracts `a * b + c` into FMA by default. The port keeps every expression in float in
+COLMAP's order but evaluates it with .NET's `MathF` functions (`rsqrt(x)` becomes
+`1 / MathF.Sqrt(x)`) and never fuses a multiply-add (CLAUDE.md). `erff`, which .NET lacks, is
+evaluated in double from Abramowitz and Stegun 7.1.6 and rounded to float
+(`Mvs/PatchMatchLikelihood.cs`). CUDA's float `min`/`max` are `fminf`/`fmaxf`, which return
+the other operand when one is NaN; the port keeps that (`PatchMatchKernel.CudaMin`/
+`CudaMax`), because degenerate geometry relies on it to yield a bounded cost. Results can
+differ from a GPU run in the last bits; downstream, PatchMatch's hypotheses can then diverge.
+
+**Why.** CUDA's device math library is not available, and fused operations would make
+results differ across CPUs. The rule keeps the port identical on every platform. PatchMatch
+is Tier C.
+
+**Evidence.** `PatchMatchInputsTests.RefImageFilter_MatchesBruteForce` (C#-only) checks the
+prefilter against a double-precision evaluation to 1e-5;
+`PatchMatchKernelTests.Likelihood_ErfMatchesKnownValues` checks `ErfF` against A&S's table;
+`PatchMatchKernelTests.GeomConsistencyCost_DegenerateBackProjectionCostsTheMaximum` and the
+`ComputeIncProb(float.NaN)` assertion in `Likelihood_MessagesAndPriors` pin the
+`fminf`/`fmaxf` behavior.
+
+## 97. PatchMatch computes window radii 21 to 32
+
+**What differs.** `PatchMatchOptions::Check` accepts `window_radius` up to 32
+(`kMaxPatchMatchWindowRadius`), but `PatchMatchCuda::Run` only instantiates its templated
+kernels for radii 1 to 20; for 21 to 32 it logs "Window size ... not supported" and computes
+nothing, leaving the depth and normal maps as initialized. The port's kernel takes the radius
+at run time (`Mvs/PatchMatchKernel.Photometric.cs`), so every radius `Check` accepts is
+computed.
+
+**Why.** The limit is an artefact of CUDA template instantiation, and silently returning
+random maps for an accepted option is a bug; computing is what the option asks for. Radii
+1 to 20 behave as in COLMAP.
+
+**Evidence.** `PatchMatchTests.PatchMatchOptions_CheckBounds` pins the accepted range;
+`PatchMatchKernelTests.PhotoConsistency_ComputesRadiiBeyondCudaTemplates` computes the NCC
+at radii 25 and 32.
 
 ## 98. The undistorters hand their images to a host sink, and "copy" re-hands the decoded image
 
@@ -2205,3 +2333,22 @@ choice as entry 71 for feature matching.
 gets bit-identical poses from one worker and from eight, and fails without the fresh PRNG.
 Before the fix, `HierarchicalPipeline_WithoutNoise` (1:1) passed alone but missed its 5e-4
 projection-center bound (5.2e-4) in the full suite.
+
+## 122. PatchMatchController runs problems one at a time and aborts the one in flight on stop
+
+**What differs.** `PatchMatchController::Run` (patch_match.cc) runs one problem per GPU on
+a thread pool and checks `CheckIfStopped()` only at the start of `ProcessProblem`, so a stop
+lets every in-flight problem finish and write its maps. The port
+(`Mvs/PatchMatchController.cs`) runs the problems one after another, each PatchMatch run
+parallel over columns on the CPU, and passes the CancellationToken into `PatchMatch.Run`:
+a stop aborts the running problem, which writes no maps, and `Run` returns normally. The
+problems already finished keep their maps; a later run redoes the aborted one (its outputs
+do not exist, so it is not skipped).
+
+**Why.** There are no GPUs to spread problems over (entry 86), and one CPU PatchMatch run
+already uses every core. On the CPU a single 2 MP problem takes minutes, and a user who
+cancels should not have to wait for it; skipping its outputs keeps the workspace free of
+half-computed maps.
+
+**Evidence.** `PatchMatchControllerTests.Run_CancelledMidProblemWritesNothingForIt` and
+`Run_StopsWithoutErrorWhenCancelled` (C#-only).

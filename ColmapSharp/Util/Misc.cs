@@ -1,11 +1,11 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 // Ported from COLMAP (BSD-3-Clause, see THIRD_PARTY_NOTICES.md).
 //
-// Misc: the double instantiations of VectorToCSV and CSVToVector from colmap/util/misc.h,
-// with the string helpers they call from colmap/util/string.cc (StringSplit with
+// Misc: the double and std::string instantiations of VectorToCSV / CSVToVector from
+// colmap/util/misc.h, with the string helpers they call from colmap/util/string.cc (StringSplit with
 // token_compress_on, StringTrim, StringToDouble). First user: Scene/Camera.cs
-// (ParamsToString / SetParamsFromString), whose camera_test.cc cases pin them; the int,
-// float and string instantiations and misc_test.cc's CSVToVector cases come with the rest
+// (ParamsToString / SetParamsFromString), whose camera_test.cc cases pin them; the int
+// and float instantiations and misc_test.cc's CSVToVector cases come with the rest
 // of util/misc when a caller needs them.
 //
 // VectorToCSV streams each value with an ostream's default precision (6 significant
@@ -72,6 +72,27 @@ public static class Misc
 			}
 
 			values.Add(value);
+		}
+
+		return values;
+	}
+
+	/// <summary>
+	/// CSVToVector&lt;std::string&gt;: splits on ',' and ';', trims each element and skips empty
+	/// ones. First user: Mvs/PatchMatchController.cs (the source-image lines of
+	/// patch-match.cfg).
+	/// </summary>
+	public static List<string> CsvToStringVector(string csv)
+	{
+		string[] elems = csv.Split(CsvDelimiters);
+		var values = new List<string>(elems.Length);
+		foreach (string rawElem in elems)
+		{
+			string elem = rawElem.Trim(WhiteSpace);
+			if (elem.Length > 0)
+			{
+				values.Add(elem);
+			}
 		}
 
 		return values;

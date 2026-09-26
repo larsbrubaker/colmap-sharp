@@ -54,6 +54,8 @@ internal static class MvsTestUtils
 
 		public void Add(string path, Bitmap bitmap) => bitmaps[path] = bitmap;
 
+		public bool Remove(string path) => bitmaps.Remove(path);
+
 		public bool Exists(string path) => bitmaps.ContainsKey(path);
 
 		public Bitmap Read(string path, bool asRgb)
