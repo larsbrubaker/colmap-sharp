@@ -99,9 +99,13 @@ with the EigenQuaternion × Euclidean<3> product manifold, as in COLMAP 4.2.
 / domain-size pooling, force_covariant — needs VLFeat `covdet.c`, `vl_sift_calc_raw_descriptor`,
 `vl_imgradient_polar_f`; then the five pending `SiftCpuExtraction` rows CovariantSift,
 CovariantAffineSift, CovariantAffineSiftUpright, CovariantDSPSift, CovariantAffineDSPSift),
-`feature/matcher` (brute force + managed kd-tree for approximate NN, cross-check, ratio test,
-guided matching) + sift_test.cc's matcher cases, `feature/extractor`, `feature/index`.
-Skipped: `sift_test.cc` ExtractSiftFeaturesGPU.Nominal (SiftGPU is excluded).
+`feature/extractor`; `MemoryConstrainedLRUCache` (util/cache.h) + its 7 `cache_test.cc` cases.
+Skipped (SiftGPU excluded): `sift_test.cc` ExtractSiftFeaturesGPU.Nominal,
+CreateSiftGPUMatcherOpenGL/CUDA.Nominal, MatchSiftFeaturesGPU.{Nominal,TypeMismatch},
+MatchSiftFeaturesCPUvsGPU.Nominal, MatchGuidedSiftFeaturesGPU.* (7),
+MatchGuidedSiftFeaturesCPUvsGPUGuided.EssentialMatrix. Skipped (ONNX learned features out of
+scope): `matcher_test.cc` Check for the 9 non-SIFT-bruteforce types and the aliked lines of
+Copy/CopyAssignment. The feature index is exact (divergence 42), not faiss.
 Memory: VLFeat's scale space for a 6400×4800 upsampled first octave is multi-GB (as in COLMAP);
 MatterCAD (esp. wasm32) must cap `max_image_size` accordingly.
 

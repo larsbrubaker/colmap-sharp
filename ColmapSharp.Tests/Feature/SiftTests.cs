@@ -9,7 +9,7 @@
 // CovariantAffineSiftUpright, CovariantDSPSift and CovariantAffineDSPSift need COLMAP's
 // CovariantSiftCPUFeatureExtractor (VLFeat covdet), which is not ported yet; they land with it.
 // Skipped: ExtractSiftFeaturesGPU.Nominal (SiftGPU, excluded). The matcher tests of
-// sift_test.cc land with the SIFT matchers (feature/matcher).
+// sift_test.cc are in SiftMatcherTests.cs and SiftMatcherGuidedTests.cs.
 //
 // The extractor is constructed directly: CreateSiftFeatureExtractor returns exactly this
 // SiftCPUFeatureExtractor for these options, and the factory lands with feature/extractor.

@@ -862,3 +862,32 @@ wheel's value, while the unfused build prints 98.7667007, exactly the port's. Ag
 wheel (`SiftOracleTests.CSharpOnly_MatchesPycolmapWithinFmaTolerance`, nine option sets) the
 keypoint counts and order agree exactly, values within 1.03e-3, descriptor bytes within 1 on
 at most 0.05% of the bytes.
+
+## 42. FeatureDescriptorIndex is an exact nearest-neighbor search, not faiss's IVF index
+
+**What differs.** COLMAP's `FeatureDescriptorIndex` (feature/index.cc) wraps faiss: an exact
+`IndexFlatL2` for fewer than 512 indexed descriptors, and for 512 or more an inverted-file
+index (`IndexIVFScalarQuantizer` with `QT_8bit_direct` for SIFT, `IndexIVFFlat` otherwise;
+4 sqrt(N) k-means centroids, searched with `nprobe = 8`). The IVF search is approximate: it
+only visits the 8 nearest clusters, so it can miss a query's true nearest or second-nearest
+neighbour. The port (`Feature/FeatureDescriptorIndex.cs`) always returns the exact k nearest
+neighbours, ordered by (squared distance, index). SIFT descriptors are compared as integers
+(exact); other descriptor types sum (a - b)^2 in float, left to right, where faiss's flat
+index uses the ||a||^2 + ||b||^2 - 2ab expansion.
+
+**Why.** faiss is native code (CLAUDE.md contract 1). Porting it, k-means training included,
+would reproduce a randomized approximation whose exact output also depends on faiss's
+OpenMP partitioning and BLAS. The exact search is the result the IVF index approximates, and
+it makes the default (index) matching path agree with COLMAP's own brute-force matcher, which
+is what `SiftCPUFeatureMatcherFaissVsBruteForce` asserts. On an image pair with 512+
+features, the SIFT matches can therefore differ from COLMAP's default CPU matcher wherever
+faiss's approximation missed a neighbour (COLMAP returns fewer or different matches there);
+they equal COLMAP's `cpu_brute_force_matcher` matches except where acos-of-dot and sqrt-of-L2
+round a threshold comparison differently, which COLMAP's two paths also do. Ties in distance
+are ordered by index; faiss leaves them unspecified, and the ratio test rejects a tie for the
+best neighbour either way.
+
+**Evidence.** `FeatureDescriptorIndexTests` (index_test.cc 1:1, including 1000 descriptors,
+where COLMAP uses IVF) and `SiftMatcherTests.SiftCPUFeatureMatcherFaissVsBruteForce_Nominal`
+(sift_test.cc 1:1) pass. Speed: an 8192 x 8192 SIFT pair with cross-check takes about 114 ms
+through the index and 51 ms brute force on a 10-core Apple M-series machine (Release build).

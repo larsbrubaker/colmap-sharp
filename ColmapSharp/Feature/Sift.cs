@@ -11,8 +11,9 @@
 // Not here yet: CovariantSiftCPUFeatureExtractor (estimate_affine_shape, domain-size
 // pooling, force_covariant_extractor) needs VLFeat's covdet, which is not ported, so this
 // extractor rejects those options exactly like COLMAP's SiftCPUFeatureExtractor does; the
-// CreateSiftFeatureExtractor factory, FeatureExtractionOptions and the SIFT matchers land
-// with feature/extractor and feature/matcher. SiftGPU is excluded (docs/LICENSE_AUDIT.md).
+// CreateSiftFeatureExtractor factory and FeatureExtractionOptions land with
+// feature/extractor. The matching half of sift.cc is SiftMatcher.cs. SiftGPU is excluded
+// (docs/LICENSE_AUDIT.md).
 //
 // Tier A (exact) against unfused VLFeat: the VLFeat layer matches VLFeat compiled without
 // FMA contraction bit for bit (VlSiftFilterTests). The macOS arm64 pycolmap wheel fuses

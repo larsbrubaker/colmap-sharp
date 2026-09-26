@@ -37,7 +37,7 @@ The modules that exist only because of an excluded dependency are listed below.
 | LSD (`thirdparty/LSD`) | **AGPL-3.0** | Line segment detection (`image/line`, `estimators/coordinate_frame`) | **Excluded.** Coordinate-frame estimation from lines is skipped, or reimplemented from the published LSD paper (von Gioi et al., IPOL 2012) if it is ever needed. |
 | CGAL | **GPL-3.0** / commercial | Delaunay meshing, advancing-front meshing, texture mapping | **Excluded.** Delaunay tetrahedralization comes from MIConvexHull (MIT) or MatterCAD's own solution. Graph cut, visibility scoring and surface extraction are COLMAP's own (BSD) and are ported. |
 | PoissonRecon (`thirdparty/PoissonRecon`) | MIT | Poisson surface reconstruction | **Port freely.** Add Kazhdan's notice when the first file lands. |
-| faiss | MIT | Nearest-neighbor descriptor matching, retrieval | Not used (native). Write a managed kd-tree / brute-force matcher instead. |
+| faiss | MIT | Nearest-neighbor descriptor matching, retrieval | Not used (native). Replaced by an exact managed k-NN search (`Feature/FeatureDescriptorIndex.cs`, docs/CPP_DIVERGENCES.md entry 42). |
 | Symforce-Caspar | Apache-2.0 | GPU bundle adjustment | Not needed (GPU only). |
 | OpenImageIO | Apache-2.0 | Image decoding, EXIF | Not used (native). The library takes decoded pixel buffers; the host (MatterCAD/agg-sharp) decodes. EXIF focal length is read by a small managed parser written here. |
 | SQLite | Public domain | Feature/match database | Not used (native). The database is an in-memory C# store with the same API; persistence, if needed, is a managed format of our own. |
