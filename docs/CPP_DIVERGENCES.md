@@ -2284,6 +2284,27 @@ but those rare cases.
 **Evidence.** `PoissonTreeOracleTests.LogF_MatchesLibm`: over 4000 float arguments spanning
 2^-40..2^40, the result equals Apple's `logf` (the oracle's) bit for bit.
 
+## 117. Bitmap interpolation treats points beyond int range and NaN as outside the image
+
+**What differs.** `Bitmap::InterpolateBilinear` computes `x0 = static_cast<int>(std::floor(x))`,
+`x1 = x0 + 1` and rejects the point when `x0 < 0 || x1 >= width_` (likewise for y);
+`InterpolateNearestNeighbor` casts `std::round(x)`. For a point beyond int range or NaN the
+cast is undefined behavior in C++. The port tests the doubles first (`x >= 0 && x < width - 1`,
+the same check for every finite x) and returns null for NaN in both methods, so such points
+are outside the image.
+
+**Why.** .NET saturates `(int)double` (and maps NaN to 0), so the literal translation turned
+`floor(x) = int.MaxValue` into `x1 = int.MinValue`, passed the bounds check and indexed far
+outside the pixel array; NaN sampled pixel (0, 0). On x86 COLMAP's cast yields `INT_MIN`, which
+the check rejects, so returning null is what COLMAP does there; on arm64 COLMAP reads out of
+bounds.
+
+**Evidence.** Rectifying a synthetic stereo pair (`Warp.WarpImageWithHomographyBetweenCameras`)
+maps some target pixels to source points beyond int range for about 2.5% of PRNG seeds; this
+made `UndistortersTests.StereoImageRectifier_Integration` fail intermittently depending on the
+thread-static PRNG state earlier tests left behind. `UndistortionTests.CSharpOnly_RectifyAndUndistortStereoImages_FarSourceSamples`
+(seed 25) and `BitmapTests.CSharpOnly_InterpolateFarOutsideOrNaN_ReturnsNull` pin it.
+
 ## 120. SceneClustering.Create hands the image pairs over in a scrambled order
 
 **What differs.** COLMAP's `SceneClustering::Create` builds the edge list by iterating the

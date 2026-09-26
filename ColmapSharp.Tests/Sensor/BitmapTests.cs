@@ -318,6 +318,30 @@ public partial class BitmapTests
 		}
 	}
 
+	// C#-only (docs/CPP_DIVERGENCES.md, entry 117): a sample point beyond int range, or NaN,
+	// is outside the image. .NET saturates (int)double, so floor(x) = int.MaxValue made
+	// x0 + 1 wrap negative, pass the bounds check and index far outside the pixel array.
+	[Test]
+	public async Task CSharpOnly_InterpolateFarOutsideOrNaN_ReturnsNull()
+	{
+		foreach (bool asRgb in new[] { true, false })
+		{
+			var bitmap = new Bitmap(11, 10, asRgb);
+			bitmap.Fill(new BitmapColor<byte>(1, 2, 3));
+			double[] bad = [3e9, -3e9, int.MaxValue, double.PositiveInfinity, double.NegativeInfinity, double.NaN];
+			foreach (double v in bad)
+			{
+				using (Assert.Multiple())
+				{
+					await Assert.That(bitmap.InterpolateBilinear(v, 5.0).HasValue).IsFalse();
+					await Assert.That(bitmap.InterpolateBilinear(5.0, v).HasValue).IsFalse();
+					await Assert.That(bitmap.InterpolateNearestNeighbor(v, 5.0).HasValue).IsFalse();
+					await Assert.That(bitmap.InterpolateNearestNeighbor(5.0, v).HasValue).IsFalse();
+				}
+			}
+		}
+	}
+
 	[Test]
 	public async Task Bitmap_RescaleRGB()
 	{

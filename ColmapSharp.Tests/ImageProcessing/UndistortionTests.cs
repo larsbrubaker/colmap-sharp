@@ -8,11 +8,13 @@
 // RectifyStereoCameras_Nominal is Tier B with COLMAP's 1e-5 tolerance.
 // UndistortImage_WarpOptions compares a direct warp with a warp-then-Rescale, so it runs
 // through Bitmap.Rescale (Tier B, docs/CPP_DIVERGENCES.md entry 9); its bounds are COLMAP's.
-// CSharpOnly_UndistortReconstruction_KeepsCameraIds is C#-only and pins divergence entry 60.
+// CSharpOnly_UndistortReconstruction_KeepsCameraIds is C#-only and pins divergence entry 60;
+// CSharpOnly_RectifyAndUndistortStereoImages_FarSourceSamples is C#-only and pins entry 117.
 
 using ColmapSharp.Geometry;
 using ColmapSharp.ImageProcessing;
 using ColmapSharp.LinearAlgebra;
+using ColmapSharp.Mathematics;
 using ColmapSharp.Scene;
 using ColmapSharp.Sensor;
 using ColmapSharp.Util;
@@ -546,6 +548,49 @@ public class UndistortionTests
 			await Assert.That(undistortedCamera.Height).IsEqualTo(undistortedImage1.Height);
 			await Assert.That(undistortedImage1.Width).IsEqualTo(undistortedImage2.Width);
 			await Assert.That(undistortedImage1.Height).IsEqualTo(undistortedImage2.Height);
+		}
+	}
+
+	// C#-only (docs/CPP_DIVERGENCES.md, entry 117): with PRNG seed 25 the synthetic stereo pair
+	// that UndistortersTests.StereoImageRectifier_Integration builds rectifies some target
+	// pixels to source points beyond int range. Bitmap.InterpolateBilinear used to index out
+	// of its array there, which made that test fail whenever an earlier test on the same
+	// thread left the thread-static PRNG in such a state.
+	[Test]
+	public async Task CSharpOnly_RectifyAndUndistortStereoImages_FarSourceSamples()
+	{
+		RandomUtils.SetPRNGSeed(25);
+		var syntheticOptions = new SyntheticDatasetOptions
+		{
+			NumRigs = 1,
+			NumCamerasPerRig = 1,
+			NumFramesPerRig = 2,
+			CameraWidth = 100,
+			CameraHeight = 100,
+		};
+		var reconstruction = new Reconstruction();
+		Synthetic.SynthesizeDataset(syntheticOptions, reconstruction);
+		List<uint> imageIds = reconstruction.RegImageIds();
+		ColmapSharp.Scene.Image image1 = reconstruction.Image(imageIds[0]);
+		ColmapSharp.Scene.Image image2 = reconstruction.Image(imageIds[1]);
+		var bitmap1 = new Bitmap(100, 100, true);
+		var bitmap2 = new Bitmap(100, 100, true);
+
+		Undistortion.RectifyAndUndistortStereoImages(
+			new UndistortCameraOptions(),
+			bitmap1,
+			bitmap2,
+			reconstruction.Camera(image1.CameraId),
+			reconstruction.Camera(image2.CameraId),
+			image2.CamFromWorld() * image1.CamFromWorld().Inverse(),
+			out Bitmap undistortedImage1,
+			out Bitmap undistortedImage2,
+			out Camera undistortedCamera,
+			out Matrix4d _);
+		using (Assert.Multiple())
+		{
+			await Assert.That(undistortedImage1.Width).IsEqualTo(undistortedCamera.Width);
+			await Assert.That(undistortedImage2.Height).IsEqualTo(undistortedCamera.Height);
 		}
 	}
 }

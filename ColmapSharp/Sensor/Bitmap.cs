@@ -179,6 +179,13 @@ public sealed partial class Bitmap
 	/// </summary>
 	public BitmapColor<byte>? InterpolateNearestNeighbor(double x, double y)
 	{
+		// (int)NaN is 0 in .NET, which would return pixel (0, 0); a NaN point is outside the
+		// image (docs/CPP_DIVERGENCES.md, entry 117). Infinities saturate and GetPixel rejects them.
+		if (double.IsNaN(x) || double.IsNaN(y))
+		{
+			return null;
+		}
+
 		int xx = (int)Math.Round(x, MidpointRounding.AwayFromZero);
 		int yy = (int)Math.Round(y, MidpointRounding.AwayFromZero);
 		return GetPixel(xx, yy);
@@ -190,15 +197,20 @@ public sealed partial class Bitmap
 	/// </summary>
 	public BitmapColor<float>? InterpolateBilinear(double x, double y)
 	{
+		// COLMAP's check is `x0 < 0 || x1 >= width_ || ...` on x0 = (int)floor(x), x1 = x0 + 1.
+		// For finite x, floor(x) >= 0 <=> x >= 0 and floor(x) + 1 < width <=> x < width - 1, so
+		// testing the doubles first is the same check. It also keeps points beyond int range
+		// and NaN out: .NET saturates (int)double, so x0 = int.MaxValue made x1 wrap to
+		// int.MinValue, pass the check and index far outside the array (entry 117).
+		if (!(x >= 0 && x < width - 1 && y >= 0 && y < height - 1))
+		{
+			return null;
+		}
+
 		int x0 = (int)Math.Floor(x);
 		int x1 = x0 + 1;
 		int y0 = (int)Math.Floor(y);
 		int y1 = y0 + 1;
-
-		if (x0 < 0 || x1 >= width || y0 < 0 || y1 >= height)
-		{
-			return null;
-		}
 
 		double dx = x - x0;
 		double dy = y - y0;
