@@ -47,10 +47,9 @@ Skipped `util/types_test.cc` cases: `Span.SizeAndEmpty`, `FilterView.Empty/All/N
 RangeExpression` — COLMAP's `span`/`filter_view` are replaced by `System.Span<T>` and LINQ, so
 there is no ColmapSharp code under test.
 
-### Phase 5 — Optimization primitives
-`optim/tiny_solver` (+ `estimators/cost_functions/tiny_manifold.h`, needed by its test).
-
 ### Phase 6 — Minimal solvers and estimators
+The four TinySolver callers (essential / fundamental refinement, relpose shared and one-sided
+focal) use `Optim/TinySolver.cs` with `TinyProductManifold<…, TinyEuclideanManifold1>`.
 Estimators implement `IEstimator<TX,TY,TModel>` (+ `ILocalEstimator` for LO-RANSAC) as
 `readonly struct`s — see `Optim/Estimator.cs` and `Estimators/Solvers/SimilarityTransform.cs`.
 `LoRansac.Estimate` hides (does not override) `Ransac.Estimate`: call it on the LoRansac type.

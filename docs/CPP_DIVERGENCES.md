@@ -347,6 +347,28 @@ builds and is left for when profiling shows RANSAC is a bottleneck.
 COLMAP's expectations. The C#-only `RansacTests.CSharpOnly_ParallelRequiresRandomSampler`
 pins the kept validation.
 
+## 19. TinySphereManifold's tangent basis uses Hughes & Moller, not Eigen's unitOrthogonal()
+
+**What differs.** COLMAP's `SphereManifold<3>` (`estimators/cost_functions/tiny_manifold.h`)
+builds the tangent basis at x as `b1 = x_hat.unitOrthogonal()`, `b2 = x_hat.cross(b1)`.
+`Estimators/CostFunctions/TinyManifold.cs` builds `b1` with the construction of Hughes &
+Moller, "Building an Orthonormal Basis from a Unit Vector" (JGT 4(4), 1999): zero the
+component of smallest magnitude (the first on a tie), swap the other two and negate one,
+normalize. `b2` is the same cross product. The two constructions can pick a different unit
+vector in the tangent plane, so the tangent coordinates of a step, and with them TinySolver's
+Jacobi scaling and iterates, can differ from COLMAP's while spanning the same plane.
+
+**Why.** Eigen documents only that `unitOrthogonal()` returns some unit vector orthogonal to
+the input (its choice for 3-vectors is an implementation detail of MPL-2.0 code we may not
+transcribe, CLAUDE.md contract 2). Any orthonormal tangent basis gives a valid retraction and
+Plus Jacobian; TinySolver is Tier C, so what must agree is the converged result, which does
+not depend on the basis.
+
+**Evidence.** `TinyManifoldTests.SphereManifold_PlusStaysOnUnitSphere` and
+`SphereManifold_PlusJacobianMatchesFiniteDiff` (1:1: orthogonality to x within 1e-12 and the
+finite-difference Jacobian within 1e-6) and `TinySolverTests.TinySolver_ManifoldConvergesAndStaysOnManifold`
+(1:1: the sphere fit converges to target.normalized() within 1e-6) pass.
+
 ## 20. CSV number parsing uses .NET's invariant parser
 
 **What differs.** `Util/Misc.CsvToDoubleVector` (COLMAP's `CSVToVector<double>`, used by

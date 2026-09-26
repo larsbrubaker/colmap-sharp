@@ -54,8 +54,12 @@ functions of `internal/ceres/loss_function.cc` in `LossFunctions.cs` (with
 product manifolds of `internal/ceres/manifold.cc`, `include/ceres/sphere_manifold.h`,
 `include/ceres/internal/sphere_manifold_functions.h`,
 `include/ceres/internal/householder_vector.h` and `include/ceres/product_manifold.h` in
-`Manifolds.cs`; and the cost-function contract of `include/ceres/cost_function.h` and
-`include/ceres/autodiff_cost_function.h` in `AutoDiffCostFunction.cs`.
+`Manifolds.cs`; the cost-function contract of `include/ceres/cost_function.h` and
+`include/ceres/autodiff_cost_function.h` in `AutoDiffCostFunction.cs`; and the TinySolver
+function adapter of `include/ceres/tiny_solver_autodiff_function.h` in
+`TinySolverAutoDiffFunction.cs`. `ColmapSharp/Optim/TinySolver.cs` ports COLMAP's
+`colmap/optim/tiny_solver.h`, which is COLMAP's modified copy of Ceres'
+`include/ceres/tiny_solver.h` and carries this notice.
 
 ```
 Ceres Solver - A fast non-linear least squares minimizer

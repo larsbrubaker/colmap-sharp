@@ -6,7 +6,8 @@
 // infrastructure shared by every test file that ports such a check (first users:
 // Geometry/Rigid3dTests.cs, Sim3dTests.cs, GpsTests.cs, BboxTests.cs, Scene/FrameTests.cs, and
 // the pose, essential/homography matrix, triangulation and normalization tests; the VectorXd overload
-// serves Optim/SparseCholeskyTests.cs and LeastAbsoluteDeviationsTests.cs).
+// serves Optim/SparseCholeskyTests.cs and LeastAbsoluteDeviationsTests.cs; the MatrixXd
+// overload Estimators/CostFunctions/TinyManifoldTests.cs and QuaternionUtilsTests.cs).
 //
 // Semantics, as in COLMAP: if rhs is zero (Eigen's isZero(), every coefficient within
 // dummy_precision = 1e-12 of 0), lhs matches when lhs.norm() <= tol, because isApprox is
@@ -85,6 +86,22 @@ internal static class EigenMatchers
 	public static bool EigenMatrixNear(VectorXd lhs, VectorXd rhs, double tol = LinearAlgebraConstants.DummyPrecision)
 	{
 		if (lhs.Length != rhs.Length)
+		{
+			return false;
+		}
+
+		if (IsZero(rhs.AsSpan()))
+		{
+			return lhs.Norm() <= tol;
+		}
+
+		return lhs.IsApprox(rhs, tol);
+	}
+
+	/// <summary>EigenMatrixNear(rhs, tol) applied to lhs; a shape mismatch never matches.</summary>
+	public static bool EigenMatrixNear(MatrixXd lhs, MatrixXd rhs, double tol = LinearAlgebraConstants.DummyPrecision)
+	{
+		if (lhs.Rows != rhs.Rows || lhs.Cols != rhs.Cols)
 		{
 			return false;
 		}
