@@ -10,8 +10,7 @@
 // decimal separator is "," (built from the invariant culture, so it works in invariant
 // globalization mode too). ReconstructionIOOracleTests.cs holds the C#-only pycolmap checks.
 //
-// Not ported here: the Export* cases (ExportNVM, ExportCam, ExportRecon3D, ExportBundler,
-// ExportPLY, ExportVRML), which land with the exporters.
+// The Export* cases are in ReconstructionIOTests.Export.cs.
 // COLMAP's gtest_main seeds the PRNG with 0 before every test; tests seed and synthesize
 // before their first await (the PRNG is thread-local).
 
@@ -29,7 +28,7 @@ using static ColmapSharp.Scene.ReconstructionIOText;
 
 namespace ColmapSharp.Tests.Scene;
 
-public class ReconstructionIOTests
+public partial class ReconstructionIOTests
 {
 	private static readonly string[] Parts = ["rigs", "cameras", "frames", "images", "points3D"];
 

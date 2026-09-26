@@ -35,16 +35,9 @@ resize (Apache-2.0) would make it exact if a fixture ever needs that.
 
 ### Phase 4 — Scene
 - `rig` (scene/rig: `ReadRigConfig`/`ApplyRigConfig` + `rig_test.cc`).
-- `pose_graph` (+ `pose_graph_test.cc`; component functions take a `Reconstruction`).
-- `reconstruction_io.cc`'s exporters (ExportNVM/Cam/Recon3D/Bundler/PLY/VRML) + the
-  Export* cases of `reconstruction_io_test.cc`.
-- `Util/CppStreamFormat.FormatDouble` is exact but slow (~16 s to write 1M PLY points as
-  text): write a fast exact %g (shortest round-trip digits + correct rounding).
 - `Reconstruction.ExtractColors*` (the host decodes images; take a Bitmap provider).
 - `scene_clustering`, `reconstruction_clustering`.
-- Deferred tests: `reconstruction_io_test.cc` Export* (ExportNVM, ExportCam, ExportRecon3D,
-  ExportBundler, ExportPLY, ExportVRML; with the exporters); `reconstruction_test.cc`
-  ExtractColorsForAllImages;
+- Deferred tests: `reconstruction_test.cc` ExtractColorsForAllImages;
   `reconstruction_matchers_test.cc` Near (needs alignment); an IdMap test that reaches
   `Compact()`.
 - Before the pipeline phases, decide how the library surfaces COLMAP's `LOG(WARNING)`

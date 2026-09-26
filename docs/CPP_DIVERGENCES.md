@@ -862,6 +862,26 @@ first group constant, SPARSE_SCHUR solves as SPARSE_NORMAL_CHOLESKY and the orde
 holds all six blocks. `ProblemTests.UserOrdering_Empty_Fails` and
 `UserOrdering_OnlyConstantBlocks_Fails` cover case 3.
 
+## 38. PoseGraph orders equally large frame components by smallest frame id
+
+**What differs.** COLMAP's `PoseGraph::ConnectedFrameComponents` collects the frames of the
+valid edges in a `FlatHashSet`, finds the components (whose order follows that set, entry 2)
+and orders them with an unstable `std::sort` by descending size, so the order of equally large
+components is unspecified. `LargestConnectedFrameComponent` keeps the first strictly largest
+component in the same hash order. `Scene/PoseGraph.cs` hands `FindConnectedComponents` the
+frames in ascending id order and sorts stably, so equally large components come out by their
+smallest frame id, and `LargestConnectedFrameComponent` returns that same first one.
+`ConnectedImageIdsForFrameComponents` follows the same component order. The pose graph's own
+edge map is a `Dictionary` (insertion order until an edge is deleted); no output depends on it.
+
+**Why.** CLAUDE.md's stable-sort and hash-order rules: the tie order decides which component
+global SfM treats as the largest. COLMAP relies on no particular order: `pose_graph_test.cc`
+uses components of different sizes and compares sets.
+
+**Evidence.** `PoseGraphTests` (pose_graph_test.cc 1:1) pass with COLMAP's expectations;
+`PoseGraphTests.CSharpOnly_EqualSizeComponentsOrderedBySmallestFrameId` pins the tie order and
+that the largest component equals the first one.
+
 ## 40. ExtractTopScaleFeatures keeps equal-scale keypoints in input order
 
 **What differs.** COLMAP's `ExtractTopScaleFeatures` (feature/utils.cc) selects the largest

@@ -56,4 +56,88 @@ public class CppStreamFormatTests
 			await Assert.That(CppStreamFormat.FormatDouble(double.NaN, 17)).IsEqualTo("nan");
 		}
 	}
+
+	// C#-only: the fast formatter relies on .NET's "E{n}" being correctly rounded with
+	// half-even ties, which .NET does not document; this pins it against the exact-expansion
+	// oracle. 20k values x 9 precisions keeps the suite fast; the same generator was run
+	// with 5M values when the fast path was written.
+	[Test]
+	public async Task CSharpOnly_FastMatchesSlowOracle()
+	{
+		string mismatches = DiffAgainstOracle(FormatTestValues.Generate(20_000, seed: 20260926), [0, 1, 2, 6, 12, 15, 16, 17, 20]);
+		await Assert.That(mismatches).IsEqualTo(string.Empty);
+	}
+
+	// C#-only: short-digit powers of ten at every precision from 1 to 30, where the fixed
+	// layout pads far more integer zeros than there are significant digits.
+	[Test]
+	public async Task CSharpOnly_DecimalPowersMatchSlowOracle()
+	{
+		int[] precisions = [.. Enumerable.Range(1, 30)];
+		string mismatches = DiffAgainstOracle(FormatTestValues.GenerateDecimalPowers(3_000, seed: 20260927), precisions);
+		await Assert.That(mismatches).IsEqualTo(string.Empty);
+	}
+
+	// C#-only regression: the fixed layout of a value whose digits were stripped to one but
+	// whose exponent is large overflowed the output buffer (IndexOutOfRangeException).
+	[Test]
+	[Arguments(-1e16, 17, "-10000000000000000")]
+	[Arguments(1e20, 21, "100000000000000000000")]
+	[Arguments(1e22, 30, "10000000000000000000000")]
+	public async Task CSharpOnly_LargeExponentFixedLayout(double value, int precision, string expected)
+	{
+		await Assert.That(CppStreamFormat.FormatDouble(value, precision)).IsEqualTo(expected);
+	}
+
+	// The first ten fast/slow mismatches, one per line; empty when they all agree.
+	private static string DiffAgainstOracle(IEnumerable<double> values, int[] precisions)
+	{
+		var mismatches = new List<string>();
+		foreach (double value in values)
+		{
+			foreach (int precision in precisions)
+			{
+				string fast;
+				try
+				{
+					fast = CppStreamFormat.FormatDouble(value, precision);
+				}
+				catch (Exception ex)
+				{
+					fast = ex.GetType().Name;
+				}
+
+				string slow = SlowCppStreamFormat.FormatDouble(value, precision);
+				if (fast != slow && mismatches.Count < 10)
+				{
+					mismatches.Add($"{BitConverter.DoubleToInt64Bits(value):X16} p={precision}: fast={fast} slow={slow}");
+				}
+			}
+		}
+
+		return string.Join("\n", mismatches);
+	}
+
+	// C#-only: precisions past a double's longest exact expansion (767 significant digits)
+	// print the whole expansion. The oracle only accepts up to 801, so the subnormal's
+	// 751-digit expansion at precision 1000 is compared against the oracle at 800.
+	[Test]
+	[Arguments(123.0, 800, "123")]
+	[Arguments(0.1, 60, "0.1000000000000000055511151231257827021181583404541015625")]
+	public async Task CSharpOnly_LargePrecision(double value, int precision, string expected)
+	{
+		await Assert.That(CppStreamFormat.FormatDouble(value, precision)).IsEqualTo(expected);
+	}
+
+	[Test]
+	public async Task CSharpOnly_LargePrecisionSubnormalMatchesSlowOracle()
+	{
+		string fast = CppStreamFormat.FormatDouble(5e-324, 1000);
+		string slow = SlowCppStreamFormat.FormatDouble(5e-324, 800);
+		using (Assert.Multiple())
+		{
+			await Assert.That(fast).IsEqualTo(slow);
+			await Assert.That(fast.Length).IsEqualTo(751 + "e-324".Length + 1);
+		}
+	}
 }
