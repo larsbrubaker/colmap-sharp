@@ -1400,3 +1400,41 @@ and 57).
 
 **Evidence.** `ModelTests.Model_GetMaxOverlappingImagesTies` (C#-only) pins the order;
 `Model_GetMaxOverlappingImages` (model_test.cc 1:1) passes.
+
+## 77. ComputeNormalizedMinGraphCut partitions with our own multilevel bisection, not METIS
+
+**What differs.** COLMAP's `ComputeNormalizedMinGraphCut` (math/graph_cut.cc) calls
+`METIS_PartGraphKway` with default options. The port (`Mathematics/GraphCut.cs`) builds the
+same CSR graph (vertex indices by first appearance, parallel edges kept) and hands it to
+`Mathematics/MultilevelPartitioner.cs`, written here from the published multilevel scheme
+(Hendrickson & Leland 1995; Karypis & Kumar, SIAM J. Sci. Comput. 1998; Fiduccia &
+Mattheyses 1982): heavy-edge-matching coarsening (followed, when over 10% of the vertices
+stay unmatched, by pairing unmatched vertices that share a neighbor and unmatched isolated
+vertices, so stars, hub images and many small components still coarsen), greedy graph
+growing from eight seeds on the coarsest graph (a vertex too heavy to fit is skipped), FM refinement at every level, and recursive bisection for k parts
+(floor(k/2) parts on the first side). METIS's k-way path instead refines all k parts at once
+with its own greedy k-way refinement and randomizes its visit orders with GKlib's RNG. So the
+labels, which part gets which number, and the exact cut can differ from COLMAP's. Each
+bisection allows 3% over its target weight (METIS's k-way `ufactor` default of 30), rounded
+up to a whole vertex so that small graphs can always be split. Every tie is broken by vertex
+index, so the output is deterministic. Self-loops are ignored (they never cross a cut).
+
+**Why.** Porting the reached METIS subset (coarsening, recursive-bisection initial
+partitioning, 2-way and k-way FM refinement, balancing, GKlib's priority queues and RNG) is
+well over the ~3k-line budget set for this step, and a close match would also need GKlib's
+random stream reproduced exactly. COLMAP's contract, and all its callers need (scene
+clustering), is a balanced partition with a small cut; graph_cut_test.cc checks the label
+range, that both parts are used, and the component split of a disconnected graph. No METIS
+code was read or transcribed, so METIS's notice is not needed.
+
+**Evidence.** Tier C. The four ported `GraphCut_ComputeNormalizedMinGraphCut*` cases in
+GraphCutTests pass. NormalizedMinGraphCutTests (C#-only) checks that planted clusters (2-5
+dense clusters in a ring of light edges, ten random draws each) come out one part per
+cluster, that random graphs of 100-400 vertices split into 1, 2, 3, 5 and 8 parts give
+non-empty parts within 10% (plus three vertices) of n/k and identical output on a second
+call, that a 100 x 40 unit grid is bisected with 43 cut edges against an optimum of 40, and
+that the partitioner's step count grows less than 6x from n = 5k to 20k on a star, a
+20-hub graph and disconnected pairs (a quadratic step would give 16x). In Release on an
+Apple arm64 laptop, k = 2 takes 42-162 ms for stars of 10k-40k leaves, 21-58 ms for
+10k-40k leaves on 20 hubs, 2-22 ms for 10k-40k disconnected pairs, and 0.11 s / 2.4 s for
+random graphs of 10k / 100k vertices with 5 edges per vertex.

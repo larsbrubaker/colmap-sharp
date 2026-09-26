@@ -3,11 +3,10 @@
 //
 // GraphCutTests: colmap/math/graph_cut_test.cc ported 1:1, one method per gtest
 // TEST(Suite, Name) named Suite_Name. Tests ColmapSharp/Mathematics/GraphCut.cs and
-// MinSTGraphCut.cs. Tier A: cut weights, flows and S-T labels are exact.
-//
-// Not yet ported: the four GraphCut.ComputeNormalizedMinGraphCut* cases (plain,
-// DuplicateEdge, MissingVertex, Disconnected). The function wraps METIS, whose replacement
-// partitioner has not landed; they are listed in PORTING_PLAN.md.
+// MinSTGraphCut.cs. Tier A: cut weights, flows and S-T labels are exact. The
+// ComputeNormalizedMinGraphCut* cases are Tier C (MultilevelPartitioner stands in for METIS,
+// docs/CPP_DIVERGENCES.md entry 77); like COLMAP's, they pin the label count and range, that
+// both parts are used, and the component split of the disconnected graph.
 
 using ColmapSharp.Mathematics;
 
@@ -65,6 +64,61 @@ public class GraphCutTests
 		var weights = new List<int> { 1, 3, 1 };
 		GraphCut.ComputeMinGraphCutStoerWagner(edges, weights, out var cutWeight, out var cutLabels);
 		await AssertCut(cutWeight, cutLabels, 0, 5);
+	}
+
+	[Test]
+	public async Task GraphCut_ComputeNormalizedMinGraphCut()
+	{
+		var edges = new List<(int, int)>
+		{
+			(3, 4), (3, 6), (3, 5), (0, 4), (0, 1), (0, 6), (0, 7), (0, 5),
+			(0, 2), (4, 1), (1, 6), (1, 5), (6, 7), (7, 5), (5, 2), (3, 4),
+		};
+		var weights = new List<int> { 0, 3, 1, 3, 1, 2, 6, 1, 8, 1, 1, 80, 2, 1, 1, 4 };
+		var cutLabels = GraphCut.ComputeNormalizedMinGraphCut(edges, weights, 2);
+		await AssertTwoPartLabels(cutLabels, 8);
+	}
+
+	[Test]
+	public async Task GraphCut_ComputeNormalizedMinGraphCutDuplicateEdge()
+	{
+		var edges = new List<(int, int)>
+		{
+			(3, 4), (3, 6), (3, 5), (0, 4), (0, 1), (0, 6), (0, 7), (0, 5),
+			(0, 2), (4, 1), (1, 6), (1, 5), (6, 7), (7, 5), (5, 2), (3, 4), (3, 4),
+		};
+		var weights = new List<int> { 0, 3, 1, 3, 1, 2, 6, 1, 8, 1, 1, 80, 2, 1, 1, 4, 4 };
+		var cutLabels = GraphCut.ComputeNormalizedMinGraphCut(edges, weights, 2);
+		await AssertTwoPartLabels(cutLabels, 8);
+	}
+
+	[Test]
+	public async Task GraphCut_ComputeNormalizedMinGraphCutMissingVertex()
+	{
+		var edges = new List<(int, int)>
+		{
+			(3, 4), (3, 6), (3, 5), (0, 1), (0, 6), (0, 7), (0, 5),
+			(0, 2), (4, 1), (1, 6), (1, 5), (6, 7), (7, 5), (5, 2),
+		};
+		var weights = new List<int> { 0, 3, 1, 3, 1, 2, 6, 1, 8, 1, 1, 80, 2, 1 };
+		var cutLabels = GraphCut.ComputeNormalizedMinGraphCut(edges, weights, 2);
+		await AssertTwoPartLabels(cutLabels, 8);
+	}
+
+	[Test]
+	public async Task GraphCut_ComputeNormalizedMinGraphCutDisconnected()
+	{
+		var edges = new List<(int, int)> { (0, 1), (1, 2), (3, 4) };
+		var weights = new List<int> { 1, 3, 1 };
+		var cutLabels = GraphCut.ComputeNormalizedMinGraphCut(edges, weights, 2);
+		using (Assert.Multiple())
+		{
+			await Assert.That(cutLabels.Count).IsEqualTo(5);
+			await Assert.That(cutLabels[0]).IsEqualTo(cutLabels[1]);
+			await Assert.That(cutLabels[1]).IsEqualTo(cutLabels[2]);
+			await Assert.That(cutLabels[2]).IsNotEqualTo(cutLabels[3]);
+			await Assert.That(cutLabels[3]).IsEqualTo(cutLabels[4]);
+		}
 	}
 
 	[Test]
@@ -134,6 +188,27 @@ public class GraphCutTests
 				await Assert.That(label).IsGreaterThanOrEqualTo((byte)0);
 				await Assert.That(label).IsLessThan((byte)2);
 			}
+		}
+	}
+
+	private static async Task AssertTwoPartLabels(Dictionary<int, int> cutLabels, int expectedCount)
+	{
+		var numLabels = new int[2];
+		using (Assert.Multiple())
+		{
+			await Assert.That(cutLabels.Count).IsEqualTo(expectedCount);
+			foreach (var (_, label) in cutLabels)
+			{
+				await Assert.That(label).IsGreaterThanOrEqualTo(0);
+				await Assert.That(label).IsLessThan(2);
+				if (label is >= 0 and < 2)
+				{
+					numLabels[label]++;
+				}
+			}
+
+			await Assert.That(numLabels[0]).IsGreaterThan(0);
+			await Assert.That(numLabels[1]).IsGreaterThan(0);
 		}
 	}
 }

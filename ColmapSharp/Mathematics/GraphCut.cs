@@ -2,8 +2,10 @@
 // Ported from COLMAP (BSD-3-Clause, see THIRD_PARTY_NOTICES.md).
 //
 // GraphCut: the free functions of colmap/math/graph_cut.h and graph_cut.cc. This file holds
-// ComputeMinGraphCutStoerWagner, the global min-cut of an undirected graph; its neighbor
-// MinSTGraphCut.cs holds the S-T min-cut class from the same header. Tests:
+// ComputeMinGraphCutStoerWagner, the global min-cut of an undirected graph, and
+// ComputeNormalizedMinGraphCut, the balanced k-way partition; its neighbor MinSTGraphCut.cs
+// holds the S-T min-cut class from the same header, and MultilevelPartitioner.cs the
+// partitioner that stands in for METIS. Tests:
 // ColmapSharp.Tests/Mathematics/GraphCutTests.cs (graph_cut_test.cc).
 //
 // COLMAP calls boost::stoer_wagner_min_cut. Boost is not ported (docs/LICENSE_AUDIT.md); this
@@ -15,8 +17,10 @@
 // (the vertices merged into the last-added vertex of the best phase). graph_cut_test.cc only
 // pins the weight and the label range. See docs/CPP_DIVERGENCES.md, entry 4.
 //
-// Not here: ComputeNormalizedMinGraphCut, which wraps METIS's k-way partitioner. It lands
-// with its replacement partitioner (scene clustering needs it); see PORTING_PLAN.md.
+// ComputeNormalizedMinGraphCut builds the same CSR graph as COLMAP's MetisGraph wrapper but
+// partitions it with MultilevelPartitioner instead of METIS_PartGraphKway. Tier C: the parts
+// are balanced with a small cut, but need not be METIS's parts. See docs/CPP_DIVERGENCES.md,
+// entry 77.
 
 using ColmapSharp.Util;
 
@@ -164,5 +168,75 @@ public static class GraphCut
 		adjacency[from].Clear();
 		members[into].AddRange(members[from]);
 		members[from].Clear();
+	}
+
+	/// <summary>
+	/// Port of colmap::ComputeNormalizedMinGraphCut: splits the graph into
+	/// <paramref name="numParts"/> parts of about equal vertex count with a small total weight
+	/// of cut edges. Returns vertex id -> part label in [0, numParts). Only vertices that appear
+	/// in an edge are labeled. Parallel edges add up.
+	/// </summary>
+	public static Dictionary<int, int> ComputeNormalizedMinGraphCut(
+		IReadOnlyList<(int, int)> edges,
+		IReadOnlyList<int> weights,
+		int numParts)
+	{
+		Check.That(edges.Count > 0);
+		Check.Eq(edges.Count, weights.Count);
+		Check.Gt(numParts, 0);
+
+		// As COLMAP's MetisGraph: vertex indices in order of first appearance, and each
+		// vertex's neighbors in edge order.
+		var idToIndex = new Dictionary<int, int>();
+		var indexToId = new List<int>();
+		var adjacency = new List<List<(int Neighbor, int Weight)>>();
+		int GetVertexIndex(int id)
+		{
+			if (!idToIndex.TryGetValue(id, out var index))
+			{
+				index = indexToId.Count;
+				idToIndex.Add(id, index);
+				indexToId.Add(id);
+				adjacency.Add([]);
+			}
+
+			return index;
+		}
+
+		for (var i = 0; i < edges.Count; i++)
+		{
+			var index1 = GetVertexIndex(edges[i].Item1);
+			var index2 = GetVertexIndex(edges[i].Item2);
+			adjacency[index1].Add((index2, weights[i]));
+			adjacency[index2].Add((index1, weights[i]));
+		}
+
+		var xadj = new int[indexToId.Count + 1];
+		var adjncy = new int[2 * edges.Count];
+		var adjwgt = new int[2 * edges.Count];
+		var edgeIndex = 0;
+		for (var v = 0; v < indexToId.Count; v++)
+		{
+			xadj[v] = edgeIndex;
+			foreach (var (neighbor, weight) in adjacency[v])
+			{
+				adjncy[edgeIndex] = neighbor;
+				adjwgt[edgeIndex] = weight;
+				edgeIndex++;
+			}
+		}
+
+		xadj[indexToId.Count] = edgeIndex;
+		Check.Eq(edgeIndex, 2 * edges.Count);
+
+		var cutLabels = MultilevelPartitioner.Partition(xadj, adjncy, adjwgt, numParts);
+
+		var labels = new Dictionary<int, int>(indexToId.Count);
+		for (var index = 0; index < cutLabels.Length; index++)
+		{
+			labels.Add(indexToId[index], cutLabels[index]);
+		}
+
+		return labels;
 	}
 }

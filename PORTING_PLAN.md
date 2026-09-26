@@ -118,9 +118,6 @@ the user can relate it to their photos; CGAL's AABB tree for occlusion is replac
 managed BVH written here).
 
 ### Phase 13 — Global and hierarchical mapping
-- `ComputeNormalizedMinGraphCut` (graph_cut.cc, METIS k-way) and its 4 graph_cut_test.cc
-  cases (`ComputeNormalizedMinGraphCut*`): only scene_clustering uses it. Port METIS
-  (Apache-2.0) or write a multilevel partitioner with FM refinement (a divergence entry).
 `sfm/global_mapper`, `controllers/global_pipeline`, `hierarchical_pipeline`,
 `rotation_averaging` controller.
 
