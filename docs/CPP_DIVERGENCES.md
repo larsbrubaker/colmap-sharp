@@ -266,3 +266,23 @@ simplicial one, not a different result, and can replace it later behind the same
 (`SparseCholeskyWithFallbackSolverTests`, `LeastAbsoluteDeviationsTests`), including the
 singular, indefinite and ridge cases whose outcome depends on the pivot rules. The C#-only
 `SimplicialCholeskyTests` pin the solutions to the dense LLT within 1e-10 relative error.
+
+## 14. CorrespondenceGraph lists image pairs in insertion order
+
+**What differs.** `CorrespondenceGraph.ImagePairs()` and `NumMatchesBetweenAllImages()`
+enumerate image pairs in the order `AddTwoViewGeometry` added them. COLMAP iterates its
+`FlatHashMap<image_pair_t, ImagePair>`, whose order is the hash table's: `std::unordered_map`
+or `boost::unordered_flat_map`, whichever `COLMAP_HASH_MAP_BACKEND` the build picked
+(`cmake/FindDependencies.cmake`), so it is not even the same across COLMAP builds.
+
+**Why.** Same reasoning as entry 2: reproducing either backend's bucket layout would mean
+porting it, and the order is not part of COLMAP's contract. `correspondence_graph_test.cc`
+compares `ImagePairs()` with `UnorderedElementsAre` and reads `NumMatchesBetweenAllImages()`
+by key. Insertion order is deterministic on every platform. Every per-point correspondence
+list, `ExtractMatchesBetweenImages` and `ExtractTransitiveCorrespondences` are in COLMAP's
+order already (they come from vectors, not hash iteration).
+
+**Evidence.** `CorrespondenceGraphTests` (all 11 cases) pass. Code ported later that walks
+the pairs in this order (COLMAP's `PoseGraph::Load`, and through it the global mapper) will
+see them in load order; a pycolmap fixture for such a pipeline is then compared at Tier C,
+not Tier A.

@@ -30,7 +30,7 @@ Each phase ends with its ported tests green. Test names follow COLMAP's.
 
 ### Phase 2 — Geometry
 `geometry/`: `pose`, `essential_matrix`, `homography_matrix`, `triangulation`,
-`normalization`, `pose_prior`; `rigid3_matchers_test.cc`, `sim3_matchers_test.cc`.
+`normalization`, `pose_prior`; `sim3_matchers_test.cc`.
 
 ### Phase 3 — Sensor
 `sensor/models_jacobian.h` (`ImgFromCamWithJac`, `CameraModelImgFromCamWithJac`,
@@ -47,12 +47,18 @@ resampler matching OIIO within 1 grey level, `docs/CPP_DIVERGENCES.md`); porting
 resize (Apache-2.0) would make it exact if a fixture ever needs that.
 
 ### Phase 4 — Scene
-`point2d`, `point3d`, `track`, `camera`, `frame`, `image`, `rig`, `correspondence_graph`,
-`two_view_geometry`, `pose_graph`, `projection`, `visibility_pyramid`, `reconstruction`,
-`reconstruction_io` (COLMAP binary and text formats, so pycolmap-written models become
-fixtures), `reconstruction_manager`, `reconstruction_pruning`, `synthetic` (the synthetic
-dataset generator that most downstream tests use), `database` (in-memory store with
-COLMAP's API), `database_cache`, `scene_clustering`, `reconstruction_clustering`.
+`camera` (then add `TwoViewGeometry.camera1/camera2` and their swap in `Invert`), `frame`,
+`image`, `rig`, `pose_graph` (+ `pose_graph_test.cc`; its component functions take a
+`Reconstruction`), `projection`, `reconstruction`, `reconstruction_io` (COLMAP binary and text
+formats, so pycolmap-written models become fixtures), `reconstruction_manager`,
+`reconstruction_pruning`, `synthetic` (the synthetic dataset generator that most downstream
+tests use), `database` (in-memory store with COLMAP's API), `database_cache`,
+`scene_clustering`, `reconstruction_clustering`. Before the pipeline phases, decide how the
+library surfaces COLMAP's `LOG(WARNING)` messages (dropped for now).
+
+Skipped `util/types_test.cc` cases: `Span.SizeAndEmpty`, `FilterView.Empty/All/None/Nominal/
+RangeExpression` — COLMAP's `span`/`filter_view` are replaced by `System.Span<T>` and LINQ, so
+there is no ColmapSharp code under test.
 
 ### Phase 5 — Optimization primitives
 `optim/`: `ransac`, `loransac` (generic over `ISampler<TSelf>` / `ISupportMeasurer<TSupport>`;
