@@ -1963,6 +1963,19 @@ the element order reaches global positioning and bundle adjustment as residual o
 through `ReconstructionNear` at COLMAP's bounds, with the exact observation count in the
 noise-free cases.
 
+## 101. RotationAveragingPipeline checks for a stop between stages
+
+**What differs.** COLMAP's `RotationAveragingPipeline::Run` never calls `CheckIfStopped`. The
+port (`Controllers/RotationAveragingPipeline.cs`) checks `BaseController.CheckIfStopped`
+(the host's `CancellationToken` or stop function) before gravity refinement and before
+rotation averaging, and returns without estimating rotations when a stop was requested.
+Without a stop request it runs exactly COLMAP's steps.
+
+**Why.** CLAUDE.md requires long-running work to be cancellable from MatterCAD.
+
+**Evidence.** `RotationAveragingPipelineTests.CSharpOnly_CancellationStopsBeforeRotationAveraging`;
+the three ported cases run without a stop request and pass at COLMAP's tolerances.
+
 ## 106. Poisson splatting runs sequentially in sample order
 
 **What differs.** PoissonRecon splats the samples' normals (`setInterpolatedDataField`) in a

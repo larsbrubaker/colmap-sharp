@@ -57,6 +57,14 @@ public sealed class GravityRefinerOptions
 	/// <summary>An arctan loss at 1 - cos(max_gravity_error).</summary>
 	public LossFunction CreateLossFunction() =>
 		new ArctanLoss(1 - Math.Cos(MathUtils.DegToRad(MaxGravityError)));
+
+	/// <summary>A copy (C++ copies the options struct by value).</summary>
+	public GravityRefinerOptions Clone()
+	{
+		var copy = (GravityRefinerOptions)MemberwiseClone();
+		copy.SolverOptions = SolverOptions.Clone();
+		return copy;
+	}
 }
 
 /// <summary>Port of colmap::GravityRefiner.</summary>
