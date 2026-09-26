@@ -63,7 +63,7 @@ Estimators implement `IEstimator<TX,TY,TModel>` (+ `ILocalEstimator` for LO-RANS
 `readonly struct`s — see `Optim/Estimator.cs` and `Estimators/Solvers/SimilarityTransform.cs`.
 `LoRansac.Estimate` hides (does not override) `Ransac.Estimate`: call it on the LoRansac type.
 Open estimators: `two_view_geometry` (partly ported, branch pending), `pose`, `generalized_pose`, `triangulation`, `alignment`,
-`fundamental_matrix_degensac`, `rotation_averaging`, `global_positioning`,
+`rotation_averaging`, `global_positioning`,
 `gravity_refinement`, `view_graph_calibration`.
 
 ### Phase 7 — Nonlinear least-squares solver (Ceres replacement)
