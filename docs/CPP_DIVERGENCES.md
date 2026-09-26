@@ -210,3 +210,31 @@ It may be another compiler choice in the wheel (as in entry 7). We do not emulat
 **Evidence.** `GeometryOracleTests.ToleranceFields("gps", "utm_to_ellipsoid")` pins it at
 1e-14 relative; the observed gap is 1 ulp (about 7e-15 deg). The Python re-derivation was a
 scratch harness following gps.cc term for term.
+
+## 12. FMA contraction in the camera models
+
+**What differs.** Camera model projection (`CameraModelImgFromCam`) and ray unprojection
+(`CameraModelCamRayFromImg`) of every perspective model, and `CameraModelCamFromImg` of the
+fisheye, division, FOV and EUCM models, differ from the pycolmap 4.2.0 macOS arm64 wheel by
+a few ulps on part of the inputs (at most 1.6e-14 relative to max(1, |value|) in the
+fixture). Which calls succeed or fail never differs.
+
+**Why.** Same cause as entries 1 and 6: the wheel is built with contraction on and fuses
+multiply-adds that sit in one C++ statement, e.g. `*x = f * *x + c1` in every model's
+`ImgFromCam` and `u * u + v * v + 1.0` in `CamRayFromImg`. ColmapSharp never uses FMA in
+math paths (CLAUDE.md, "No FMA"). The iterative undistortion runs its distortion on
+`ceres::Jet`, whose operators are separate function calls that clang does not contract, and
+it matches the wheel bit for bit.
+
+**Evidence.** `oracle/camera_models.py` prints it: re-deriving SIMPLE_RADIAL's projected x
+with ColmapSharp's formula matches the wheel on 64/75 and 60/75 points of the two parameter
+sets, and on 75/75 with only `f * x + c1` fused; PINHOLE's ray z matches on 98/101 plain and
+101/101 with `u*u + v*v` fused as `fma(u, u, v*v)`.
+`CameraModelOracleTests` requires bit-identical `CamFromImg` for the models whose
+unprojection is the iterative undistortion or a plain pinhole, and for all of
+EQUIRECTANGULAR, and pins everything else at 2e-14 relative to max(1, |value|).
+
+**Related, not observed here.** C++ `EquirectangularCameraModel` evaluates
+`2.0 * EIGEN_PI * (...)` with EIGEN_PI a `long double` literal, so on x86-64 Linux (80-bit
+long double) its results may differ from both the macOS wheel (where long double is double)
+and ColmapSharp, which uses `Math.PI` in double.
