@@ -5,7 +5,7 @@
 // Sturm: PoseLib/misc/sturm.h - real-root isolation of a univariate polynomial by Sturm
 // sequences and bisection, finished with Ridders' method and Newton steps. Used by the
 // minimal solvers whose problem reduces to one polynomial: Re3q3.cs (degree 8, for P4Pf)
-// and, later, relpose_5pt (degree 10).
+// and Relpose5pt.cs (degree 10).
 //
 // Translation notes:
 // - PoseLib makes the degree N a template parameter so the buffers live on the stack; here N

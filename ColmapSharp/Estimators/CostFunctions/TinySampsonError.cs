@@ -10,10 +10,8 @@
 // TinyFundamentalSampsonErrorCostFunctor cases of tiny_sampson_error_test.cc).
 //
 // The header's other three functors (TinyTangentSampsonErrorCostFunctor,
-// TinyFocalSampsonErrorCostFunctor, TinyOneSidedFocalTangentSampsonErrorCostFunctor) serve
-// the essential-matrix and focal-length refiners and build on sampson_error.h's Jet-templated
-// SampsonError / TangentSampsonError / EssentialMatrixFromPoseParams; they are ported with
-// those.
+// TinyFocalSampsonErrorCostFunctor, TinyOneSidedFocalTangentSampsonErrorCostFunctor) are in
+// TinyRelativePoseSampsonError.cs, which also holds the outer and contraction helpers used here.
 //
 // Tier C in use (an iterative solver's cost); the residuals themselves are scalar formulas
 // whose only Eigen dependencies are 3x3 products and a quaternion-to-matrix conversion.
@@ -60,7 +58,7 @@ public readonly struct TinyFundamentalSampsonErrorCostFunctor(Vector2d[] points1
 		// Eigen::Map<const Quaterniond>: coefficients stored x, y, z, w.
 		u = new Quaterniond(parameters[3], parameters[0], parameters[1], parameters[2]).ToRotationMatrix();
 		v = new Quaterniond(parameters[7], parameters[4], parameters[5], parameters[6]).ToRotationMatrix();
-		return Outer(u.Col(0), v.Col(0)) + parameters[8] * Outer(u.Col(1), v.Col(1));
+		return RelativePoseJacobians.Outer(u.Col(0), v.Col(0)) + parameters[8] * RelativePoseJacobians.Outer(u.Col(1), v.Col(1));
 	}
 
 	/// <summary>
@@ -84,11 +82,11 @@ public readonly struct TinyFundamentalSampsonErrorCostFunctor(Vector2d[] points1
 			RotationCol01Derivatives(parameters.Slice(4, 4), dV0, dV1);
 			for (int l = 0; l < 4; ++l)
 			{
-				dF[l] = Outer(dU0[l], v.Col(0)) + sigma * Outer(dU1[l], v.Col(1));
-				dF[4 + l] = Outer(u.Col(0), dV0[l]) + sigma * Outer(u.Col(1), dV1[l]);
+				dF[l] = RelativePoseJacobians.Outer(dU0[l], v.Col(0)) + sigma * RelativePoseJacobians.Outer(dU1[l], v.Col(1));
+				dF[4 + l] = RelativePoseJacobians.Outer(u.Col(0), dV0[l]) + sigma * RelativePoseJacobians.Outer(u.Col(1), dV1[l]);
 			}
 
-			dF[8] = Outer(u.Col(1), v.Col(1));
+			dF[8] = RelativePoseJacobians.Outer(u.Col(1), v.Col(1));
 		}
 
 		Matrix3d fTranspose = f.Transpose();
@@ -129,11 +127,11 @@ public readonly struct TinyFundamentalSampsonErrorCostFunctor(Vector2d[] points1
 				var g1 = new Vector3d(ftPoint2.X, ftPoint2.Y, 0.0);
 				var g2 = new Vector3d(fPoint1.X, fPoint1.Y, 0.0);
 				double coef = num / (denom * sqrtDenom);
-				Matrix3d drdF = (1.0 / sqrtDenom) * Outer(point2, point1) -
-					coef * (Outer(g2, point1) + Outer(point2, g1));
+				Matrix3d drdF = (1.0 / sqrtDenom) * RelativePoseJacobians.Outer(point2, point1) -
+					coef * (RelativePoseJacobians.Outer(g2, point1) + RelativePoseJacobians.Outer(point2, g1));
 				for (int l = 0; l < 9; ++l)
 				{
-					jacobian[i + l * n] = CwiseProductSum(drdF, dF[l]);
+					jacobian[i + l * n] = RelativePoseJacobians.CwiseProductSum(drdF, dF[l]);
 				}
 			}
 		}
@@ -156,25 +154,5 @@ public readonly struct TinyFundamentalSampsonErrorCostFunctor(Vector2d[] points1
 		dcol1[1] = new Vector3d(2 * x, 0, 2 * z);        // dR.col(1)/dqy
 		dcol1[2] = new Vector3d(-2 * w, -4 * z, 2 * y);  // dR.col(1)/dqz
 		dcol1[3] = new Vector3d(-2 * z, 0, 2 * x);       // dR.col(1)/dqw
-	}
-
-	// a b^T.
-	private static Matrix3d Outer(Vector3d a, Vector3d b) => new(
-		a.X * b.X, a.X * b.Y, a.X * b.Z,
-		a.Y * b.X, a.Y * b.Y, a.Y * b.Z,
-		a.Z * b.X, a.Z * b.Y, a.Z * b.Z);
-
-	// a.cwiseProduct(b).sum(), summed in column-major order.
-	private static double CwiseProductSum(in Matrix3d a, in Matrix3d b)
-	{
-		double sum = a[0, 0] * b[0, 0];
-		for (int k = 1; k < 9; ++k)
-		{
-			int row = k % 3;
-			int col = k / 3;
-			sum += a[row, col] * b[row, col];
-		}
-
-		return sum;
 	}
 }

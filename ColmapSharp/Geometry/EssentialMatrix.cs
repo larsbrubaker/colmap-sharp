@@ -28,6 +28,8 @@
 // - EpipoleFromEssentialMatrix returns the null vector of E (or E^T) as the SVD gives it,
 //   so its overall sign is arbitrary, as in COLMAP (an epipole is a homogeneous point).
 
+using System.Runtime.InteropServices;
+
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Util;
 
@@ -301,8 +303,30 @@ public static class EssentialMatrix
 		in Matrix3d e,
 		List<double> residuals)
 	{
-		int numRays = camRays1WithJac.Count;
-		Check.Eq(numRays, camRays2WithJac.Count);
+		Check.Eq(camRays1WithJac.Count, camRays2WithJac.Count);
+		residuals.Clear();
+		CollectionsMarshal.SetCount(residuals, camRays1WithJac.Count);
+		ComputeSquaredTangentSampsonErrorWithCheirality(
+			camRays1WithJac as CamRayWithJac[] ?? [.. camRays1WithJac],
+			camRays2WithJac as CamRayWithJac[] ?? [.. camRays2WithJac],
+			e,
+			CollectionsMarshal.AsSpan(residuals));
+	}
+
+	/// <summary>
+	/// Span form of <see cref="ComputeSquaredTangentSampsonErrorWithCheirality(IReadOnlyList{CamRayWithJac}, IReadOnlyList{CamRayWithJac}, in Matrix3d, List{double})"/>
+	/// for the RANSAC estimators, which score into a caller-sized buffer
+	/// (<paramref name="residuals"/>.Length == number of rays).
+	/// </summary>
+	public static void ComputeSquaredTangentSampsonErrorWithCheirality(
+		ReadOnlySpan<CamRayWithJac> camRays1WithJac,
+		ReadOnlySpan<CamRayWithJac> camRays2WithJac,
+		in Matrix3d e,
+		Span<double> residuals)
+	{
+		int numRays = camRays1WithJac.Length;
+		Check.Eq(numRays, camRays2WithJac.Length);
+		Check.Eq(residuals.Length, numRays);
 
 		// Recover the relative pose from E (resolving the four-fold decomposition
 		// ambiguity by cheirality voting) and flag which correspondences triangulate
@@ -318,20 +342,13 @@ public static class EssentialMatrix
 
 		var validIndices = new List<int>();
 		PoseFromEssentialMatrix(e, rays1, rays2, out _, validIndices);
-		var isCheiral = new bool[numRays];
-		foreach (int idx in validIndices)
-		{
-			isCheiral[idx] = true;
-		}
 
 		// Correspondences behind either camera are not valid inliers for the relative
 		// pose regardless of their residual, so they get an infinite residual.
-		residuals.Clear();
-		for (int i = 0; i < numRays; ++i)
+		residuals.Fill(double.MaxValue);
+		foreach (int idx in validIndices)
 		{
-			residuals.Add(isCheiral[i]
-				? ComputeSquaredTangentSampsonError(camRays1WithJac[i], camRays2WithJac[i], e)
-				: double.MaxValue);
+			residuals[idx] = ComputeSquaredTangentSampsonError(camRays1WithJac[idx], camRays2WithJac[idx], e);
 		}
 	}
 }

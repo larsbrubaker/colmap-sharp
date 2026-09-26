@@ -62,10 +62,8 @@ Skipped `scene/database_test.cc` cases: `OpenFile`, `OpenCloseFile`, `OpenFileWi
 ### Phase 6 — Minimal solvers and estimators
 The four TinySolver callers (essential / fundamental refinement, relpose shared and one-sided
 focal) use `Optim/TinySolver.cs` with `TinyProductManifold<…, TinyEuclideanManifold1>`.
-Open: `essential_matrix` (5-pt via PoseLib relpose_5pt, >5-pt poly solver, 8-pt, tangent
-Sampson refiner), `relpose_shared_focal`, `relpose_one_sided_focal`, the rest of `tiny_sampson_error.h`
-(Tangent, Focal, OneSidedFocalTangent functors + their 7 `tiny_sampson_error_test.cc`
-cases) and `sampson_error.h`.
+Open: `relpose_shared_focal`, `relpose_one_sided_focal` (their Tiny focal Sampson functors
+are in `Estimators/CostFunctions/TinyRelativePoseSampsonError.cs`).
 Estimators implement `IEstimator<TX,TY,TModel>` (+ `ILocalEstimator` for LO-RANSAC) as
 `readonly struct`s — see `Optim/Estimator.cs` and `Estimators/Solvers/SimilarityTransform.cs`.
 `LoRansac.Estimate` hides (does not override) `Ransac.Estimate`: call it on the LoRansac type.

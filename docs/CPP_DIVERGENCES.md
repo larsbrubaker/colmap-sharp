@@ -570,6 +570,35 @@ returns 8 solutions with max residual below 3e-9, and for x^2 = 1, y^2 = 4, z = 
 linear third equation) it returns 0 solutions for every seed, as the port does (upstream
 behavior, pinned by `Re3q3Tests.CSharpOnly_LinearEquationReturnsNoSolutionsLikePoseLib`).
 
+## 27. The five-point solver takes its null space from unpivoted Householder QR
+
+**What differs.** PoseLib's `relpose_5pt` (the minimal case of COLMAP's
+`EssentialMatrixFivePointEstimator`) takes the 4D null space of its five epipolar
+constraints from the last four columns of the full Q of
+`epipolar_constraints.fullPivHouseholderQr()` (a 9 x 5 matrix).
+`Estimators/Solvers/PoseLib/Relpose5pt.cs` takes the same four columns from an unpivoted
+Householder QR (`LinearAlgebra/Householder.FactorInPlace` / `ApplyQ`, allocation-free). Both
+are orthonormal bases of the same space (in any A = Q R the first five columns of Q contain
+A's column space); only the basis inside it differs, and so do the intermediate polynomial
+coefficients (`compute_trace_constraints`, the degree-10 determinant polynomial and its
+roots, which parametrize the solutions in basis coordinates).
+
+**Why.** Eigen (MPL-2.0) is not ported, and full-pivoting Householder QR has no published
+convention precise enough to reproduce Eigen's Q column for column (entry 24 is the same
+choice for the 7-point fundamental solver). The solution set does not depend on the basis:
+the solver returns every unit-norm E = x N0 + y N1 + z N2 + N3 in the null space that meets
+the cubic constraints, and a change of orthonormal basis maps that set onto itself (up to
+the sign of each E, which the Sampson errors and COLMAP's tests ignore). What can differ is
+numerical conditioning: the back substitution's 1e-6 test for switching to the three-row QR
+solve, and the Sturm bracketing tolerance, act on basis-dependent quantities, so a solution
+near those thresholds can come out with slightly different rounding, and a near-degenerate
+root can be kept on one side and dropped on the other.
+
+**Evidence.** `EssentialMatrixSolverTests.EssentialMatrixFivePointEstimatorTests_Nominal(5)`
+(100 random minimal problems, at least one model within COLMAP's 5e-3 of the true E, with
+Sampson residuals below 1e-5) passes 1:1, as do the over-determined (20, 1000) and LO-RANSAC
+cases that sit on the same solver. Not compared against C++ PoseLib intermediates.
+
 ## 29. re3q3_rotation's pre-rotation uses a fixed-seed mt19937, not std::rand
 
 **What differs.** PoseLib's `re3q3_rotation` (used by `gp3p`, which COLMAP's
