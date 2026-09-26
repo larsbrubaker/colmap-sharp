@@ -52,8 +52,9 @@ dataset generator that most downstream tests use), `database` (in-memory store w
 COLMAP's API), `database_cache`, `scene_clustering`, `reconstruction_clustering`.
 
 ### Phase 5 — Optimization primitives
-`optim/`: samplers (random, progressive, combination), `ransac`, `loransac`,
-`support_measurement`, `sprt`, `least_absolute_deviations`, `tiny_solver`,
+`optim/`: `ransac`, `loransac` (generic over `ISampler<TSelf>` / `ISupportMeasurer<TSupport>`;
+decide PROSAC's out-of-range index when k == N, cast `num_inliers - i` to ulong as C++ does;
+constrain samplers to `class` or drop the struct claim in Sampler.cs), `least_absolute_deviations`, `tiny_solver`,
 `sparse_cholesky` (own implementation with AMD ordering; CHOLMOD is LGPL).
 
 ### Phase 6 — Minimal solvers and estimators
