@@ -3,7 +3,9 @@
 // COLMAP 4.2.0) after finalizeForMultigrid: addFEMConstraints (the divergence of the normal
 // field, FEMTree.System.inl's _addFEMConstraints) and addInterpolationConstraints
 // (_addInterpolationConstraints), then the solver's per-depth matrix rows and prolongation
-// constraints (_getSliceMatrixAndProlongationConstraints, _getProlongedMatrixRowSize). Built and run by
+// constraints (_getSliceMatrixAndProlongationConstraints, _getProlongedMatrixRowSize) and its
+// point-constraint transfers (_setPointValuesFromProlongedSolution,
+// _updateRestrictedInterpolationConstraints). Built and run by
 // oracle/fixture_poisson_tree.py, which writes ColmapSharp.Tests/TestData/oracle/poisson_system.json
 // (read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests.System.cs). Not part of any
 // build. The shared set-up and output format are in oracle/poisson_harness.h; the stages up to
@@ -189,6 +191,26 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input) {
     PrintF(name + "/sliceconstraints", sliceConstraints);
     PrintF(name + "/slicediagonal", diagonal);
     PrintI(name + "/prolongedrowsizes", prolongedRowSizes);
+
+    // The solver's point-constraint transfers: _setPointValuesFromProlongedSolution at every
+    // depth (rewriting the entries' dual values from the prolonged solution), then
+    // _updateRestrictedInterpolationConstraints at every depth from a synthetic solution into
+    // one restricted-constraint array.
+    for (int d = 1; d <= tree._maxDepth; d++) tree.template _setPointValuesFromProlongedSolution<0>(d, bsData, (const Real*)&prolonged[0], std::make_tuple(iInfo));
+    {
+      typedef typename FEMTree<Dim, Real>::template ApproximatePointInterpolationInfo<Real, 0, Reconstructor::Poisson::ConstraintDual<Dim, Real>, Reconstructor::Poisson::SystemDual<Dim, Real>> Approximate;
+      const auto& iData = static_cast<Approximate*>(iInfo)->iData;
+      std::vector<double> out;
+      tree.tree().processNodes([&](const FEMTreeNode* n) {
+        const auto* e = iData(n);
+        if (e) out.push_back(n->nodeData.nodeIndex), out.push_back(e->dualValues[0]);
+      });
+      PrintF(name + "/prolongedpointvalues", out);
+    }
+    std::vector<Real> solution(tree._sNodesEnd(tree._maxDepth)), restricted(tree._sNodesEnd(tree._maxDepth - 1));
+    for (size_t i = 0; i < solution.size(); i++) solution[i] = (Real)((long long)(i * 53 % 97) - 48) / (Real)32;
+    for (int d = 1; d <= tree._maxDepth; d++) tree.template _updateRestrictedInterpolationConstraints<0>(bsData, d, (const Real*)&solution[0], &restricted[0], std::make_tuple(iInfo));
+    PrintF(name + "/restrictedinterpolation", std::vector<double>(restricted.begin(), restricted.end()));
   }
 
   delete normalInfo;

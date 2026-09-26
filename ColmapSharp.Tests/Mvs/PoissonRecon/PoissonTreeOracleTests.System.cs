@@ -4,7 +4,7 @@
 // Poisson::Solver::Solve after finalizeForMultigrid - the normal-divergence constraints
 // (PoissonFemConstraints, with PoissonMultigrid's restriction and prolongation), the point
 // interpolation constraints, and the solver's per-depth matrix rows and prolongation
-// constraints (PoissonSystem, PoissonSystemMatrix) - against the
+// constraints and point-constraint transfers (PoissonSystem, PoissonSystemMatrix) - against the
 // "system*" runs of oracle/poisson_system_harness.cc (TestData/oracle/poisson_system.json).
 // Tier A, bit-identical floats. Each run replays the harness's input through the stages the
 // other PoissonTreeOracleTests files check step by step, then compares the stages here.
@@ -55,7 +55,7 @@ public partial class PoissonTreeOracleTests
 	// The harness's solver-assembly block: per depth of at most SliceLimit nodes, the matrix rows,
 	// prolongation constraints and inverse diagonals of
 	// _getSliceMatrixAndProlongationConstraints over a synthetic prolonged solution, and
-	// _getProlongedMatrixRowSize of every valid node.
+	// _getProlongedMatrixRowSize of every valid node; then the point-constraint transfers.
 	private static void AddSliceCases(Cases produced, FemTree tree, SortedTreeNodes sorted, Prepared p, int solveDepth)
 	{
 		const int SliceLimit = 12000;
@@ -128,6 +128,36 @@ public partial class PoissonTreeOracleTests
 		produced.F("sliceconstraints", constraints);
 		produced.F("slicediagonal", diagonal);
 		produced.I("prolongedrowsizes", prolongedRowSizes);
+
+		// The point-constraint transfers, as the harness runs them.
+		for (int d = 1; d <= maxDepth; d++)
+		{
+			system.SetPointValuesFromProlongedSolution(d, prolonged);
+		}
+
+		var pointValues = new List<double>();
+		tree.ProcessNodes(tree.Root, node =>
+		{
+			int slot = p.Interpolation.Index(tree.NodeIndex(node));
+			if (slot != -1)
+			{
+				pointValues.AddRange([tree.NodeIndex(node), p.Interpolation.Value(slot, 4)]);
+			}
+		});
+		produced.F("prolongedpointvalues", pointValues);
+		var solution = new float[PoissonMultigrid.End(tree, sorted, maxDepth)];
+		for (int i = 0; i < solution.Length; i++)
+		{
+			solution[i] = (float)((long)(i * 53L % 97) - 48) / 32f;
+		}
+
+		var restricted = new float[PoissonMultigrid.End(tree, sorted, maxDepth - 1)];
+		for (int d = 1; d <= maxDepth; d++)
+		{
+			system.UpdateRestrictedInterpolationConstraints(d, solution, restricted);
+		}
+
+		produced.F("restrictedinterpolation", restricted.Select(v => (double)v).ToList());
 	}
 
 	// The harness's Run up to and including finalizeForMultigrid, emitting its sorted slices.

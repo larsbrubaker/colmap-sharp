@@ -9,8 +9,12 @@
 // with _addPointValues for the interpolation part), the inverse diagonal, and the constraint
 // the coarser (prolonged) solution already meets (_getConstraintFromProlongedSolution with
 // _getInterpolationConstraintFromProlongedSolution); _getProlongedMatrixRowSize counts a
-// node's valid parent-depth neighbors. The solver (a later slice) relaxes these rows.
-// Tier A against oracle/poisson_system_harness.cc (the "slice*" and "prolongedrowsize" cases).
+// node's valid parent-depth neighbors. Between depths the solver moves the point constraints
+// with _setPointValuesFromProlongedSolution (the dual values from the coarser solution) and
+// _updateRestrictedInterpolationConstraints (the constraints the finer solution meets, onto the
+// coarser depth). The solver (a later slice) relaxes these rows.
+// Tier A against oracle/poisson_system_harness.cc (the "slice*", "prolongedrowsizes",
+// "prolongedpointvalues" and "restrictedinterpolation" cases).
 //
 // Translation notes:
 // - One instance holds the scratch windows and the row buffer, so the per-node loops do not
@@ -47,6 +51,8 @@ public sealed class PoissonSystem
 	private readonly int[] neighbors;
 	private readonly int[] pNeighbors;
 	private readonly float[] pointValues;
+	private readonly NeighborKey pointKey;
+	private readonly int[] childWindow;
 	private readonly int[] off = new int[Dim];
 	private readonly int[] other = new int[Dim];
 
@@ -75,6 +81,10 @@ public sealed class PoissonSystem
 		neighbors = new int[width * width * width];
 		pNeighbors = new int[width * width * width];
 		pointValues = new float[width * width * width];
+
+		// ConstPointSupportKey: the functions whose support contains a node's cell.
+		pointKey = new NeighborKey(tree, support.SupportEnd, -support.SupportStart, resetOnMissing: false);
+		childWindow = new int[support.SupportSize * support.SupportSize * support.SupportSize];
 		PoissonMultigrid.SetFem1ValidityFlags(tree, sorted, f.Signature);
 	}
 
@@ -191,6 +201,160 @@ public sealed class PoissonSystem
 		}
 
 		return temp;
+	}
+
+	/// <summary>
+	/// Sets the dual value of every interpolation entry in the valid nodes of
+	/// <paramref name="highDepth"/> to SystemDual of the prolonged coarser solution (indexed by
+	/// node index) at the entry's position, times the entry's weight: the part of the point
+	/// constraint the coarser levels already meet. Port of
+	/// <c>_setPointValuesFromProlongedSolution</c> with <c>_coarserFunctionValues</c>.
+	/// </summary>
+	public void SetPointValuesFromProlongedSolution(int highDepth, float[] prolongedSolution)
+	{
+		if (interpolation == null || bsData == null)
+		{
+			return;
+		}
+
+		int lowDepth = highDepth - 1;
+		if (lowDepth < 0)
+		{
+			return;
+		}
+
+		// For every node at the current depth
+		pointKey.Set(lowDepth + tree.DepthOffset);
+		int end = PoissonMultigrid.End(tree, sorted, highDepth);
+		for (int i = PoissonMultigrid.Begin(tree, sorted, highDepth); i < end; i++)
+		{
+			int node = sorted.TreeNodes[i];
+			if (!PoissonMultigrid.IsValidFem1Node(tree, node) || !PoissonMultigrid.IsValidSpaceNode(tree, node))
+			{
+				continue;
+			}
+
+			int slot = interpolation.Index(tree.NodeIndex(node));
+			if (slot == -1)
+			{
+				continue;
+			}
+
+			int parent = tree.Parent(node);
+			pointKey.GetNeighbors(parent);
+			float value = 0;
+			if (tree.LocalDepth(node) >= 0)
+			{
+				// Iterate over all basis functions that overlap the point at the coarser resolutions
+				bsData.Init(tree.LocalDepth(parent), interpolation.Value(slot, 0), interpolation.Value(slot, 1), interpolation.Value(slot, 2), tree.LocalOffset(parent, 0), tree.LocalOffset(parent, 1), tree.LocalOffset(parent, 2));
+				value = AccumulateValues(pointKey.Window(tree.Depth(parent)), prolongedSolution);
+			}
+
+			interpolation.Value(slot, 4) = value * systemWeight * interpolation.Value(slot, 3);
+		}
+	}
+
+	/// <summary>
+	/// Adds to <paramref name="restrictedConstraints"/> (indexed by node index) at highDepth - 1
+	/// the point constraints met by the <paramref name="solution"/> at <paramref name="highDepth"/>:
+	/// per interpolation entry of a valid space node at the coarser depth, SystemDual of the finer
+	/// solution at the entry times the entry's weight, times each coarser supporting function's
+	/// value there. Port of <c>_updateRestrictedInterpolationConstraints</c> with
+	/// <c>_finerFunctionValues</c>.
+	/// </summary>
+	public void UpdateRestrictedInterpolationConstraints(int highDepth, float[] solution, float[] restrictedConstraints)
+	{
+		if (interpolation == null || bsData == null)
+		{
+			return;
+		}
+
+		// Note: We can't iterate over the finer point nodes as the point weights might be
+		// scaled incorrectly, due to the adaptive exponent. So instead, we will iterate
+		// over the coarser nodes and evaluate the finer solution at the associated points.
+		int lowDepth = highDepth - 1;
+		if (lowDepth < 0)
+		{
+			return;
+		}
+
+		pointKey.Set(lowDepth + tree.DepthOffset);
+		int end = PoissonMultigrid.End(tree, sorted, lowDepth);
+		for (int i = PoissonMultigrid.Begin(tree, sorted, lowDepth); i < end; i++)
+		{
+			int node = sorted.TreeNodes[i];
+			if (!PoissonMultigrid.IsValidSpaceNode(tree, node))
+			{
+				continue;
+			}
+
+			int d = tree.LocalDepth(node);
+			int[] window = pointKey.GetNeighbors(node);
+			int slot = interpolation.Index(tree.NodeIndex(node));
+			if (slot == -1)
+			{
+				continue;
+			}
+
+			float x = interpolation.Value(slot, 0), y = interpolation.Value(slot, 1), z = interpolation.Value(slot, 2);
+
+			// _finerFunctionValues: the finer solution's functions around the child containing the
+			// point. (It has its own evaluator state upstream; evaluating it first lets this one
+			// state serve both.)
+			int cIdx = ChildIndex(node, x, y, z);
+			Array.Fill(childWindow, FemTree.None);
+			pointKey.GetChildNeighbors(cIdx, tree.Depth(node), childWindow);
+			bsData.Init(d + 1, x, y, z, (tree.LocalOffset(node, 0) << 1) | (cIdx & 1), (tree.LocalOffset(node, 1) << 1) | ((cIdx >> 1) & 1), (tree.LocalOffset(node, 2) << 1) | ((cIdx >> 2) & 1));
+			float finer = AccumulateValues(childWindow, solution);
+			float dualValue = finer * systemWeight * interpolation.Value(slot, 3);
+
+			// Update constraints for all nodes @( depth-1 ) that overlap the point
+			bsData.Init(d, x, y, z, tree.LocalOffset(node, 0), tree.LocalOffset(node, 1), tree.LocalOffset(node, 2));
+			foreach (int n in window)
+			{
+				if (PoissonMultigrid.IsValidFem1Node(tree, n))
+				{
+					float temp = 0;
+					temp += dualValue * (float)bsData.Value(tree.LocalOffset(n, 0), tree.LocalOffset(n, 1), tree.LocalOffset(n, 2));
+					restrictedConstraints[tree.NodeIndex(n)] += temp;
+				}
+			}
+		}
+	}
+
+	// Sum over the valid functions of a point-support window of coefficient * (float) value at
+	// the evaluator's point, in window order.
+	private float AccumulateValues(int[] window, float[] coefficients)
+	{
+		float values = 0;
+		foreach (int n in window)
+		{
+			if (PoissonMultigrid.IsValidFem1Node(tree, n))
+			{
+				float temp = (float)bsData!.Value(tree.LocalOffset(n, 0), tree.LocalOffset(n, 1), tree.LocalOffset(n, 2));
+				values += coefficients[tree.NodeIndex(n)] * temp;
+			}
+		}
+
+		return values;
+	}
+
+	// FEMTree::_childIndex: bit d set when p[d] >= the node's float center, Real( off + 0.5 ) * width.
+	private int ChildIndex(int node, float x, float y, float z)
+	{
+		float w = (float)(1.0 / (1 << tree.LocalDepth(node)));
+		int cIdx = 0;
+		for (int d = 0; d < Dim; d++)
+		{
+			float c = (float)(tree.LocalOffset(node, d) + 0.5) * w;
+			float p = d == 0 ? x : d == 1 ? y : z;
+			if (p >= c)
+			{
+				cIdx |= 1 << d;
+			}
+		}
+
+		return cIdx;
 	}
 
 	// Port of _setMatrixRowAndGetConstraintFromProlongation: row `row` of the matrix for the
