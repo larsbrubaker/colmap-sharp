@@ -6,7 +6,8 @@
 // three unknowns, PoseLib's re-implementation of Kukelova's E3Q3 (adapted from Jan Heller's
 // implementation) with the elimination-variable choice of Zhou et al., "A Stable Algebraic
 // Camera Pose Estimation for Minimal Configurations of 2D/3D Point and Line
-// Correspondences", ACCV 2018. Used by P4pf.cs; the univariate step goes through Sturm.cs.
+// Correspondences", ACCV 2018. Used by P4pf.cs and Gp3p.cs; the univariate step goes
+// through Sturm.cs.
 //
 // Translation notes:
 // - The 3x10 coefficient matrix and the 3x8 solution matrix are column-major spans
@@ -17,8 +18,17 @@
 //   mt19937 with a fixed seed on every call (Shoemake's uniform rotation, Graphics Gems III,
 //   for the rotation), so the result depends only on the input and is thread-safe. See
 //   docs/CPP_DIVERGENCES.md entry 26.
-// - rotation_to_3q3, cayley_param and re3q3_rotation are not ported: no solver COLMAP
-//   calls uses them.
+// - Upstream behavior, kept: a system with a purely linear equation (for example x^2 = 1,
+//   y^2 = 4, z = x + y, which has four finite solutions) returns 0 solutions. An affine change
+//   of variables cannot give a linear equation quadratic terms, so every elimination matrix
+//   keeps a zero row, the retry runs with det = 0, and the inverse yields non-finite
+//   coefficients that Sturm bisection rejects. PoseLib fa7280f built with clang++ and Eigen
+//   3.4 returns 0 for this system for every std::srand seed 1..20 (and with the retry off);
+//   Re3q3Tests.CSharpOnly_LinearEquationReturnsNoSolutionsLikePoseLib pins it. Callers
+//   (P4pf) never pass a linear row.
+// - The inhomogeneous (3 x 10) rotation_to_3q3 and re3q3_rotation overloads, and
+//   quat_multiply from PoseLib/misc/quaternion.h, are ported for Gp3p.cs. The homogeneous
+//   (3 x 9) overloads and cayley_param are not: no solver COLMAP calls uses them.
 //
 // Tier B.
 
@@ -32,6 +42,12 @@ public static class Re3q3
 {
 	/// <summary>The fixed seed of the random change of variables (see the file header).</summary>
 	private const uint RandomVarChangeSeed = 0;
+
+	/// <summary>
+	/// The fixed seed of re3q3_rotation's random pre-rotation. Distinct from
+	/// <see cref="RandomVarChangeSeed"/> so the two draws are not the same rotation.
+	/// </summary>
+	private const uint RotationPreconditionSeed = 1;
 
 	/// <summary>
 	/// Solve the system coeffs * [x^2, xy, xz, y^2, yz, z^2, x, y, z, 1]^T = 0 (3 x 10,
@@ -290,6 +306,97 @@ public static class Re3q3
 		Refine3q3(coeffs, solutions, nRoots);
 
 		return nRoots;
+	}
+
+	/// <summary>
+	/// Inhomogeneous linear constraints on a rotation matrix, Rcoeffs * [R(:); 1] = 0 (3 x 10,
+	/// column-major, R(:) column-major), converted into a 3q3 problem in the Cayley
+	/// parameters. Port of the 3 x 10 overload of poselib::re3q3::rotation_to_3q3.
+	/// </summary>
+	public static void RotationTo3q3(ReadOnlySpan<double> rcoeffs, Span<double> coeffs)
+	{
+		for (int k = 0; k < 3; k++)
+		{
+			double r0 = rcoeffs[k], r1 = rcoeffs[k + 3], r2 = rcoeffs[k + 6], r3 = rcoeffs[k + 9], r4 = rcoeffs[k + 12];
+			double r5 = rcoeffs[k + 15], r6 = rcoeffs[k + 18], r7 = rcoeffs[k + 21], r8 = rcoeffs[k + 24], r9 = rcoeffs[k + 27];
+			coeffs[k] = r0 - r4 - r8 + r9;
+			coeffs[k + 3] = 2 * r1 + 2 * r3;
+			coeffs[k + 6] = 2 * r2 + 2 * r6;
+			coeffs[k + 9] = r4 - r0 - r8 + r9;
+			coeffs[k + 12] = 2 * r5 + 2 * r7;
+			coeffs[k + 15] = r8 - r4 - r0 + r9;
+			coeffs[k + 18] = 2 * r5 - 2 * r7;
+			coeffs[k + 21] = 2 * r6 - 2 * r2;
+			coeffs[k + 24] = 2 * r1 - 2 * r3;
+			coeffs[k + 27] = r0 + r4 + r8 + r9;
+		}
+	}
+
+	/// <summary>
+	/// Solve Rcoeffs * [R(:); 1] = 0 (3 x 10, column-major) for rotations R. Writes up to
+	/// eight unit quaternions (PoseLib order, real part first) to
+	/// <paramref name="solutions"/> and returns their count. PoseLib first rotates the
+	/// problem by a random rotation R0 so that no solution sits at the Cayley transform's
+	/// singularity (a rotation by pi), solves in Cayley parameters, and composes R0 back. Port
+	/// of the 3 x 10 overload of poselib::re3q3::re3q3_rotation (re3q3_rotation_impl).
+	/// </summary>
+	/// <remarks>
+	/// PoseLib draws R0 from Eigen's Quaternion::UnitRandom, i.e. from std::rand; here it
+	/// comes from a fresh mt19937 with a fixed seed on every call, so the result depends only
+	/// on the input (docs/CPP_DIVERGENCES.md entry 29).
+	/// </remarks>
+	public static int SolveRotation(ReadOnlySpan<double> rcoeffs, Span<Vector4d> solutions, bool tryRandomVarChange = true)
+	{
+		// PoseLib reads UnitRandom().coeffs(), which is Eigen's (x, y, z, w) memory order,
+		// as a (w, x, y, z) vector. The draw is uniform on the unit sphere either way, so the
+		// component order does not change the distribution; the port keeps PoseLib's reading.
+		Quaterniond draw = UnitRandomQuaternion(new Mt19937(RotationPreconditionSeed));
+		var q0 = new Vector4d(draw.X, draw.Y, draw.Z, draw.W);
+		Matrix3d r0 = CameraPose.QuatToRotmat(q0);
+
+		// Rcoeffs.block<3, 3>(0, 3 b) = Rcoeffs.block<3, 3>(0, 3 b) * R0 for b = 0, 1, 2.
+		Span<double> rotated = stackalloc double[30];
+		rcoeffs[..30].CopyTo(rotated);
+		for (int b = 0; b < 3; ++b)
+		{
+			for (int row = 0; row < 3; ++row)
+			{
+				for (int col = 0; col < 3; ++col)
+				{
+					rotated[row + 3 * (3 * b + col)] =
+						rcoeffs[row + 3 * (3 * b)] * r0[0, col] +
+						rcoeffs[row + 3 * (3 * b + 1)] * r0[1, col] +
+						rcoeffs[row + 3 * (3 * b + 2)] * r0[2, col];
+				}
+			}
+		}
+
+		Span<double> coeffs = stackalloc double[30];
+		RotationTo3q3(rotated, coeffs);
+
+		Span<double> solutionsCayley = stackalloc double[24];
+		int nSols = Solve(coeffs, solutionsCayley, tryRandomVarChange);
+
+		for (int i = 0; i < nSols; ++i)
+		{
+			Vector4d q = new Vector4d(1.0, solutionsCayley[3 * i], solutionsCayley[3 * i + 1], solutionsCayley[3 * i + 2]).Normalized();
+			solutions[i] = QuatMultiply(q0, q);
+		}
+
+		return nSols;
+	}
+
+	/// <summary>Port of poselib::quat_multiply on (w, x, y, z) vectors.</summary>
+	internal static Vector4d QuatMultiply(Vector4d qa, Vector4d qb)
+	{
+		double qa1 = qa.X, qa2 = qa.Y, qa3 = qa.Z, qa4 = qa.W;
+		double qb1 = qb.X, qb2 = qb.Y, qb3 = qb.Z, qb4 = qb.W;
+
+		return new Vector4d(
+			qa1 * qb1 - qa2 * qb2 - qa3 * qb3 - qa4 * qb4,
+			qa1 * qb2 + qa2 * qb1 + qa3 * qb4 - qa4 * qb3,
+			qa1 * qb3 + qa3 * qb1 - qa2 * qb4 + qa4 * qb2,
+			qa1 * qb4 + qa2 * qb3 - qa3 * qb2 + qa4 * qb1);
 	}
 
 	private static Vector3d Col(ReadOnlySpan<double> m3xN, int j) => new(m3xN[3 * j], m3xN[3 * j + 1], m3xN[3 * j + 2]);

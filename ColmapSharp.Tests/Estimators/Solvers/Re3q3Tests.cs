@@ -81,4 +81,27 @@ public class Re3q3Tests
 
 		await Assert.That(failures).IsEmpty();
 	}
+
+	/// <summary>
+	/// C#-only: x^2 = 1, y^2 = 4, z = x + y has four finite solutions, but its third equation
+	/// is linear, so no affine change of variables makes any elimination matrix regular.
+	/// PoseLib fa7280f (built with clang++ in a scratch harness) returns 0 for every
+	/// std::srand seed tried; this pins the same upstream behavior (see the Re3q3.cs header).
+	/// </summary>
+	[Test]
+	public async Task CSharpOnly_LinearEquationReturnsNoSolutionsLikePoseLib()
+	{
+		double[] coeffs = new double[30];
+		coeffs[0 + 3 * 0] = 1.0;  // x^2
+		coeffs[0 + 3 * 9] = -1.0; // -1
+		coeffs[1 + 3 * 3] = 1.0;  // y^2
+		coeffs[1 + 3 * 9] = -4.0; // -4
+		coeffs[2 + 3 * 8] = 1.0;  // z
+		coeffs[2 + 3 * 6] = -1.0; // -x
+		coeffs[2 + 3 * 7] = -1.0; // -y
+
+		double[] solutions = new double[24];
+		await Assert.That(Re3q3.Solve(coeffs, solutions)).IsEqualTo(0);
+		await Assert.That(Re3q3.Solve(coeffs, solutions, tryRandomVarChange: false)).IsEqualTo(0);
+	}
 }

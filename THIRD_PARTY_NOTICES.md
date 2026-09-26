@@ -118,8 +118,9 @@ uses from `misc/quaternion.h` and `misc/essential.cc`); `CameraPose` (`PoseLib/c
 `misc/quaternion.h`); the camera description of `misc/camera_models.h/.cc`
 (`PoseLibCamera.cs`); the Sturm-sequence root finder of `misc/sturm.h`; the
 three-quadratics solver of `misc/re3q3.cc`; the P3P solver of `solvers/p3p.cc` with
-`solvers/p3p_common.h` and `misc/univariate.cc`'s single-real-root cubic; and the P4Pf
-solver of `solvers/p4pf.cc`.
+`solvers/p3p_common.h` and `misc/univariate.cc`'s single-real-root cubic; the P4Pf
+solver of `solvers/p4pf.cc`; and the generalized P3P solver of `solvers/gp3p.cc`
+(`Gp3p.cs`, with `re3q3_rotation`, `rotation_to_3q3` and `quat_multiply` in `Re3q3.cs`).
 
 ```
 BSD 3-Clause License

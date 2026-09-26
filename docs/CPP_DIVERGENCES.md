@@ -532,4 +532,35 @@ A change of variables followed by `refine_3q3` against the original coefficients
 same system, so the solution set should agree up to solver tolerance whichever random matrix
 is drawn. The C#-only `Re3q3Tests.CSharpOnly_DegenerateEliminationUsesRandomVarChange`
 (x^2 = 1, y^2 = 4, z^2 = 9: every elimination determinant is 0) finds all eight solutions and
-each satisfies the original system to 1e-8. Not compared against C++ PoseLib.
+each satisfies the original system to 1e-8. Cross-checked against C++ PoseLib fa7280f built
+with clang++ and Eigen 3.4 headers in a scratch harness: for std::srand seeds 1..20 it also
+returns 8 solutions with max residual below 3e-9, and for x^2 = 1, y^2 = 4, z = x + y (a
+linear third equation) it returns 0 solutions for every seed, as the port does (upstream
+behavior, pinned by `Re3q3Tests.CSharpOnly_LinearEquationReturnsNoSolutionsLikePoseLib`).
+
+## 29. re3q3_rotation's pre-rotation uses a fixed-seed mt19937, not std::rand
+
+**What differs.** PoseLib's `re3q3_rotation` (used by `gp3p`, which COLMAP's
+`GP3PEstimator` calls; `Estimators/Solvers/PoseLib/Re3q3.cs` `SolveRotation`) rotates every
+problem by a random rotation R0 before solving in Cayley parameters, so that no solution
+lands on the Cayley transform's singularity (a rotation by pi). Unlike re3q3's change of
+variables (entry 26), this draw happens on *every* call, not only for degenerate input.
+PoseLib takes R0 from Eigen's `Quaternion::UnitRandom()`, i.e. from the process-global
+`std::rand()`. The port draws it (Shoemake's uniform rotation) from a fresh `Mt19937` seeded
+with 1 on every call.
+
+**Why.** The same as entry 26: `std::rand()` is hidden global state whose sequence depends on
+the C library and on every earlier call, so COLMAP's gp3p is not reproducible even against
+itself, and porting it would make sequential and parallel runs disagree. Eigen's `UnitRandom`
+is MPL-2.0 and not ported. The seed differs from entry 26's so the two draws are not the same
+rotation. Consequence: for a fixed input the port always uses the same R0, so an input whose
+true rotation is (close to) R0 composed with a rotation by pi is always ill-conditioned here,
+where PoseLib would be only for an unlucky draw. That set has measure zero and RANSAC draws
+other samples, so no ported test is affected.
+
+**Evidence.** PoseLib fa7280f's gp3p, built with clang++ and Eigen 3.4 headers in a scratch
+harness, returns the same four poses for `std::srand` seeds 1..5 on a fixed three-ray input,
+agreeing to about 1e-10 across seeds; the port returns the same four poses to 1e-8
+(`Gp3pTests.CSharpOnly_MatchesPoseLibSolutionSet`, order-insensitive, since the order depends
+on R0). The 1:1 `GeneralizedAbsolutePoseTests.ParameterizedGP3PEstimatorTests_Nominal` cases
+pass with COLMAP's tolerances.
