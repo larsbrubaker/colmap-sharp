@@ -347,6 +347,29 @@ builds and is left for when profiling shows RANSAC is a bottleneck.
 COLMAP's expectations. The C#-only `RansacTests.CSharpOnly_ParallelRequiresRandomSampler`
 pins the kept validation.
 
+## 18. Solver cost and gradient are summed in residual-block order for any thread count
+
+**What differs.** Ceres' `ProgramEvaluator` accumulates the cost and the gradient per
+thread and then adds the per-thread partial sums, so with `num_threads > 1` the last bits of
+the cost, the gradient (and through them every accept/reject decision and tolerance test)
+depend on how `ParallelFor` split the residual blocks. `Solver/ProgramEvaluator.cs`
+evaluates the residual blocks in parallel but stores each block's cost in its own slot and
+sums the slots in residual-block order, and computes the gradient as J'r after the parallel
+pass (`BlockSparseMatrix.LeftMultiplyAndAccumulate`, row block by row block). The result
+equals Ceres' single-threaded summation order for the cost; the gradient's grouping of
+additions differs from Ceres' even at one thread (Ceres adds each residual block's
+J_i' r_i into the gradient as it goes, which is the same order for the block-sparse
+Jacobian and a column-wise order for the dense one).
+
+**Why.** CLAUDE.md's threading rule: sequential and parallel runs must give the same
+result. Ceres' per-thread reduction is scheduling-dependent, so no fixed order could
+reproduce it anyway; bundle adjustment is Tier C.
+
+**Evidence.** `BundleAdjustmentProblemTests.ThreadCount_DoesNotChangeTheResult` solves the
+same problem with 1 and 4 threads for every linear solver and gets bit-identical parameters,
+final cost and iteration counts. `Gradient_MatchesFiniteDifferencesOfTheCost` checks the
+gradient against the cost it is the derivative of.
+
 ## 19. TinySphereManifold's tangent basis uses Hughes & Moller, not Eigen's unitOrthogonal()
 
 **What differs.** COLMAP's `SphereManifold<3>` (`estimators/cost_functions/tiny_manifold.h`)
@@ -411,6 +434,26 @@ choice and needs no extra state.
 `ComputeBoundsAndCentroid`, ...) pass with COLMAP's expectations;
 `ReconstructionTests.CSharpOnly_IterationIsInAscendingIdOrder` and `IdMapTests` pin the
 order.
+
+## 22. SPARSE_NORMAL_CHOLESKY factors with the simplicial LLT and its own AMD ordering
+
+**What differs.** Ceres 2.2 (as COLMAP builds it, with SuiteSparse) reorders the reduced
+program's parameter blocks with CAMD on the Jacobian's block structure, forms J'J in that
+order and factors it with CHOLMOD; with EIGEN_SPARSE it leaves the blocks in order and lets
+Eigen's AMD permute the matrix. `Solver/LinearSolvers.cs` keeps the problem's block order,
+forms the lower triangle of J'J + D^2 from the block structure, and factors it with
+`LinearAlgebra/SimplicialCholesky.cs` (LLT, AMD from `AmdOrdering.cs`), the same stand-in as
+entry 13. The steps agree to rounding; the last bits differ, and so can a borderline
+accept/reject decision late in a solve.
+
+**Why.** CHOLMOD is GPL/LGPL and Eigen MPL-2.0 (`docs/LICENSE_AUDIT.md`); entry 13 has the
+reasoning. A factorization failure is reported as Ceres' Eigen back end reports it
+("Eigen failure. Unable to find numeric factorization.", a rejected step).
+
+**Evidence.** `CeresExampleTests.Powell` and `CurveFitting` reach the tutorial's printed
+optimum, cost, iteration count and number of rejected steps with SPARSE_NORMAL_CHOLESKY as
+with DENSE_QR, and `BundleAdjustmentProblemTests.RecoversGroundTruth` recovers the ground
+truth with all three linear solvers.
 
 ## 24. The 7-point fundamental solver takes its null space from unpivoted Householder QR
 

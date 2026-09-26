@@ -60,6 +60,7 @@ public sealed class SimplicialCholesky
 
 	// Symbolic analysis.
 	private int _n = -1;
+	private SparseMatrixCsc? _analyzed;
 	private int[] _patternColPtr = [];
 	private int[] _patternRowIdx = [];
 	private int[] _perm = []; // new index -> original index
@@ -119,6 +120,7 @@ public sealed class SimplicialCholesky
 		_n = n;
 		_factorized = false;
 		Info = ComputationInfo.NumericalIssue;
+		_analyzed = a;
 		_patternColPtr = a.ColPtr.ToArray();
 		_patternRowIdx = a.RowIndices.ToArray();
 
@@ -161,8 +163,11 @@ public sealed class SimplicialCholesky
 			throw new InvalidOperationException("AnalyzePattern must run before Factorize.");
 		}
 
-		if (a.Rows != _n || a.Cols != _n || !a.ColPtr.SequenceEqual(_patternColPtr)
-			|| !a.RowIndices.SequenceEqual(_patternRowIdx))
+		// A SparseMatrixCsc's pattern is immutable, so the very matrix that was analyzed (the
+		// solver's per-iteration case) needs no O(nnz) pattern comparison.
+		if (!ReferenceEquals(a, _analyzed)
+			&& (a.Rows != _n || a.Cols != _n || !a.ColPtr.SequenceEqual(_patternColPtr)
+				|| !a.RowIndices.SequenceEqual(_patternRowIdx)))
 		{
 			throw new ArgumentException("Factorize needs a matrix with the pattern given to AnalyzePattern.", nameof(a));
 		}

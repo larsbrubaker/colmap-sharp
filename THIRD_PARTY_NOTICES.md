@@ -55,9 +55,23 @@ product manifolds of `internal/ceres/manifold.cc`, `include/ceres/sphere_manifol
 `include/ceres/internal/sphere_manifold_functions.h`,
 `include/ceres/internal/householder_vector.h` and `include/ceres/product_manifold.h` in
 `Manifolds.cs`; the cost-function contract of `include/ceres/cost_function.h` and
-`include/ceres/autodiff_cost_function.h` in `AutoDiffCostFunction.cs`; and the TinySolver
+`include/ceres/autodiff_cost_function.h` in `AutoDiffCostFunction.cs`; the TinySolver
 function adapter of `include/ceres/tiny_solver_autodiff_function.h` in
-`TinySolverAutoDiffFunction.cs`. `ColmapSharp/Optim/TinySolver.cs` ports COLMAP's
+`TinySolverAutoDiffFunction.cs`; the problem, program,
+parameter/residual blocks, loss corrector, program evaluator, dense and block-sparse
+Jacobians, the DENSE_QR / DENSE_NORMAL_CHOLESKY / SPARSE_NORMAL_CHOLESKY linear solvers, the
+Levenberg-Marquardt strategy, the trust-region minimizer and `ceres::Solve` with its options
+and summary (`internal/ceres/problem_impl.cc`, `program.cc`, `parameter_block.h`,
+`residual_block.cc`, `corrector.cc`, `program_evaluator.h`, `block_jacobian_writer.cc`,
+`block_sparse_matrix.cc`, `dense_sparse_matrix.cc`, `dense_qr_solver.cc`,
+`dense_normal_cholesky_solver.cc`, `sparse_normal_cholesky_solver.cc`,
+`levenberg_marquardt_strategy.cc`, `trust_region_step_evaluator.cc`,
+`trust_region_minimizer.cc`, `trust_region_preprocessor.cc`, `minimizer.cc`, `solver.cc`) in
+`Problem.cs`, `Program.cs`, `ParameterBlock.cs`, `ResidualBlock.cs`, `ProgramEvaluator.cs`,
+`SparseMatrix.cs`, `BlockSparseMatrix.cs`, `LinearSolvers.cs`, `TrustRegionStrategy.cs`,
+`TrustRegionMinimizer.cs`, `SolverTypes.cs` and `LeastSquaresSolver.cs` (with
+`corrector_test.cc` and `trust_region_minimizer_test.cc` ported in the tests, and the data of
+`examples/curve_fitting.cc` in `CeresExampleTests.cs`). `ColmapSharp/Optim/TinySolver.cs` ports COLMAP's
 `colmap/optim/tiny_solver.h`, which is COLMAP's modified copy of Ceres'
 `include/ceres/tiny_solver.h` and carries this notice.
 
