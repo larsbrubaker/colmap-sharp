@@ -44,6 +44,13 @@ public class SyntheticOracleTests
 	// Projections to pixels (~1e3) inherit that last-ulp pose difference.
 	private const double ProjectionTolerance = 1e-9;
 
+	// Sums over an image's ~2000 2D points of values carrying ProjectionTolerance-sized
+	// rounding (noise deltas, clean projections): a few ulps each, accumulated.
+	private const double SummaryTolerance = 1e-8;
+
+	// The same sums weighted by the 3D point id (up to ~2000): SummaryTolerance times the id.
+	private const double IdWeightedSummaryTolerance = 1e-4;
+
 	public static IEnumerable<string> CaseNames() =>
 		OracleFixture.Load("synthetic.json").GetProperty("cases").EnumerateArray().Select(c => c.GetProperty("name").GetString()!);
 
@@ -94,6 +101,10 @@ public class SyntheticOracleTests
 	/// point (a 3-draw chunk) matches as a multiset. The chunks only line up if pruning consumed
 	/// exactly as many draws as COLMAP's. Deltas are noisy minus clean values, so they carry the
 	/// rounding of the addition: 1e-9 px for 2D points (~1e3), 1e-12 for 3D points (~1).
+	/// Cases too large to record every 2D point (the fixture's SUMMARIZED_NOISE_CASES, e.g. the
+	/// "Nominal" noise of bundle_adjustment_test.cc on 100 frames and 2000 points) match each
+	/// image's noise chunk by a summary (count, first three deltas, sums), and pin the clean
+	/// dataset by per-image observation summaries and the exact sum of the 3D point positions.
 	/// </summary>
 	[Test]
 	[MethodDataSource(nameof(NoiseCaseNames))]
@@ -109,8 +120,12 @@ public class SyntheticOracleTests
 			NumCamerasPerRig = o.GetProperty("num_cameras_per_rig").GetInt32(),
 			NumFramesPerRig = o.GetProperty("num_frames_per_rig").GetInt32(),
 			NumPoints3D = o.GetProperty("num_points3D").GetInt32(),
-			TrackLength = o.GetProperty("track_length").GetInt32(),
 		};
+		if (o.TryGetProperty("track_length", out JsonElement trackLength))
+		{
+			options.TrackLength = trackLength.GetInt32();
+		}
+
 		JsonElement n = expected.GetProperty("noise_options");
 		var noiseOptions = new SyntheticNoiseOptions
 		{
@@ -126,9 +141,15 @@ public class SyntheticOracleTests
 		var trackLengths = reconstruction.Points3D.ToDictionary(kv => kv.Key, kv => kv.Value.Track.Length);
 		var clean2D = reconstruction.Images.ToDictionary(kv => kv.Key, kv => kv.Value.Points2D.Select(p => p.Xy).ToList());
 		var clean3D = reconstruction.Points3D.ToDictionary(kv => kv.Key, kv => kv.Value.Xyz);
+		bool summarized = expected.TryGetProperty("points2D_delta_summaries", out JsonElement expectedSummaries);
+		var failures = new List<string>();
+		if (summarized)
+		{
+			CompareCleanSummaries(expected, reconstruction, failures);
+		}
+
 		Synthetic.SynthesizeNoise(noiseOptions, reconstruction);
 
-		var failures = new List<string>();
 		ulong[] expectedIds = OracleFixture.UInt64s(expected.GetProperty("point3D_ids"));
 		long[] expectedLengths = OracleFixture.Int64s(expected.GetProperty("track_lengths"));
 		if (!trackLengths.Keys.Order().SequenceEqual(expectedIds)
@@ -148,9 +169,19 @@ public class SyntheticOracleTests
 
 		var actual2D = reconstruction.Images.Select(kv => kv.Value.Points2D
 			.Select((p, i) => new[] { p.Xy.X - clean2D[kv.Key][i].X, p.Xy.Y - clean2D[kv.Key][i].Y }).ToList()).ToList();
-		var expected2D = expected.GetProperty("points2D_deltas").EnumerateArray()
-			.Select(image => image.EnumerateArray().Select(OracleFixture.Doubles).ToList()).ToList();
-		MatchChunks("image 2D noise", actual2D, expected2D, ProjectionTolerance, failures);
+		if (summarized)
+		{
+			var actualSummaries = actual2D.Select(deltas => new List<double[]> { SummarizeImageNoise(deltas) }).ToList();
+			var expectedSummaryChunks = expectedSummaries.EnumerateArray()
+				.Select(summary => new List<double[]> { OracleFixture.Doubles(summary) }).ToList();
+			MatchChunks("image 2D noise summary", actualSummaries, expectedSummaryChunks, SummaryTolerance, failures);
+		}
+		else
+		{
+			var expected2D = expected.GetProperty("points2D_deltas").EnumerateArray()
+				.Select(image => image.EnumerateArray().Select(OracleFixture.Doubles).ToList()).ToList();
+			MatchChunks("image 2D noise", actual2D, expected2D, ProjectionTolerance, failures);
+		}
 
 		var actual3D = reconstruction.Points3D.Select(kv =>
 		{
@@ -162,6 +193,82 @@ public class SyntheticOracleTests
 		MatchChunks("3D point noise", actual3D, expected3D, GaussianTolerance, failures);
 
 		await Assert.That(string.Join("\n", failures.Take(20))).IsEqualTo("");
+	}
+
+	// [count, first three (dx, dy), sum dx, sum dy, sum dx^2 + dy^2], summed in index order;
+	// oracle/fixture_synthetic.py summarize_image_noise.
+	private static double[] SummarizeImageNoise(List<double[]> deltas)
+	{
+		var summary = new List<double> { deltas.Count };
+		summary.AddRange(deltas.Take(3).SelectMany(d => d));
+		double sumX = 0, sumY = 0, sumSquares = 0;
+		foreach (double[] d in deltas)
+		{
+			sumX += d[0];
+			sumY += d[1];
+			sumSquares += d[0] * d[0] + d[1] * d[1];
+		}
+
+		summary.AddRange([sumX, sumY, sumSquares]);
+		return summary.ToArray();
+	}
+
+	// The clean dataset of a summarized noise case, order-insensitively where hash order
+	// decides the layout (entry 31): per image the number of 2D points observing a 3D point,
+	// every point without one exactly (index and position: same shuffle permutation), and sums
+	// x, y, id * x, id * y over the observing points in ascending id order (so which point
+	// projects where is pinned, not which index it sits at); the sum of the 3D point positions
+	// in id order exactly (uniform draws). Mirrors fixture_synthetic.py summarize_observations.
+	private static void CompareCleanSummaries(JsonElement expected, Reconstruction reconstruction, List<string> failures)
+	{
+		double[] expectedSum = OracleFixture.Doubles(expected.GetProperty("points3D_clean_sum"));
+		var sum = new double[3];
+		foreach (Point3D point3D in reconstruction.Points3D.OrderBy(kv => kv.Key).Select(kv => kv.Value))
+		{
+			sum[0] += point3D.Xyz.X;
+			sum[1] += point3D.Xyz.Y;
+			sum[2] += point3D.Xyz.Z;
+		}
+
+		if (!sum.SequenceEqual(expectedSum))
+		{
+			failures.Add($"clean 3D point sum ({string.Join(", ", sum)})");
+		}
+
+		foreach (JsonElement json in expected.GetProperty("observations").EnumerateArray())
+		{
+			Image image = reconstruction.Image(json.GetProperty("image_id").GetUInt32());
+			var observing = image.Points2D.Where(p => p.HasPoint3D).OrderBy(p => p.Point3DId).ToList();
+			if (observing.Count != json.GetProperty("num_with_point3D").GetInt32())
+			{
+				failures.Add($"image {image.ImageId}: {observing.Count} 2D points observe a 3D point");
+			}
+
+			var without = image.Points2D.Select((p, idx) => (p, idx)).Where(e => !e.p.HasPoint3D).ToList();
+			JsonElement expectedWithout = json.GetProperty("without_point3D");
+			if (without.Count != expectedWithout.GetArrayLength()
+				|| !without.Zip(expectedWithout.EnumerateArray()).All(pair => pair.First.idx == pair.Second[0].GetInt32()
+					&& pair.First.p.Xy == new Vector2d(pair.Second[1].GetDouble(), pair.Second[2].GetDouble())))
+			{
+				failures.Add($"image {image.ImageId}: 2D points without a 3D point differ");
+			}
+
+			double sumX = 0, sumY = 0, sumIdX = 0, sumIdY = 0;
+			foreach (Point2D point2D in observing)
+			{
+				sumX += point2D.Xy.X;
+				sumY += point2D.Xy.Y;
+				sumIdX += point2D.Point3DId * point2D.Xy.X;
+				sumIdY += point2D.Point3DId * point2D.Xy.Y;
+			}
+
+			double[] e = OracleFixture.Doubles(json.GetProperty("sums"));
+			if (Math.Abs(sumX - e[0]) > SummaryTolerance || Math.Abs(sumY - e[1]) > SummaryTolerance
+				|| Math.Abs(sumIdX - e[2]) > IdWeightedSummaryTolerance || Math.Abs(sumIdY - e[3]) > IdWeightedSummaryTolerance)
+			{
+				failures.Add($"image {image.ImageId}: observation sums ({sumX:R}, {sumY:R}, {sumIdX:R}, {sumIdY:R})");
+			}
+		}
 	}
 
 	// Multiset match: every actual chunk pairs with a distinct expected chunk within tol.

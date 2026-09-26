@@ -7,12 +7,14 @@
 # without a database and records every camera, rig, frame, image (with all 2D points) and
 # 3D point. Values are written with repr(), so doubles round-trip exactly.
 #
-# NOISE_CASES additionally prune tracks (track_length) and run synthesize_noise. COLMAP visits
+# NOISE_CASES additionally run synthesize_noise (after pruning tracks, where track_length is set). COLMAP visits
 # 3D points and images in hash order there and ColmapSharp in ascending id order
 # (docs/CPP_DIVERGENCES.md entry 31), so these record what can be compared order-insensitively:
 # the track lengths after pruning, the frame poses after noise (frames are visited in the same
 # order), and per image / per 3D point the noise that was added (noisy minus clean value), whose
-# chunks of the Gaussian stream match as a multiset.
+# chunks of the Gaussian stream match as a multiset. SUMMARIZED_NOISE_CASES record per-image
+# summaries of the 2D noise and clean observations instead of every 2D point, plus the sum of
+# the clean 3D point positions (exact: uniform draws summed in id order), to keep the file small.
 #
 # Must run on macOS: the draws go through libc++'s <random> (see fixture_random.py).
 #
@@ -42,7 +44,17 @@ NOISE_CASES = [
       "track_length": 3},
      {"rig_from_world_translation_stddev": 0.1, "rig_from_world_rotation_stddev": 0.5,
       "point3D_stddev": 0.05, "point2D_stddev": 0.5}),
+    # The "Nominal" noise of bundle_adjustment_test.cc on a dataset large enough for the
+    # hash order to scramble which image and 3D point receive which draws.
+    ("nominal_ba_noise_100_frames", 0,
+     {"num_rigs": 1, "num_cameras_per_rig": 1, "num_frames_per_rig": 100, "num_points3D": 2000},
+     {"rig_from_world_translation_stddev": 0.1, "rig_from_world_rotation_stddev": 0.5,
+      "point3D_stddev": 0.1, "point2D_stddev": 0.5}),
 ]
+
+# Noise cases too large to record every 2D point (100 images x 2010 points): these record
+# per-image summaries instead (see summarize_image_noise and summarize_observations).
+SUMMARIZED_NOISE_CASES = {"nominal_ba_noise_100_frames"}
 
 
 def rigid(t):
@@ -84,6 +96,40 @@ def dump(reconstruction):
             "points3D": points3D}
 
 
+def naive_sum(values):
+    """Left-to-right double addition, as the C# test does. Python 3.12's sum() of floats is
+    compensated (Neumaier), so its result can differ from a plain loop in the last bits."""
+    total = 0.0
+    for v in values:
+        total += v
+    return total
+
+
+def summarize_image_noise(deltas):
+    """[count, first three (dx, dy), sum dx, sum dy, sum dx^2 + dy^2], summed in index order."""
+    flat = [v for d in deltas[:3] for v in d]
+    return ([len(deltas)] + flat + [naive_sum(d[0] for d in deltas), naive_sum(d[1] for d in deltas),
+                                     naive_sum(d[0] * d[0] + d[1] * d[1] for d in deltas)])
+
+
+def summarize_observations(image):
+    """The clean 2D points of an image, order-insensitively: the number observing a 3D point,
+    every point without one (index, x, y), and sums x, y, id * x, id * y over the observing
+    points in ascending 3D point id order (which 3D point sits at which index is hash order)."""
+    observing = sorted((p.point3D_id, float(p.xy[0]), float(p.xy[1]))
+                       for p in image.points2D if p.has_point3D())
+    without = [[idx, float(p.xy[0]), float(p.xy[1])]
+               for idx, p in enumerate(image.points2D) if not p.has_point3D()]
+    sums = [0.0, 0.0, 0.0, 0.0]
+    for pid, x, y in observing:
+        sums[0] += x
+        sums[1] += y
+        sums[2] += pid * x
+        sums[3] += pid * y
+    return {"image_id": image.image_id, "num_with_point3D": len(observing),
+            "without_point3D": without, "sums": sums}
+
+
 def main():
     if platform.system() != "Darwin":
         sys.exit("Run on macOS: the fixture must come from the libc++ pycolmap wheel.")
@@ -109,6 +155,8 @@ def main():
         clean2D = {iid: [(float(p.xy[0]), float(p.xy[1])) for p in im.points2D]
                    for iid, im in reconstruction.images.items()}
         clean3D = {pid: [float(v) for v in p.xyz] for pid, p in reconstruction.points3D.items()}
+        summarize = name in SUMMARIZED_NOISE_CASES
+        observations = [summarize_observations(im) for _, im in sorted(reconstruction.images.items())]
         pycolmap.synthesize_noise(noise_options, reconstruction)
         points2D_deltas = []
         for iid, im in sorted(reconstruction.images.items()):
@@ -118,12 +166,19 @@ def main():
                            for pid, p in sorted(reconstruction.points3D.items())]
         frames = [{"frame_id": fid, "rig_from_world": rigid(f.rig_from_world)}
                   for fid, f in sorted(reconstruction.frames.items())]
-        noise_cases.append({"name": name, "seed": seed, "options": overrides,
-                            "noise_options": noise_overrides,
-                            "track_lengths": [track_lengths[k] for k in sorted(track_lengths)],
-                            "point3D_ids": sorted(track_lengths),
-                            "frames": frames, "points2D_deltas": points2D_deltas,
-                            "points3D_deltas": points3D_deltas})
+        case = {"name": name, "seed": seed, "options": overrides,
+                "noise_options": noise_overrides,
+                "track_lengths": [track_lengths[k] for k in sorted(track_lengths)],
+                "point3D_ids": sorted(track_lengths),
+                "frames": frames, "points3D_deltas": points3D_deltas}
+        if summarize:
+            case["points2D_delta_summaries"] = [summarize_image_noise(d) for d in points2D_deltas]
+            case["observations"] = observations
+            case["points3D_clean_sum"] = [naive_sum(clean3D[pid][k] for pid in sorted(clean3D))
+                                          for k in range(3)]
+        else:
+            case["points2D_deltas"] = points2D_deltas
+        noise_cases.append(case)
     OUTPUT.write_text(json.dumps({"pycolmap": pycolmap.__version__, "cases": cases,
                                   "noise_cases": noise_cases}, separators=(",", ":")) + "\n")
     print(f"wrote {OUTPUT}")

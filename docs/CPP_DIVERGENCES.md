@@ -717,7 +717,18 @@ one ulp). A third fixture case prunes tracks (track_length) and runs `synthesize
 `CSharpOnly_TrackLengthAndNoiseMatchPycolmap` finds the same track lengths and 3D point ids,
 the same frame poses after noise (1e-12), and the per-image and per-point noise chunks as the
 same multiset, which shows the pruning consumed exactly COLMAP's number of draws and only
-their assignment differs. All 17 `synthetic_test.cc` cases pass 1:1.
+their assignment differs. A fourth case pins this at bundle-adjustment scale: seed 0, 1 rig,
+1 camera, 100 frames, 2000 points with the "Nominal" noise of `bundle_adjustment_test.cc`
+(0.5 px, 0.1, 0.5 deg, 0.1), recorded as per-image summaries (clean observations; each
+image's 2D noise chunk) plus every 3D point's noise. There the reassignment is visible in a
+bundle adjuster's initial cost (0.5 * sum of squared reprojection residuals): ColmapSharp's
+noisy dataset gives 287550090.63, pycolmap's 287510459.99. A differential harness (scratch,
+not checked in) showed the gap is entirely this entry: it took ColmapSharp's clean dataset,
+installed pycolmap's point2D-to-3D-point layout, and replayed `SynthesizeNoise`'s draws
+visiting images and 3D points in pycolmap's hash order (the `reconstruction.images` /
+`points3D` iteration order). The result matched pycolmap's noisy reconstruction to 1.1e-13 px
+(2D), 6.7e-16 (3D), 1.8e-15 (translations) and 8.7e-19 (rotations), and its cost was
+287510459.9944969, the same as pycolmap's. All 17 `synthetic_test.cc` cases pass 1:1.
 
 ## 32. SynthesizeImages hands bitmaps to a sink instead of writing image files
 
