@@ -23,8 +23,7 @@ only if exhaustive/sequential/spatial matching proves too slow for MatterCAD pho
 Each phase ends with its ported tests green. Test names follow COLMAP's.
 
 ### Phase 1 — Math and linear algebra foundation
-- `LinearAlgebra/`: fixed-size `Vector2d/3d/4d`, `Matrix2d/3d/3x4d/4d`, `Quaterniond`,
-  `AngleAxis`; dynamic `VectorXd`/`MatrixXd`; decompositions: Householder QR, Jacobi and
+- `LinearAlgebra/`: dynamic `VectorXd`/`MatrixXd`; decompositions: Householder QR, Jacobi and
   Golub–Kahan SVD, symmetric eigen, LU with partial pivoting, LLᵀ/LDLᵀ. Written from
   textbook algorithms — **Eigen is MPL-2.0 and must not be transcribed.**
 - `Mathematics/` (COLMAP's `math/`):
