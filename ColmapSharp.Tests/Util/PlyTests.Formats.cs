@@ -2,11 +2,16 @@
 //
 // PlyTests.Formats: C#-only tests (no ply_test.cc case covers them) of ColmapSharp/Util/Ply*.cs
 // on inputs COLMAP's writers never produce: big-endian binary files for the point and mesh
-// readers, a 1M-point ASCII cloud read in bounded time (the buffered line reader), and ASCII
+// readers, a 1M-point ASCII cloud read with bounded work (the buffered line reader), and ASCII
 // texture coordinates parsed with libc++'s `>> float` rules (CppLineTokens.TryReadFloat).
+//
+// The 1M-point test guards against a pathological reader, not a slow machine. It used to
+// assert wall-clock time and failed under heavy load (12-19 s against 10 s), so it now counts
+// load-independent work instead: the stream calls and bytes the reader pulls (an unbuffered or
+// re-reading reader shows up there) and the bytes it allocates on the test's thread (per-byte
+// allocation or lines built by concatenation show up there).
 
 using System.Buffers.Binary;
-using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 
@@ -130,18 +135,57 @@ public partial class PlyTests
 			text.Append(CultureInfo.InvariantCulture, $"{i} {i * 0.5} {-i} {(byte)i} 1 2\n");
 		}
 
-		var stream = new MemoryStream(Encoding.ASCII.GetBytes(text.ToString()));
+		byte[] bytes = Encoding.ASCII.GetBytes(text.ToString());
+		var stream = new CountingStream(bytes);
 
-		var watch = Stopwatch.StartNew();
+		long allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
 		List<PlyPoint> loaded = Ply.ReadPly(stream);
-		watch.Stop();
+		long allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+		Console.WriteLine($"1M-point text PLY: {bytes.Length} bytes in {stream.ReadCalls} reads, {allocated} bytes allocated");
 
-		await Assert.That(loaded.Count).IsEqualTo(kNumPoints);
-		await Assert.That(loaded[kNumPoints - 1].Z).IsEqualTo(-999999.0f);
-		await Assert.That(loaded[300].R).IsEqualTo((byte)44);
+		using (Assert.Multiple())
+		{
+			await Assert.That(loaded.Count).IsEqualTo(kNumPoints);
+			await Assert.That(loaded[kNumPoints - 1].Z).IsEqualTo(-999999.0f);
+			await Assert.That(loaded[300].R).IsEqualTo((byte)44);
 
-		// Well under this on a laptop even in Debug; the bound only catches a pathological reader.
-		await Assert.That(watch.Elapsed.TotalSeconds).IsLessThan(10.0);
+			// Every byte exactly once, in large blocks (PlyByteReader reads 64 KiB at a time; the
+			// bound allows 4 KiB). A reader that went to the stream per byte or per line would
+			// make millions of calls.
+			await Assert.That(stream.BytesRead).IsEqualTo((long)bytes.Length);
+			await Assert.That(stream.ReadCalls).IsLessThanOrEqualTo((bytes.Length / 4096) + 2);
+
+			// About 780 bytes per point measured (Debug, .NET 10): the per-line string, split
+			// array and token strings. The bound leaves room for runtime differences; allocating
+			// per byte or copying a growing prefix per line would be many times it.
+			await Assert.That(allocated).IsLessThan(2000L * kNumPoints);
+		}
+	}
+
+	// A MemoryStream that counts what a reader pulls from it.
+	private sealed class CountingStream(byte[] bytes) : MemoryStream(bytes)
+	{
+		public long ReadCalls { get; private set; }
+
+		public long BytesRead { get; private set; }
+
+		public override int Read(byte[] buffer, int offset, int count) => Counted(base.Read(buffer, offset, count));
+
+		public override int Read(Span<byte> buffer) => Counted(base.Read(buffer));
+
+		public override int ReadByte()
+		{
+			int value = base.ReadByte();
+			Counted(value < 0 ? 0 : 1);
+			return value;
+		}
+
+		private int Counted(int read)
+		{
+			ReadCalls++;
+			BytesRead += read;
+			return read;
+		}
 	}
 
 	[Test]

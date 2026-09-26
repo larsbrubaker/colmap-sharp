@@ -80,6 +80,14 @@ public sealed class MinSTGraphCut<TValue>
 	// Filled by Compute: tree membership per node (FreeNode, SourceTree, SinkTree).
 	private byte[] trees = [];
 
+	/// <summary>
+	/// Diagnostic for tests: the steps the last <see cref="Compute"/> took, counting every arc
+	/// examined while growing trees and adopting orphans and every parent link followed while
+	/// augmenting or measuring distances. Unlike wall-clock time it does not depend on machine
+	/// load, so a scaling test can bound it to catch quadratic behavior.
+	/// </summary>
+	internal long LastComputeWork { get; private set; }
+
 	/// <summary>Creates a graph with <paramref name="numNodes"/> nodes plus the two terminals.</summary>
 	public MinSTGraphCut(int numNodes)
 	{
@@ -141,7 +149,10 @@ public sealed class MinSTGraphCut<TValue>
 	/// <summary>Computes the min-cut with the max-flow algorithm and returns the flow.</summary>
 	public TValue Compute()
 	{
-		return new Solver(this).Run(out trees);
+		var solver = new Solver(this);
+		var flow = solver.Run(out trees);
+		LastComputeWork = solver.Work;
+		return flow;
 	}
 
 	/// <summary>
@@ -231,6 +242,9 @@ public sealed class MinSTGraphCut<TValue>
 		private readonly Queue<int> orphans = new();
 		private TValue flow;
 		private int time;
+
+		// Steps taken, for MinSTGraphCut.LastComputeWork.
+		public long Work { get; private set; }
 
 		public Solver(MinSTGraphCut<TValue> graph)
 		{
@@ -331,6 +345,7 @@ public sealed class MinSTGraphCut<TValue>
 		{
 			while (active.Count > 0)
 			{
+				Work++;
 				var p = active.Peek();
 				if (tree[p] == FreeNode)
 				{
@@ -343,6 +358,7 @@ public sealed class MinSTGraphCut<TValue>
 				var end = arcStart[p + 1];
 				for (var k = currentArc[p]; k < end; k++)
 				{
+					Work++;
 					var e = arcs[k];
 					var q = head[e];
 					// Tree capacity: parent-to-child residual in S, child-to-parent in T.
@@ -382,6 +398,7 @@ public sealed class MinSTGraphCut<TValue>
 			var v = head[meetingEdge ^ 1];
 			for (; parentEdge[v] != TerminalParent; v = head[parentEdge[v]])
 			{
+				Work++;
 				bottleneck = TValue.Min(bottleneck, residual[parentEdge[v] ^ 1]);
 			}
 
@@ -389,6 +406,7 @@ public sealed class MinSTGraphCut<TValue>
 
 			for (v = head[meetingEdge]; parentEdge[v] != TerminalParent; v = head[parentEdge[v]])
 			{
+				Work++;
 				bottleneck = TValue.Min(bottleneck, residual[parentEdge[v]]);
 			}
 
@@ -454,6 +472,7 @@ public sealed class MinSTGraphCut<TValue>
 			time++;
 			while (orphans.Count > 0)
 			{
+				Work++;
 				var p = orphans.Dequeue();
 				var ownTree = tree[p];
 
@@ -472,6 +491,7 @@ public sealed class MinSTGraphCut<TValue>
 				var end = arcStart[p + 1];
 				for (var k = arcStart[p]; k < end; k++)
 				{
+					Work++;
 					var e = arcs[k];
 					var q = head[e];
 					if (tree[q] != ownTree || residual[ownTree == SourceTree ? e ^ 1 : e] <= TValue.Zero)
@@ -497,6 +517,7 @@ public sealed class MinSTGraphCut<TValue>
 
 				for (var k = arcStart[p]; k < end; k++)
 				{
+					Work++;
 					var e = arcs[k];
 					var q = head[e];
 					if (tree[q] != ownTree)
@@ -531,6 +552,7 @@ public sealed class MinSTGraphCut<TValue>
 			int total;
 			while (true)
 			{
+				Work++;
 				if (timestamp[v] == time)
 				{
 					total = steps + distance[v];

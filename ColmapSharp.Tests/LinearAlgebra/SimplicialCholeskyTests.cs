@@ -7,9 +7,9 @@
 // bundle-adjustment-like block-arrow normal matrix), for both factorization kinds, both
 // orderings and both stored triangles. AMD is checked to be a permutation and to cut the
 // fill of a grid Laplacian far below the natural ordering's, and a 100k-unknown Laplacian
-// must factor in seconds.
-
-using System.Diagnostics;
+// must factor with bounded fill and bounded ordering and factorization work. That last test
+// counts work through internal diagnostics (SimplicialCholesky.OrderingWork and
+// FactorizationWork) instead of timing it, so machine load cannot fail it.
 
 using ColmapSharp.LinearAlgebra;
 
@@ -232,22 +232,36 @@ public class SimplicialCholeskyTests
 		}
 	}
 
+	// Guards against pathological cost at COLMAP's scale, counted rather than timed: a
+	// wall-clock bound failed under heavy machine load (~14 s against 10 s) while the code was
+	// fine. The three counts are deterministic for this input and each catches one way the
+	// solve can go quadratic: the fill nnz(L) (a lost or broken ordering), the AMD ordering's
+	// own work (an element list or supervariable bucket that keeps growing), and the numeric
+	// factorization's inner-loop steps, which follow from the fill.
 	[Test]
-	public async Task Performance_100kUnknownGridLaplacianFactorsInSeconds()
+	public async Task Performance_100kUnknownGridLaplacianFactorsWithBoundedWork()
 	{
 		SparseMatrixCsc a = GridLaplacian(316, 316, 1e-3);
 		VectorXd b = RandomVector(new Random(5), a.Rows);
-		var watch = Stopwatch.StartNew();
 		var solver = new SimplicialCholesky(SimplicialCholeskyKind.LLT).Compute(a);
 		VectorXd x = solver.Solve(b);
-		watch.Stop();
-		Console.WriteLine($"100k Laplacian: nnz(L) = {solver.NonZerosL}, analyze+factorize+solve {watch.ElapsedMilliseconds} ms");
+		Console.WriteLine($"100k Laplacian: nnz(L) = {solver.NonZerosL}, ordering work {solver.OrderingWork}, factorization work {solver.FactorizationWork}");
 
 		using (Assert.Multiple())
 		{
 			await Assert.That(solver.Info).IsEqualTo(ComputationInfo.Success);
 			await Assert.That((a * x - b).Norm() / b.Norm()).IsLessThan(1e-10);
-			await Assert.That(watch.Elapsed.TotalSeconds).IsLessThan(10.0);
+
+			// AMD gives 2,971,294 here; the natural (banded) ordering fills about n * 316 = 3.2e7.
+			await Assert.That(solver.NonZerosL).IsLessThan(4_000_000L);
+
+			// 6,651,849 measured, about 13 visits per stored entry of A (498,016); linear in the
+			// input. A quadratic ordering would be on the order of n^2 = 1e10.
+			await Assert.That(solver.OrderingWork).IsLessThan(30L * a.NonZeros);
+
+			// 216,199,331 measured (about 7 n^1.5, the grid's nested-dissection rate); the
+			// natural ordering's band would take about n * 316^2 = 1e10.
+			await Assert.That(solver.FactorizationWork).IsLessThan(300_000_000L);
 		}
 	}
 }

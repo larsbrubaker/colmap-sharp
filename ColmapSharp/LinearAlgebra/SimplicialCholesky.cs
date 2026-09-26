@@ -97,6 +97,19 @@ public sealed class SimplicialCholesky
 	/// <summary>Stored entries of L, diagonal included (one per column), from the symbolic analysis.</summary>
 	public long NonZerosL => _n < 0 ? 0 : (long)_lColPtr[_n] + _n;
 
+	/// <summary>
+	/// Diagnostic for tests: list entries the AMD ordering visited in the last AnalyzePattern
+	/// (0 for the natural ordering). Load-independent, unlike wall-clock time.
+	/// </summary>
+	internal long OrderingWork { get; private set; }
+
+	/// <summary>
+	/// Diagnostic for tests: inner-loop steps of the last numeric factorization, one per
+	/// elimination-tree node visited while scattering a row and one per entry of L read while
+	/// updating it. Load-independent, unlike wall-clock time.
+	/// </summary>
+	internal long FactorizationWork { get; private set; }
+
 	/// <summary>Analyzes the pattern and factorizes (Eigen's compute()).</summary>
 	public SimplicialCholesky Compute(SparseMatrixCsc a)
 	{
@@ -127,10 +140,12 @@ public sealed class SimplicialCholesky
 		SparseMatrixCsc read = a.TriangularPart(_part);
 		if (_ordering == SparseOrdering.Amd)
 		{
-			_perm = AmdOrdering.Compute(read);
+			_perm = AmdOrdering.Compute(read, out long orderingWork);
+			OrderingWork = orderingWork;
 		}
 		else
 		{
+			OrderingWork = 0;
 			_perm = new int[n];
 			for (int k = 0; k < n; k++)
 			{
@@ -183,6 +198,7 @@ public sealed class SimplicialCholesky
 			}
 		}
 
+		FactorizationWork = 0;
 		_factorized = _kind == SimplicialCholeskyKind.LLT ? FactorizeLlt() : FactorizeLdlt();
 		Info = _factorized ? ComputationInfo.Success : ComputationInfo.NumericalIssue;
 		return _factorized;
@@ -385,6 +401,7 @@ public sealed class SimplicialCholesky
 			int len = 0;
 			for (; flag[i] != k; i = _parent[i])
 			{
+				FactorizationWork++;
 				stack[len++] = i;
 				flag[i] = k;
 			}
@@ -418,6 +435,7 @@ public sealed class SimplicialCholesky
 				double yj = y[j];
 				y[j] = 0.0;
 				int end = _lColPtr[j] + fill[j];
+				FactorizationWork += fill[j];
 				for (int p = _lColPtr[j]; p < end; p++)
 				{
 					y[_lRowIdx[p]] -= _lValues[p] * yj;
@@ -461,6 +479,7 @@ public sealed class SimplicialCholesky
 				double lkj = y[j] / _diag[j];
 				y[j] = 0.0;
 				int end = _lColPtr[j] + fill[j];
+				FactorizationWork += fill[j];
 				for (int p = _lColPtr[j]; p < end; p++)
 				{
 					y[_lRowIdx[p]] -= _lValues[p] * lkj;

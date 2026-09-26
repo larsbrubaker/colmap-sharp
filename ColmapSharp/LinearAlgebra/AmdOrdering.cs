@@ -43,7 +43,14 @@ public static class AmdOrdering
 	/// Fill-reducing ordering of the symmetric pattern A + A^T of a square matrix (diagonal
 	/// ignored). Returns perm with perm[k] = the original index eliminated k-th.
 	/// </summary>
-	public static int[] Compute(SparseMatrixCsc a)
+	public static int[] Compute(SparseMatrixCsc a) => Compute(a, out _);
+
+	/// <summary>
+	/// <see cref="Compute(SparseMatrixCsc)"/>, also returning the list entries the elimination
+	/// visited: a load-independent measure of its cost that tests bound to catch quadratic
+	/// behavior (a supervariable hash bucket or an element list that keeps growing).
+	/// </summary>
+	internal static int[] Compute(SparseMatrixCsc a, out long work)
 	{
 		if (a.Rows != a.Cols)
 		{
@@ -71,7 +78,7 @@ public static class AmdOrdering
 			}
 		}
 
-		return Compute(adjacency);
+		return Compute(adjacency, out work);
 	}
 
 	/// <summary>
@@ -79,7 +86,9 @@ public static class AmdOrdering
 	/// repeated edges are tolerated; an edge listed in one direction only counts both ways).
 	/// Returns perm with perm[k] = the node eliminated k-th.
 	/// </summary>
-	public static int[] Compute(IReadOnlyList<IReadOnlyList<int>> adjacency)
+	public static int[] Compute(IReadOnlyList<IReadOnlyList<int>> adjacency) => Compute(adjacency, out _);
+
+	private static int[] Compute(IReadOnlyList<IReadOnlyList<int>> adjacency, out long work)
 	{
 		int n = adjacency.Count;
 		var sets = new HashSet<int>[n];
@@ -114,7 +123,10 @@ public static class AmdOrdering
 			varAdj[i] = list;
 		}
 
-		return new State(varAdj).Run();
+		var state = new State(varAdj);
+		int[] perm = state.Run();
+		work = state.Work;
+		return perm;
 	}
 
 	private sealed class State
@@ -144,6 +156,9 @@ public static class AmdOrdering
 		private readonly int[] _cmpMark;
 		private int _stamp;
 		private int _cmpStamp;
+
+		// List entries visited, for Compute's work count.
+		public long Work { get; private set; }
 
 		public State(List<int>[] varAdj)
 		{
@@ -187,6 +202,7 @@ public static class AmdOrdering
 			{
 				while (_head[minDegree] < 0)
 				{
+					Work++;
 					minDegree++;
 				}
 
@@ -234,6 +250,7 @@ public static class AmdOrdering
 			lp.Clear();
 			_stamp++;
 			_mark[p] = _stamp;
+			Work += _elemAdj[p]!.Count + _varAdj[p]!.Count;
 			foreach (int e in _elemAdj[p]!)
 			{
 				if (_kind[e] != NodeKind.Element)
@@ -241,6 +258,7 @@ public static class AmdOrdering
 					continue;
 				}
 
+				Work += _elemVars[e]!.Count;
 				foreach (int v in _elemVars[e]!)
 				{
 					AddToPivotList(v, lp);
@@ -278,6 +296,7 @@ public static class AmdOrdering
 		{
 			foreach (int i in lp)
 			{
+				Work += _elemAdj[i]!.Count;
 				foreach (int e in _elemAdj[i]!)
 				{
 					if (_kind[e] != NodeKind.Element)
@@ -305,6 +324,7 @@ public static class AmdOrdering
 			foreach (int i in lp)
 			{
 				List<int> elems = _elemAdj[i]!;
+				Work += elems.Count + _varAdj[i]!.Count;
 				int kept = 0;
 				for (int t = 0; t < elems.Count; t++)
 				{
@@ -353,6 +373,7 @@ public static class AmdOrdering
 			for (int t = 0; t < lp.Count; t++)
 			{
 				int i = lp[t];
+				Work += _elemAdj[i]!.Count + _varAdj[i]!.Count;
 				long hash = 0;
 				foreach (int e in _elemAdj[i]!)
 				{
@@ -369,6 +390,7 @@ public static class AmdOrdering
 				{
 					foreach (int j in candidates)
 					{
+						Work++;
 						if (SameLists(i, j))
 						{
 							_weight[j] += _weight[i];
@@ -407,6 +429,8 @@ public static class AmdOrdering
 				return false;
 			}
 
+			Work += ei.Count + ai.Count + ej.Count + aj.Count;
+
 			// Element ids and variable ids share one index space, and a node is never both,
 			// so one mark pass over both lists of j compares the two sets at once.
 			_cmpStamp++;
@@ -442,6 +466,7 @@ public static class AmdOrdering
 		/// <summary>The paper's approximate external degree of variable i after eliminating p.</summary>
 		private int ApproximateDegree(int i, int p, int lpWeight, int remaining)
 		{
+			Work += _varAdj[i]!.Count + _elemAdj[i]!.Count;
 			int outsideI = lpWeight - _weight[i];
 			long bound3 = outsideI;
 			foreach (int v in _varAdj[i]!)

@@ -4,9 +4,12 @@
 // hands MinSTGraphCut millions of cells, each with terminal capacities. A version that stored
 // those as ordinary edges out of the terminal rescanned all of them after every augmentation
 // and went quadratic (160k nodes took over two minutes). This pins the fix: a 200k-node grid
-// with terminal capacities on every node must finish in a few seconds even in Debug.
-
-using System.Diagnostics;
+// with terminal capacities on every node must finish in work linear in its size.
+//
+// Work is counted, not timed: a wall-clock bound can fail under heavy machine load while the
+// code is fine. MinSTGraphCut.LastComputeWork (an internal diagnostic) counts every arc
+// examined while growing trees and adopting orphans and every parent link followed, so the
+// quadratic rescan shows up in it directly.
 
 using ColmapSharp.Mathematics;
 
@@ -60,9 +63,7 @@ public class MinSTGraphCutScalingTests
 			arcs.Add((b, a, backward));
 		}
 
-		var stopwatch = Stopwatch.StartNew();
 		var flow = graph.Compute();
-		stopwatch.Stop();
 
 		// The labels must describe a cut whose capacity is the flow (max-flow = min-cut).
 		double cutCapacity = 0;
@@ -81,9 +82,11 @@ public class MinSTGraphCutScalingTests
 
 		using (Assert.Multiple())
 		{
-			// Linear-ish behavior takes well under a second here; the quadratic version took
-			// minutes, so a generous bound stays robust on slow CI machines.
-			await Assert.That(stopwatch.Elapsed.TotalSeconds).IsLessThan(10.0);
+			// 6,210,545 steps measured, about 3.4 per node and edge (200,704 nodes; NumEdges is
+			// 1,603,840, counting reverses and terminal links), the same ratio as at a quarter
+			// and a sixteenth of the size. The quadratic version rescanned ~200k terminal links
+			// per augmentation, some 1e10 steps.
+			await Assert.That(graph.LastComputeWork).IsLessThan(10L * (graph.NumNodes + graph.NumEdges));
 			await Assert.That(Math.Abs(cutCapacity - flow)).IsLessThan(1e-3 * Math.Max(1.0, flow));
 		}
 	}
