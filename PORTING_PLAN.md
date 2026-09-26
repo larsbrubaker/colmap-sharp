@@ -22,32 +22,15 @@ only if exhaustive/sequential/spatial matching proves too slow for MatterCAD pho
 
 Each phase ends with its ported tests green. Test names follow COLMAP's.
 
-### Phase 0 — Scaffold and oracle
-- A first fixture script under `oracle/` that writes inputs and outputs to
-  `ColmapSharp.Tests/TestData/oracle/`, plus a C# test that reads them, to prove the
-  oracle loop end to end.
-
 ### Phase 1 — Math and linear algebra foundation
 - `LinearAlgebra/`: fixed-size `Vector2d/3d/4d`, `Matrix2d/3d/3x4d/4d`, `Quaterniond`,
   `AngleAxis`; dynamic `VectorXd`/`MatrixXd`; decompositions: Householder QR, Jacobi and
   Golub–Kahan SVD, symmetric eigen, LU with partial pivoting, LLᵀ/LDLᵀ. Written from
   textbook algorithms — **Eigen is MPL-2.0 and must not be transcribed.**
-- `Mathematics/` (COLMAP's `math/`): `random` (mt19937 + distributions, exact),
-  `polynomial` (companion-matrix and Durand–Kerner roots), `union_find`,
-  `connected_components`, `spanning_tree`, `graph_cut` (max-flow; COLMAP's own BSD code),
+- `Mathematics/` (COLMAP's `math/`):
+  `polynomial` (companion-matrix and Durand–Kerner roots),
   `matrix.h` helpers.
-- **Random targets libc++.** `oracle/probe_random.py` shows the pycolmap 4.2.0 wheel
-  (`cp314-macosx_14_0_arm64`) links `/usr/lib/libc++.1.dylib` and imports 333 `std::__1`
-  symbols and no `__cxx11`/`GLIBCXX` ones. pycolmap binds only `set_random_seed`, and
-  `RandomUniformInteger/Real/Gaussian` are header templates inlined into `_core`, so the
-  distributions are LLVM libc++'s: `uniform_int_distribution` via
-  `__independent_bits_engine` with rejection, `uniform_real_distribution` via
-  `generate_canonical`, `normal_distribution` via the Marsaglia polar method with a cached
-  second value. Port those from libc++'s `<__random/*>` headers (Apache-2.0 WITH
-  LLVM-exception: permissive, but add a `docs/LICENSE_AUDIT.md` row and a
-  `THIRD_PARTY_NOTICES.md` section in the same change) and say so in `Random.cs`. Oracle
-  fixtures that depend on the PRNG must come from the macOS wheel; the Linux manylinux
-  wheel uses libstdc++ and would give different numbers.
+- `random_eigen.h` + `random_eigen_test.cc`: needs the dynamic matrix types; port after them.
 - Tests: the remaining `math/*_test.cc`, plus C#-only decomposition tests against oracle
   fixtures (numpy in the oracle venv is fine for pure linear algebra checks).
 
@@ -119,6 +102,9 @@ the user can relate it to their photos; CGAL's AABB tree for occlusion is replac
 managed BVH written here).
 
 ### Phase 13 — Global and hierarchical mapping
+- `ComputeNormalizedMinGraphCut` (graph_cut.cc, METIS k-way) and its 4 graph_cut_test.cc
+  cases (`ComputeNormalizedMinGraphCut*`): only scene_clustering uses it. Port METIS
+  (Apache-2.0) or write a multilevel partitioner with FM refinement (a divergence entry).
 `sfm/global_mapper`, `controllers/global_pipeline`, `hierarchical_pipeline`,
 `rotation_averaging` controller.
 
