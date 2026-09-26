@@ -1,7 +1,8 @@
 // poisson_system_harness.cc: the system-assembly steps of PoissonRecon's
 // Poisson::Solver::Solve (thirdparty/PoissonRecon/Reconstructors.h, MIT, as vendored by
 // COLMAP 4.2.0) after finalizeForMultigrid: addFEMConstraints (the divergence of the normal
-// field, FEMTree.System.inl's _addFEMConstraints). Built and run by
+// field, FEMTree.System.inl's _addFEMConstraints) and addInterpolationConstraints
+// (_addInterpolationConstraints). Built and run by
 // oracle/fixture_poisson_tree.py, which writes ColmapSharp.Tests/TestData/oracle/poisson_system.json
 // (read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests.System.cs). Not part of any
 // build. The shared set-up and output format are in oracle/poisson_harness.h; the stages up to
@@ -133,6 +134,11 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input) {
   DenseNodeData<Real, Sigs> constraints = tree.initDenseNodeData(Sigs());
   tree.addFEMConstraints(F, *normalInfo, constraints, solveDepth);
   dump("femconstraints", constraints);
+
+  // Solve's point constraints (pointWeight > 0): addInterpolationConstraints( constraints ,
+  // solveDepth , iInfo ), on top of the FEM constraints.
+  tree.addInterpolationConstraints(constraints, solveDepth, std::make_tuple(iInfo));
+  dump("interpolationconstraints", constraints);
 
   delete normalInfo;
   delete iInfo;

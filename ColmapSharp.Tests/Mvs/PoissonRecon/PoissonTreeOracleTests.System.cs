@@ -2,7 +2,8 @@
 //
 // PoissonTreeOracleTests.System (C#-only, not a COLMAP test): the system assembly of
 // Poisson::Solver::Solve after finalizeForMultigrid - the normal-divergence constraints
-// (PoissonFemConstraints, with PoissonMultigrid's restriction and prolongation) - against the
+// (PoissonFemConstraints, with PoissonMultigrid's restriction and prolongation) and the point
+// interpolation constraints - against the
 // "system*" runs of oracle/poisson_system_harness.cc (TestData/oracle/poisson_system.json).
 // Tier A, bit-identical floats. Each run replays the harness's input through the stages the
 // other PoissonTreeOracleTests files check step by step, then compares the stages here.
@@ -27,7 +28,7 @@ public partial class PoissonTreeOracleTests
 	[Arguments("system5", 5)]
 	[Arguments("system6", 6)]
 	[Arguments("system8", 8)]
-	public async Task FemConstraints_MatchHarness(string name, int depth)
+	public async Task SystemConstraints_MatchHarness(string name, int depth)
 	{
 		JsonElement cases = OracleFixture.Load(SystemFixture).GetProperty("cases");
 		var produced = new Cases(name);
@@ -42,6 +43,10 @@ public partial class PoissonTreeOracleTests
 		var constraints = new float[sorted.Size];
 		PoissonFemConstraints.AddFemConstraints(tree, sorted, f, p.Normals, constraints, depth);
 		produced.F("femconstraints", constraints.Select(v => (double)v).ToList());
+
+		// Solve: addInterpolationConstraints( constraints , solveDepth , iInfo ).
+		PoissonFemConstraints.AddInterpolationConstraints(tree, sorted, p.Interpolation, constraints, depth);
+		produced.F("interpolationconstraints", constraints.Select(v => (double)v).ToList());
 		await Assert.That(CompareRun(cases, name, produced)).IsEqualTo(string.Empty);
 	}
 

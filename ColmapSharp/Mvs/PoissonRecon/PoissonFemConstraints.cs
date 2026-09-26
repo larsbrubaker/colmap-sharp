@@ -11,8 +11,11 @@
 // test functions around its parent (parent-child stencils), and the scattered values are
 // restricted further down with PoissonMultigrid.DownSample; coarser normals reach finer test
 // functions by prolonging the accumulated normal coefficients (PoissonMultigrid.UpSample) and
-// integrating them against each test node's parent neighbors (child-parent stencils). Tier A
-// against oracle/poisson_system_harness.cc (the "femconstraints" cases).
+// integrating them against each test node's parent neighbors (child-parent stencils). Then
+// the point-interpolation constraints (_addInterpolationConstraints): each interpolation
+// entry (PoissonInterpolation) adds its dual value times the test functions' values at its
+// position (BSplineData's point evaluation). Tier A against oracle/poisson_system_harness.cc
+// (the "femconstraints" and "interpolationconstraints" cases).
 //
 // Translation notes:
 // - The C++ runs each depth through ThreadPool::ParallelFor with atomic float adds into the
@@ -250,6 +253,88 @@ public static class PoissonFemConstraints
 			if (PoissonMultigrid.IsValidFem1Node(tree, node) && (tree.Flags(node) & FemTree.DirichletElementFlag) != 0)
 			{
 				constraints[i] *= 0f;
+			}
+		}
+	}
+
+	/// <summary>
+	/// Adds to <paramref name="constraints"/> the point-interpolation constraints: for every
+	/// valid space node at local depths 0..min(<paramref name="maxDepth"/>, tree max depth) with
+	/// an entry in <paramref name="interpolation"/> (PoissonInterpolation's layout), the entry's
+	/// dual value times each supporting degree-1 test function's value at the entry's position.
+	/// Port of <c>addInterpolationConstraints( constraints , maxDepth , iInfo )</c>
+	/// (_addInterpolationConstraints with PointD = 0 and PointEvaluator).
+	/// </summary>
+	public static void AddInterpolationConstraints(FemTree tree, SortedTreeNodes sorted, SparseNodeData interpolation, float[] constraints, int maxDepth)
+	{
+		PoissonMultigrid.SetFem1ValidityFlags(tree, sorted, TestSignature);
+		maxDepth = StdMinMax.StdMin(maxDepth, PoissonMultigrid.MaxDepth(tree));
+		var evaluator = new BSplineData(TestSignature, 0, maxDepth);
+		BSplineSupportSizes support = BSplineSupportSizes.For(FemSignature.Degree(TestSignature));
+		int leftPointRadius = support.SupportEnd;
+		int rightPointRadius = -support.SupportStart;
+		int width = support.SupportSize;
+		var neighbors = new int[width * width * width];
+		var pointOffset = new int[3];
+
+		// _oneDValues[axis][s + SupportEnd]: the value at the point of function pointOffset + s.
+		var values = new double[3, width];
+		for (int d = 0; d <= maxDepth; d++)
+		{
+			var neighborKey = new NeighborKey(tree, leftPointRadius, rightPointRadius, resetOnMissing: false);
+			neighborKey.Set(maxDepth + tree.DepthOffset);
+			SparseBSplineEvaluator bSplines = evaluator[d];
+			int end = PoissonMultigrid.End(tree, sorted, d);
+			for (int i = PoissonMultigrid.Begin(tree, sorted, d); i < end; i++)
+			{
+				int node = sorted.TreeNodes[i];
+				if (tree.IsGhost(node) || (tree.Flags(node) & FemTree.SpaceFlag) == 0)
+				{
+					continue;
+				}
+
+				neighborKey.GetNeighbors(leftPointRadius, rightPointRadius, node, neighbors);
+				int slot = interpolation.Index(tree.NodeIndex(node));
+				if (slot == -1)
+				{
+					continue;
+				}
+
+				// evaluator.initEvaluationState( p , d , off , eState ): the node's offset is the
+				// point offset, and each axis tabulates the functions around it at the float position.
+				for (int k = 0; k < 3; k++)
+				{
+					pointOffset[k] = tree.LocalOffset(node, k);
+					for (int s = -leftPointRadius; s <= rightPointRadius; s++)
+					{
+						double p = interpolation.Value(slot, k);
+						PoissonPolynomial[] components = bSplines.PolynomialsAndOffset(ref p, pointOffset[k], pointOffset[k] + s);
+						values[k, s + leftPointRadius] = components[0].Evaluate(p);
+					}
+				}
+
+				float dualValue = interpolation.Value(slot, 4);
+				for (int j = 0; j < neighbors.Length; j++)
+				{
+					int n = neighbors[j];
+					if (!PoissonMultigrid.IsValidFem1Node(tree, n) || (tree.Flags(n) & FemTree.DirichletElementFlag) != 0)
+					{
+						continue;
+					}
+
+					// PointEvaluatorState::value: v0 * ( v1 * ( v2 * 1. ) ), then (Real).
+					double value = 1.0;
+					for (int k = 2; k >= 0; k--)
+					{
+						int dOff = tree.LocalOffset(n, k) - pointOffset[k];
+						double v = dOff >= -support.SupportEnd && dOff <= -support.SupportStart ? values[k, dOff + support.SupportEnd] : 0;
+						value = v * value;
+					}
+
+					float dot = 0;
+					dot += dualValue * (float)value;
+					constraints[tree.NodeIndex(n)] += dot;
+				}
 			}
 		}
 	}
