@@ -40,8 +40,8 @@ Each phase ends with its ported tests green. Test names follow COLMAP's.
 `normalization`, `pose_prior`; `rigid3_matchers_test.cc`, `sim3_matchers_test.cc`.
 
 ### Phase 3 — Sensor
-`sensor/models` (all camera models; Tier A, bit-exact projection/unprojection, including the
-iterative undistortion), `rig`.
+`sensor/models_jacobian.h` (`ImgFromCamWithJac`, `CameraModelImgFromCamWithJac`,
+`CamRayFromImgJacobian`) + `models_jacobian_test.cc`; `rig`.
 
 Skipped `bitmap_test.cc` cases (the host decodes and encodes images, so OIIO file I/O is not
 ported; C# `Bitmap` is a reference type, so C++ move semantics have no counterpart):
@@ -81,6 +81,11 @@ Huber, soft-L1, Cauchy, Tolerant…), Levenberg–Marquardt trust region, Schur 
 dense and sparse Cholesky and iterative (PCG with Jacobi/Schur-Jacobi preconditioner) linear
 solvers, solver summary. Ported from Ceres (BSD-3, add its notice), subset only. This is the
 riskiest phase; validate against pycolmap BA on synthetic scenes (Tier C).
+Build on `Solver/Scalar.cs`'s `IScalar<T>` (camera models are already generic over it):
+`Jet<TGrad>` with `TGrad` an `[InlineArray(N)]` gradient struct exposing a static `Length`
+(no const generics in C#), `in` parameters for large N (benchmark N=6/9/15), Ceres's
+mixed scalar operators (`T*double`, `double/T`, … — not the same as `FromDouble(s) op x`),
+Exp/Log/Pow/Acos/Asin/Hypot/IsFinite/Min/Max, and generic k-th-variable seeding.
 
 ### Phase 8 — Bundle adjustment
 `estimators/bundle_adjustment*` (the non-GPU paths), `cost_functions/*`,
