@@ -25,13 +25,13 @@
 // when the QR iteration exceeds 30 iterations per eigenvalue. The input is divided by its
 // largest |entry| first and the eigenvalues multiplied back. Tier B.
 //
-// Complex-eigenvector phase: generalized_relative_pose.cc (GR6P/GR8P) reads V.real() of
-// every eigenvector of its 4x4, including those of complex eigenvalues, whose real part
-// depends on the phase. Ours is fixed by the back-substitution in EigenSolver.Vectors.cs
-// (the block's eigenvector starts as (b, lambda - a), then the vector is scaled to unit
-// norm without rotating its phase), which need not be Eigen's. Real eigenvalues are
-// unaffected (their vectors are real, and hnormalized() removes the scale and sign). A
-// divergence entry belongs with the GR6P port if its outputs for complex eigenvalues matter.
+// Complex-eigenvector phase: ours is fixed by the back-substitution in
+// EigenSolver.Vectors.cs (the block's eigenvector starts as (b, lambda - a), then the vector
+// is scaled to unit norm without rotating its phase), which need not be Eigen's. No COLMAP
+// caller can see it: GR8P (generalized_relative_pose.cc) reads V.real() of its 4x4 G, but G
+// is symmetric, so every eigenvalue is real, its vector is real, and hnormalized() removes
+// the scale and sign; GR6P's PoseLib solver uses eigenvalues only (see
+// Estimators/Solvers/GeneralizedRelativePose.GR8P.cs and PoseLib/GenRelpose6pt.cs).
 
 using System.Numerics;
 
