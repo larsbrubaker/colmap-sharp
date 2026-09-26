@@ -31,6 +31,15 @@ public class CheckTests
 	}
 
 	[Test]
+	public async Task Lt_FormatsDoublesWithSixSignificantDigits()
+	{
+		// An ostream's default precision is 6 significant digits, so glog prints 1.23457.
+		double x = 1.23456789;
+		var exception = Assert.Throws<ArgumentException>(() => Check.Lt(x, 1));
+		await Assert.That(exception.Message).Matches(@"^\[CheckTests\.cs:\d+\] Check failed: x < 1 \(1\.23457 vs\. 1\) $");
+	}
+
+	[Test]
 	public async Task Ops_PassAndFailLikeTheirOperators()
 	{
 		using (Assert.Multiple())

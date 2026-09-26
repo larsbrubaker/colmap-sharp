@@ -8,8 +8,15 @@
 // System.Math); random.h, polynomial.h, union_find.h and the graph helpers land next to it
 // as their own files. Tests: ColmapSharp.Tests/Mathematics/MathTests.cs (math_test.cc 1:1).
 //
-// Tier A (exact): everything here is scalar and deterministic, so results are
-// bit-identical to COLMAP for the same input.
+// Tier A (exact) for the integer and plain-arithmetic helpers: sign, clamp, degree/radian
+// conversion, mean/variance/stddev, NextCombination, NChooseK and TruncateCast are
+// bit-identical to COLMAP for the same input. Two exceptions:
+// - Sigmoid/ScaleSigmoid go through exp, which is the platform libm's in C++ and .NET's
+//   Math.Exp here; they can differ in the last ulp, so they are Tier B (math_test.cc
+//   compares them with a tolerance).
+// - Percentile/Median/MedianAbsoluteDeviation are exact for ordinary input, but with NaN
+//   in the data, or -0.0 and +0.0 tied at the selected rank, this quickselect may pick a
+//   different element than libc++'s nth_element (a NaN, or the other signed zero).
 //
 // Translation notes:
 // - C++ templates over arithmetic T become .NET generic math (INumber<T> and friends).
@@ -17,7 +24,8 @@
 //   float type COLMAP instantiates is the same value static_cast<double> gives.
 // - Percentile/Median reorder the span in place like COLMAP's std::nth_element does. The
 //   exact order left behind differs from libc++'s (it is unspecified there too); the
-//   returned value does not, because it depends only on the order statistics.
+//   returned value does not (NaN and signed-zero ties aside, above), because it depends
+//   only on the order statistics.
 // - THROW_CHECK* go through ColmapSharp.Util.Check, which reproduces COLMAP's messages.
 
 using System.Numerics;
@@ -266,9 +274,17 @@ public static class MathUtils
 	/// Cast value from one type to another and truncate instead of overflow, if the
 	/// input value is out of range of the output data type.
 	/// </summary>
+	/// <remarks>
+	/// Integer targets only. C++ clamps against std::numeric_limits&lt;T2&gt;::min(), which
+	/// for a floating-point T2 is the smallest positive normal (not the lowest value), so a
+	/// float target would clamp every negative input up to about 1e-38. .NET's MinValue is
+	/// the lowest value, so allowing float targets would silently diverge. Every COLMAP call
+	/// site is TruncateCast&lt;float, uint8_t&gt; (or another integer target), so the
+	/// constraint costs nothing and makes the divergence unrepresentable.
+	/// </remarks>
 	public static T2 TruncateCast<T1, T2>(T1 value)
 		where T1 : INumber<T1>
-		where T2 : INumber<T2>, IMinMaxValue<T2>
+		where T2 : IBinaryInteger<T2>, IMinMaxValue<T2>
 	{
 		// CreateTruncating is static_cast's semantics for every pairing COLMAP uses.
 		T1 max = T1.CreateTruncating(T2.MaxValue);
