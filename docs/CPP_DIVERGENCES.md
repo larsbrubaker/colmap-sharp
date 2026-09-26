@@ -3,6 +3,10 @@
 Each entry: what differs, why, and the evidence. Numbered so code comments can cite them
 (`docs/CPP_DIVERGENCES.md`, entry N). Remove an entry when the divergence is gone.
 
+Numbers are stable: an entry keeps its number for good, and a removed entry's number is not
+reused, so the gaps in the sequence are intentional. Never renumber, because code comments
+and open branches cite these numbers.
+
 ## 1. Real-valued random draws are not fused (no FMA), unlike the macOS pycolmap wheel
 
 **What differs.** `RandomUtils.RandomUniformReal` (for `min != 0`), `RandomGaussian` and
@@ -282,10 +286,10 @@ by key. Insertion order is deterministic on every platform. Every per-point corr
 list, `ExtractMatchesBetweenImages` and `ExtractTransitiveCorrespondences` are in COLMAP's
 order already (they come from vectors, not hash iteration).
 
-**Evidence.** `CorrespondenceGraphTests` (all 11 cases) pass. Code ported later that walks
-the pairs in this order (COLMAP's `PoseGraph::Load`, and through it the global mapper) will
-see them in load order; a pycolmap fixture for such a pipeline is then compared at Tier C,
-not Tier A.
+**Evidence.** `CorrespondenceGraphTests` (all 11 cases) pass. Code that walks the pairs in
+this order (`PoseGraph.Load` and `SceneClustering.Create`, and through the pose graph the
+global mapper once it is ported) sees them in load order; a pycolmap fixture for such a
+pipeline is then compared at Tier C, not Tier A.
 
 ## 15. ComputeBoundingBoxAndCentroid sorts instead of std::nth_element
 
@@ -510,12 +514,14 @@ problems, at least one model equal to the true F up to scale) pass 1:1.
 
 ## 25. Reconstruction text reading takes whole tokens; image names must be UTF-8
 
-**What differs.** Two things in `Scene/ReconstructionIO*.cs` and `Scene/CppLineTokens.cs`:
+**What differs.** Two things in `Scene/ReconstructionIO*.cs` and `Util/CppLineTokens.cs`:
 - *Tokens.* COLMAP's text readers extract values with libc++'s `istream >>`, which stops at
   the first character that cannot continue a number and leaves the rest for the next
   extraction: `"12abc"` read into an integer gives 12, and the next read sees `"abc"`.
   `CppLineTokens` takes whitespace-separated tokens whole, so `"12abc"` (or `"1.5"` read as an
-  integer) fails that read. Everything else follows libc++ as probed with a libc++ harness:
+  integer) fails that read. The other text readers built on `CppLineTokens` (SIFT feature
+  text, pair lists, the MVS workspace and PMVS files, ASCII PLY) take tokens the same way.
+  Everything else follows libc++ as probed with a libc++ harness:
   unsigned reads accept a leading `-` and wrap (`"-1"` is the maximum) and fail above the
   maximum; double reads accept decimal and hexadecimal floats (`"0x1p3"` = 8), reject `inf`
   and `nan`, and fail on overflow and on inexact underflow below the normal range (strtod's
@@ -650,7 +656,6 @@ agreeing to about 1e-10 across seeds; the port returns the same four poses to 1e
 (`Gp3pTests.CSharpOnly_MatchesPoseLibSolutionSet`, order-insensitive, since the order depends
 on R0). The 1:1 `GeneralizedAbsolutePoseTests.ParameterizedGP3PEstimatorTests_Nominal` cases
 pass with COLMAP's tolerances.
-each satisfies the original system to 1e-8. Not compared against C++ PoseLib.
 
 ## 30. The six-point focal relative pose solvers take their null space from unpivoted Householder QR
 
@@ -809,9 +814,10 @@ models with point counts 1, 2, 1, 2 and reads back sources 1, 3, 0, 2.
    (vectorized) `norm()`/`dot()` or per-thread partial sums.
 5. A non-positive-definite E'E or diagonal preconditioner block becomes NaN (the LM step is
    then invalid and the radius shrinks), where Eigen's LLT leaves unspecified values.
-6. Only the automatic elimination ordering is ported (one elimination group: the greedy
-   independent set, `ComputeStableSchurOrdering`); a user `ParameterBlockOrdering` with
-   several groups (only COLMAP's global positioner sets one) is not.
+6. With no user ordering or a single group, the elimination ordering is Ceres' automatic
+   one (the greedy independent set, `ComputeStableSchurOrdering`). A user
+   `ParameterBlockOrdering` with several groups (only COLMAP's global positioner sets one) is
+   applied as in Ceres, except for the order inside each group (entry 36).
 
 **Why.** CLAUDE.md's threading rule (sequential and parallel runs must give the same result;
 Ceres' multithreaded order is not reproducible anyway), and Eigen and SuiteSparse are
@@ -864,7 +870,7 @@ FAILURE and a message naming the problem.
 
 **Why.** 1. The in-place edit is a side effect on an input the caller may reuse (COLMAP
 rebuilds its ordering before every solve, so it never sees it). 2. CGNR is excluded from the
-port (PORTING_PLAN.md Phase 7); no COLMAP caller combines ITERATIVE_SCHUR with a user ordering. 3. A
+port (PORTING_PLAN.md, Skipped tests); no COLMAP caller combines ITERATIVE_SCHUR with a user ordering. 3. A
 library inside MatterCAD must not abort the host; the CHECK's condition is kept, only its
 consequence differs.
 
@@ -1084,7 +1090,7 @@ makes `Compute` fail, as in Ceres. The covariance is the same matrix up to round
 
 **Why.** SuiteSparseQR is GPL/LGPL and Eigen's sparse QR is MPL-2.0 (CLAUDE.md contract 2).
 COLMAP's covariance callers are single poses (plus a camera) against their observations, a
-few columns, where dense is exact enough and fast. The Phase 8 BA covariance
+few columns, where dense is exact enough and fast. The BA covariance
 (`estimators/covariance`) is COLMAP's own Schur-based code and does not use this.
 
 **Evidence.** `CovarianceTests` (the SPARSE_QR legs of Ceres' covariance_test.cc
@@ -1439,7 +1445,7 @@ name to the decoded image, and `Reconstruction.ExtractColorsForImage(imageId, bi
 the bitmap (converted to RGB like `Bitmap::Read(as_rgb=true)`). A null `ReadImage` or a null
 result behaves like COLMAP's failed read (the points stay black; COLMAP also logs a warning).
 
-**Why.** The library does not decode image files (the host does, Phase 3), and MatterCAD may
+**Why.** The library does not decode image files (the host does), and MatterCAD may
 hold the photos in memory rather than in a folder.
 
 **Evidence.** With the default (null) `ReadImage` the pipeline behaves like COLMAP's default

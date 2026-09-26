@@ -169,7 +169,7 @@ def main():
 
 
 def print_contraction_evidence(fixture):
-    """Evidence for docs/CPP_DIVERGENCES.md (camera models entry): the wheel's last-ulp
+    """Evidence for docs/CPP_DIVERGENCES.md entry 12: the wheel's last-ulp
     differences from ColmapSharp are FMA contraction. Re-derive two outputs with
     ColmapSharp's plain formula and with the multiply-adds fused, and count matches."""
     for case in fixture["cases"]:

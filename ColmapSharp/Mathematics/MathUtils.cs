@@ -47,7 +47,7 @@ public static class MathUtils
 
 	/// <summary>
 	/// Return 1 if number is positive (including 0), -1 if negative.
-	/// COLMAP leaves NaN undefined; here it returns -1.
+	/// NaN returns -1, as in COLMAP (val >= 0 is false for NaN).
 	/// </summary>
 	public static int SignOfNumber<T>(T val)
 		where T : INumber<T>
