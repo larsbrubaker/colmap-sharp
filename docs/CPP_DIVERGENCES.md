@@ -2421,14 +2421,16 @@ fixture exposes a 6x6 or dynamic product directly.
 the float overload (`logf`) of the platform libm. The port computes
 `(float)Math.Log((double)x)` (`PoissonSplat.LogF`). `Math.Log` is the host's libm as well, but
 its error is far below a float ulp, so the result is the correctly rounded float except when
-the exact logarithm lies within about 2^-29 relative of a float rounding boundary.
+the exact logarithm lies within about 2^-52 relative of a float rounding boundary (about 2^-29
+of a float ulp), where the double's own rounding can decide which way the float rounds.
 
 **Why.** .NET's `MathF.Log` maps to the host's `logf`, whose accuracy varies by platform and
 on browser-wasm; the rounded double logarithm gives the same float on every platform in all
 but those rare cases.
 
 **Evidence.** `PoissonTreeOracleTests.LogF_MatchesLibm`: over 4000 float arguments spanning
-2^-40..2^40, the result equals Apple's `logf` (the oracle's) bit for bit.
+2^-40..2^40 (`TestData/oracle/poisson_libm.json`, from `oracle/poisson_libm_harness.cc`), the
+result equals Apple's `logf` (the oracle's) bit for bit.
 
 ## 117. Bitmap interpolation treats points beyond int range and NaN as outside the image
 

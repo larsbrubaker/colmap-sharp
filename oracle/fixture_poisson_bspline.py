@@ -49,7 +49,7 @@ def parse(output):
             # (JSON has no literal for them); the C# reader accepts both forms.
             parsed = [finite_or_name(float.fromhex(v)) for v in values]
         elif kind == "c":
-            # A checksummed dump (see poisson_tree_harness.cc's PrintChunks).
+            # A checksummed dump (see poisson_harness.h's PrintChunks).
             parsed = {"count": int(values[0]), "float": values[1] == "1",
                       "chunks": [int(v) for v in values[2:]]}
         else:

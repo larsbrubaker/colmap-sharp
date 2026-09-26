@@ -12,9 +12,10 @@
 // of cbrt(x) is refined by one Newton step whose residual y0^3 - x is formed exactly in
 // double-double (Dekker's splitting product, no fused multiply-add), giving
 // cbrt(x) = y0 + c with |c| of order one ulp; x^-d = 1 - d ln(x) to far below an ulp. The
-// result is the single rounding of y0 + (c - y0 d ln x). Only an exact tie at half an ulp
-// could round differently from the true value, which does not occur for finite inputs short
-// of pathological cases.
+// result is the single rounding of y0 + (c - y0 d ln x). The terms carry errors of order
+// 2^-41 ulp (the double-rounded correction c, the ln x term and the dropped second-order
+// terms), so a true value within about 2^-41 ulp of a rounding midpoint could round the other
+// way; everywhere else the result is correctly rounded. pow(-0.0) returns +0, as C's pow does.
 
 namespace ColmapSharp.Mvs.PoissonRecon;
 
@@ -32,7 +33,13 @@ public static class PowOneThird
 			return double.NaN;
 		}
 
-		if (x == 0 || double.IsPositiveInfinity(x))
+		// pow( +-0 , y ) is +0 for y > 0 that is not an odd integer.
+		if (x == 0)
+		{
+			return 0.0;
+		}
+
+		if (double.IsPositiveInfinity(x))
 		{
 			return x;
 		}

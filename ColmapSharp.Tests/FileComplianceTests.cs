@@ -5,9 +5,10 @@
 // both repos enforce the same rule the same way. C#-only; not a COLMAP test.
 //
 // Differences from MatterCAD's copy: the root is found by walking up to ColmapSharp.sln
-// (not a fixed ../../.. from this file), scripts (.py, .sh) are measured as well as .cs,
-// and the excluded trees are this repo's: build output, the C++ reference checkout and the
-// oracle's Python venv.
+// (not a fixed ../../.. from this file), scripts (.py, .sh) and the oracle's C/C++ harnesses
+// (.c, .cc, .cpp, .h) are measured as well as .cs, and the excluded trees are this repo's:
+// build output, the C++ reference checkout and the oracle's Python venv. It also fails on
+// git conflict markers left in any text file (a merge once let them slip into a doc).
 
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -75,7 +76,34 @@ public class FileComplianceTests
 		".cs",
 		".py",
 		".sh",
+		".c",
+		".cc",
+		".cpp",
+		".h",
 	};
+
+	/// <summary>
+	/// Extensions scanned for git conflict markers: every text file kind the repo tracks.
+	/// </summary>
+	private static readonly HashSet<string> ConflictMarkerExtensions = new(IncludedExtensions, StringComparer.OrdinalIgnoreCase)
+	{
+		".md",
+		".json",
+		".txt",
+		".csproj",
+		".props",
+		".targets",
+		".sln",
+		".yml",
+		".yaml",
+		".gitignore",
+		".editorconfig",
+	};
+
+	// Built rather than written out, so this file does not itself contain the markers.
+	private static readonly string OursMarker = new string('<', 7) + " ";
+	private static readonly string SeparatorMarker = new string('=', 7);
+	private static readonly string TheirsMarker = new string('>', 7) + " ";
 
 	[Test]
 	public async Task AllFilesShouldComplyWithSizeLimits()
@@ -113,6 +141,53 @@ public class FileComplianceTests
 		}
 
 		await Assert.That(files.Count).IsGreaterThan(0);
+	}
+
+	[Test]
+	public async Task NoFileContainsConflictMarkers()
+	{
+		var projectRoot = ResolveProjectRoot();
+		var violations = new List<string>();
+		foreach (var filePath in GetAllProjectFiles(projectRoot, ConflictMarkerExtensions))
+		{
+			foreach (var line in FindConflictMarkers(filePath))
+			{
+				violations.Add($"  {GetRelativePath(projectRoot, filePath)}:{line}");
+			}
+		}
+
+		if (violations.Count > 0)
+		{
+			Assert.Fail("Git conflict markers found - resolve the merge in these files:" + Environment.NewLine + string.Join(Environment.NewLine, violations));
+		}
+
+		await Assert.That(violations.Count).IsEqualTo(0);
+	}
+
+	[Test]
+	public async Task ConflictMarkerScanFindsEachMarkerKind()
+	{
+		var root = CreateScratchRoot();
+		try
+		{
+			var path = Path.Combine(root, "docs", "Merged.md");
+			Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+			File.WriteAllLines(path, ["# Title", OursMarker + "HEAD", "ours", SeparatorMarker, "theirs", TheirsMarker + "branch", "======== not a marker", "text <<<<<<< inline"]);
+			WriteSourceFile(Path.Combine(root, "cpp-reference", "Upstream.md"));
+			File.AppendAllText(Path.Combine(root, "cpp-reference", "Upstream.md"), SeparatorMarker + Environment.NewLine);
+
+			var files = GetAllProjectFiles(root, ConflictMarkerExtensions);
+
+			using (Assert.Multiple())
+			{
+				await Assert.That(FindConflictMarkers(path)).IsEquivalentTo(new List<int> { 2, 4, 6 });
+				await Assert.That(files.Select(f => Path.GetFileName(f)).ToList()).IsEquivalentTo(new List<string> { "Merged.md" });
+			}
+		}
+		finally
+		{
+			Directory.Delete(root, true);
+		}
 	}
 
 	[Test]
@@ -180,6 +255,12 @@ public class FileComplianceTests
 		{
 			WriteSourceFile(Path.Combine(root, "Kept.cs"));
 			WriteSourceFile(Path.Combine(root, "oracle", "Kept.py"));
+			WriteSourceFile(Path.Combine(root, "oracle", "Harness.cc"));
+			WriteSourceFile(Path.Combine(root, "oracle", "Harness.h"));
+			WriteSourceFile(Path.Combine(root, "oracle", "Harness.c"));
+			WriteSourceFile(Path.Combine(root, "oracle", "Harness.cpp"));
+			WriteSourceFile(Path.Combine(root, "cpp-reference", "src", "Reference.cc"));
+			WriteSourceFile(Path.Combine(root, "docs", "NotMeasured.md"));
 			WriteSourceFile(Path.Combine(root, "cpp-reference", "src", "Reference.cs"));
 			WriteSourceFile(Path.Combine(root, "oracle", ".venv", "lib", "Vendored.py"));
 			WriteSourceFile(Path.Combine(root, "obj", "Generated.cs"));
@@ -187,7 +268,7 @@ public class FileComplianceTests
 			var files = GetAllProjectFiles(root);
 
 			await Assert.That(files.Select(f => Path.GetFileName(f)).OrderBy(f => f, StringComparer.Ordinal).ToList())
-				.IsEquivalentTo(new List<string> { "Kept.cs", "Kept.py" });
+				.IsEquivalentTo(new List<string> { "Harness.c", "Harness.cc", "Harness.cpp", "Harness.h", "Kept.cs", "Kept.py" });
 		}
 		finally
 		{
@@ -284,14 +365,38 @@ public class FileComplianceTests
 	/// <summary>
 	/// Get all relevant project files for testing.
 	/// </summary>
-	private static List<string> GetAllProjectFiles(string projectRoot)
+	private static List<string> GetAllProjectFiles(string projectRoot) => GetAllProjectFiles(projectRoot, IncludedExtensions);
+
+	private static List<string> GetAllProjectFiles(string projectRoot, HashSet<string> extensions)
 	{
 		var files = new List<string>();
-		ScanDirectory(projectRoot, projectRoot, files);
+		ScanDirectory(projectRoot, projectRoot, files, extensions);
 		return files;
 	}
 
-	private static void ScanDirectory(string projectRoot, string directory, List<string> files)
+	/// <summary>
+	/// The 1-based line numbers holding a git conflict marker: a line starting with seven '&lt;'
+	/// or '&gt;' and a space, or a line of exactly seven '='.
+	/// </summary>
+	private static List<int> FindConflictMarkers(string filePath)
+	{
+		var found = new List<int>();
+		var lines = File.ReadAllLines(filePath);
+		for (int i = 0; i < lines.Length; i++)
+		{
+			var line = lines[i];
+			if (line.StartsWith(OursMarker, StringComparison.Ordinal) || line.StartsWith(TheirsMarker, StringComparison.Ordinal) || line == SeparatorMarker)
+			{
+				found.Add(i + 1);
+			}
+		}
+
+		return found;
+	}
+
+	private static void ScanDirectory(string projectRoot, string directory, List<string> files) => ScanDirectory(projectRoot, directory, files, IncludedExtensions);
+
+	private static void ScanDirectory(string projectRoot, string directory, List<string> files, HashSet<string> extensions)
 	{
 		// Skip excluded directories
 		if (IsExcludedDirectory(projectRoot, directory))
@@ -305,7 +410,7 @@ public class FileComplianceTests
 			foreach (var file in Directory.GetFiles(directory))
 			{
 				var extension = Path.GetExtension(file);
-				if (IncludedExtensions.Contains(extension))
+				if (extensions.Contains(extension))
 				{
 					files.Add(file);
 				}
@@ -314,7 +419,7 @@ public class FileComplianceTests
 			// Recurse into subdirectories
 			foreach (var subDir in Directory.GetDirectories(directory))
 			{
-				ScanDirectory(projectRoot, subDir, files);
+				ScanDirectory(projectRoot, subDir, files, extensions);
 			}
 		}
 		catch (UnauthorizedAccessException)

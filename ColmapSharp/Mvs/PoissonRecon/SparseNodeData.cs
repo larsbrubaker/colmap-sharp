@@ -86,6 +86,27 @@ public class SparseNodeData
 		return slot;
 	}
 
+	/// <summary>
+	/// Re-keys the entries after nodes were renumbered: new index i takes the entry of old index
+	/// map[i] (none when map[i] is -1 or beyond the old map), for new indices below
+	/// <paramref name="newNodeCount"/>. The packed values are not moved. Port of
+	/// <c>SparseNodeData::_remapIndices( oldNodeIndices , newNodeCount )</c>.
+	/// </summary>
+	public void RemapIndices(ReadOnlySpan<int> map, int newNodeCount)
+	{
+		var newIndices = new int[newNodeCount];
+		for (int i = 0; i < newNodeCount; i++)
+		{
+			newIndices[i] = -1;
+			if (map[i] != -1 && map[i] < indices.Length)
+			{
+				newIndices[i] = indices[map[i]];
+			}
+		}
+
+		indices = newIndices;
+	}
+
 	/// <summary>The k-th float of an entry.</summary>
 	public ref float Value(int slot, int k = 0) => ref data[slot * Width + k];
 }

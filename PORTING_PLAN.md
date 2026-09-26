@@ -27,8 +27,11 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
 `MeshTextureMapping`'s result into a textured mesh.
 
 ### Phase 12 — Dense reconstruction (MVS)
-- `poisson_meshing`: PoissonRecon port in progress (slices 3–8: weighted samples, finalize,
-  FEM system, solver, level set, trimmer + public API + `poisson_meshing_test.cc`).
+- `poisson_meshing`: PoissonRecon port in progress. Done: B-splines, octree, density,
+  splatting, finalize, interpolation info, FEM constraint/system integrators and
+  restriction/prolongation. Remaining: addFEMConstraints, addInterpolationConstraints, system
+  matrix rows with prolongation, the multigrid solver, level-set extraction, the trimmer, the
+  public API and `poisson_meshing_test.cc`.
 
 ### Verification
 - End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us (also the

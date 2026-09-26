@@ -6,12 +6,17 @@
 // accumulation, with and without confidence weights), FemTree (shape, offsets, node indices,
 // resetNodeIndices, pruned traversal), NeighborKey (const, resetting and creating keys, child
 // windows, cache invalidation across node creation), SortedTreeNodes, PoissonDensity and
-// PoissonSplat (the normal field with its depth/weight sums, and the color field) -
-// against TestData/oracle/poisson_tree.json, which oracle/fixture_poisson_tree.py records from
-// oracle/poisson_tree_harness.cc (the vendored PoissonRecon built with -ffp-contract=off).
+// PoissonSplat (the normal field with its depth/weight sums, and the color field),
+// PoissonInterpolation (the point-interpolation constraints) and
+// PoissonFinalize (re-rooting, full depth, refinement, ghost marking, clipping) -
+// against TestData/oracle/poisson_tree.json (and poisson_libm.json for pow and logf), which
+// oracle/fixture_poisson_tree.py records from oracle/poisson_tree_harness.cc (and
+// poisson_libm_harness.cc), the vendored PoissonRecon built with -ffp-contract=off.
 // Tier A: integers equal, floats bit-identical, and each value's kind (integer or float) as
 // the harness printed it. Dumps longer than 1024 values are stored as checksums of 256-value
 // chunks (the harness's PrintChunks); a mismatch there reports the first differing chunk.
+// This file holds the tree-stage tests and the shared helpers; the density, splat,
+// interpolation and finalize stages are in PoissonTreeOracleTests.Stages.cs.
 //
 // The harness generates its input points (a noisy ellipsoid shell with some zero, non-finite
 // and coincident samples) and prints them as each run's "input" case, so this test replays
@@ -28,9 +33,12 @@ using TUnit.Core;
 
 namespace ColmapSharp.Tests.Mvs.PoissonRecon;
 
-public class PoissonTreeOracleTests
+public partial class PoissonTreeOracleTests
 {
 	private const string Fixture = "poisson_tree.json";
+
+	// oracle/poisson_libm_harness.cc's pow and logf tables.
+	private const string LibmFixture = "poisson_libm.json";
 
 	// The harness checksums long dumps in chunks of this many values (PrintChunks).
 	private const int ChunkSize = 256;
@@ -48,37 +56,6 @@ public class PoissonTreeOracleTests
 	}
 
 	[Test]
-	[Arguments("density5", 5)]
-	[Arguments("density3", 3)]
-	[Arguments("density6", 6)]
-	public async Task DensityStage_MatchesHarness(string name, int depth)
-	{
-		var produced = new Cases(name);
-		JsonElement cases = OracleFixture.Load(Fixture).GetProperty("cases");
-		PoissonSampleSet set = Build(cases.GetProperty(name + "/input"), depth, confidence: false, out PoissonSolutionParameters parameters);
-		FemTree tree = set.Tree;
-		tree.ResetNodeIndices(0);
-		int nodesBefore = tree.NodeCount;
-
-		// Solve: setDensityEstimator< 1 , Reconstructor::WeightDegree >( samples , kernelDepth , samplesPerNode ).
-		DensityEstimator density = PoissonDensity.SetDensityEstimator(set, 1, 2, (int)parameters.KernelDepth, parameters.SamplesPerNode);
-
-		produced.F("density", DumpField(tree, density, 1));
-		produced.I("densitytree", DumpTree(tree));
-		produced.I("densityinfo", [density.Count, density.KernelDepth, density.CoDimension, nodesBefore, tree.NodeCount]);
-
-		// Solve: the normal field (then negated) and the color field (then scaled per level).
-		SparseNodeData normals = PoissonSplat.SetNormalField(set, density, (int)parameters.BaseDepth, (int)parameters.Depth, parameters.LowDepthCutOff, out var pointDepthAndWeight);
-		produced.F("normals", DumpField(tree, normals, 3));
-		produced.F("pointdepthandweight", [pointDepthAndWeight.DepthSum, pointDepthAndWeight.WeightSum, pointDepthAndWeight.TotalWeight]);
-		produced.I("normaltree", DumpTree(tree));
-		SparseNodeData colors = PoissonSplat.SetAuxField(set, parameters.PerLevelDataScaleFactor);
-		produced.F("colors", DumpField(tree, colors, 4));
-		produced.I("splatinfo", [normals.Count, colors.Count, tree.NodeCount]);
-		await Assert.That(CompareRun(cases, name, produced)).IsEqualTo(string.Empty);
-	}
-
-	[Test]
 	public async Task ConfidenceWeights_MatchHarness()
 	{
 		const string name = "confidence3";
@@ -92,7 +69,7 @@ public class PoissonTreeOracleTests
 	[Test]
 	public async Task PowOneThird_IsCorrectlyRoundedAndMatchesLibmWhereLibmIs()
 	{
-		JsonElement cases = OracleFixture.Load(Fixture).GetProperty("cases");
+		JsonElement cases = OracleFixture.Load(LibmFixture).GetProperty("cases");
 		double[] xs = cases.GetProperty("powonethird/x").EnumerateArray().Select(ReadDouble).ToArray();
 		double[] libm = cases.GetProperty("powonethird/y").EnumerateArray().Select(ReadDouble).ToArray();
 		double[] correct = cases.GetProperty("powonethird/correct").EnumerateArray().Select(ReadDouble).ToArray();
@@ -119,9 +96,39 @@ public class PoissonTreeOracleTests
 	}
 
 	[Test]
+	public async Task SubTreeScope_ZeroesTheDepthOffsetWhileActive()
+	{
+		// FEMTree::SubTreeExtractor sets _depthOffset to 0 for its lifetime and restores it.
+		var tree = new FemTree();
+		int offsetInside;
+		int localDepthInside;
+		using (tree.ExtractSubTree(tree.SpaceRoot))
+		{
+			offsetInside = tree.DepthOffset;
+			localDepthInside = tree.LocalDepth(tree.SpaceRoot);
+		}
+
+		using (Assert.Multiple())
+		{
+			await Assert.That(offsetInside).IsEqualTo(0);
+			await Assert.That(localDepthInside).IsEqualTo(0);
+			await Assert.That(tree.DepthOffset).IsEqualTo(1);
+			await Assert.That(tree.LocalDepth(tree.SpaceRoot)).IsEqualTo(0);
+		}
+	}
+
+	[Test]
+	public async Task PowOneThird_OfNegativeZero_IsPositiveZero()
+	{
+		// C's pow( -0.0 , y ) is +0 for y > 0 that is not an odd integer.
+		double result = PowOneThird.Pow(-0.0);
+		await Assert.That(BitConverter.DoubleToInt64Bits(result)).IsEqualTo(0L);
+	}
+
+	[Test]
 	public async Task LogF_MatchesLibm()
 	{
-		JsonElement cases = OracleFixture.Load(Fixture).GetProperty("cases");
+		JsonElement cases = OracleFixture.Load(LibmFixture).GetProperty("cases");
 		double[] xs = cases.GetProperty("logf/x").EnumerateArray().Select(ReadDouble).ToArray();
 		var produced = new Cases("logf");
 		produced.F("y", xs.Select(x => (double)PoissonSplat.LogF((float)x)).ToList());
@@ -397,6 +404,13 @@ public class PoissonTreeOracleTests
 		}
 
 		return null;
+	}
+
+	private static List<double> DumpFlags(FemTree tree)
+	{
+		var values = new List<double>();
+		tree.ProcessNodes(tree.Root, node => values.Add(tree.Flags(node)));
+		return values;
 	}
 
 	private static List<double> DumpTree(FemTree tree)

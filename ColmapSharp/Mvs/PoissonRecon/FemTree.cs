@@ -20,13 +20,15 @@
 // Translation notes:
 // - FEMTree's constructor creates the global root (index 0) and its brood (indices 1..8);
 //   the unit cube is the root's last child (depth offset 1), so a node's depth here is its
-//   global depth and the local (unit-cube) depth is Depth - 1. Point insertion temporarily
-//   renumbers the space root's subtree to depth 0 / offset 0 (FEMTreeNode::SubTreeExtractor)
-//   and restores it afterwards; PoissonSampleSet does exactly that.
+//   global depth and the local (unit-cube) depth is Depth - DepthOffset (LocalDepth).
+//   Finalizing re-roots the tree (AddRootLevel, Init), raising the depth offset. The stages
+//   before it temporarily renumber the space root's subtree to depth 0 / offset 0
+//   (ExtractSubTree, FEMTreeNode::SubTreeExtractor) and restore it afterwards.
 // - processNodes is recursive in the C++; here it is too (the recursion depth is the tree
 //   depth, at most ~20), with the same "visit, then descend if the functor returned true"
 //   order.
-// - Nodes are never deleted in the stages ported so far (pruning lands with finalize).
+// - Nodes are never deleted: pruning marks the parents of pruned broods as ghosts
+//   (SetGhostFlag), as the C++ does.
 
 namespace ColmapSharp.Mvs.PoissonRecon;
 
@@ -88,20 +90,125 @@ public sealed class FemTree
 		parent[Root] = None;
 		nodeIndex[Root] = NodeCount++;
 		InitChildren(Root);
-		ResetDepthAndOffset(Root, 0, 0, 0, 0);
-
-		// The depth offset is 1: the space root is the root's last child.
-		SpaceRoot = firstChild[Root] + ChildCount - 1;
+		DepthOffset = 1;
+		Init();
 	}
 
 	/// <summary>The global root (FEMTree::_tree).</summary>
 	public int Root { get; }
 
 	/// <summary>The node covering the unit cube (FEMTree::spaceRoot).</summary>
-	public int SpaceRoot { get; }
+	public int SpaceRoot { get; private set; }
 
-	/// <summary>How many levels the space root sits below the global root (FEMTree::_depthOffset).</summary>
-	public int DepthOffset => 1;
+	/// <summary>
+	/// How many levels the space root sits below the global root (FEMTree::_depthOffset): 1
+	/// after construction, larger once finalizing re-roots the tree (<see cref="AddRootLevel"/>).
+	/// </summary>
+	public int DepthOffset { get; private set; }
+
+	/// <summary>
+	/// The offset of the unit cube's first cell at a local depth within the global grid. Port of
+	/// <c>FEMTree::_localInset</c>.
+	/// </summary>
+	public int LocalInset(int localDepth) => DepthOffset == 0 ? 0 : 1 << (localDepth + DepthOffset - 1);
+
+	/// <summary>The node's depth below the unit cube (negative above it). Port of <c>_localDepth</c>.</summary>
+	public int LocalDepth(int node) => depth[node] - DepthOffset;
+
+	/// <summary>
+	/// The node's offset along axis d within the unit cube's grid at its local depth, or -1
+	/// for nodes above the cube. Port of <c>_localDepthAndOffset</c>.
+	/// </summary>
+	public int LocalOffset(int node, int d)
+	{
+		int localDepth = depth[node] - DepthOffset;
+		return localDepth < 0 ? -1 : offsets[3 * node + d] - LocalInset(localDepth);
+	}
+
+	/// <summary>
+	/// Inserts a new brood between the global root and its children, so the old children hang
+	/// off the new brood's last node and the unit cube moves one level down, and increments the
+	/// depth offset. The old last child's children move to the old first child. Port of the
+	/// re-rooting loop body of <c>_finalizeForMultigrid</c> (with <c>NewBrood</c>).
+	/// </summary>
+	public void AddRootLevel()
+	{
+		int oldChildren = firstChild[Root];
+		if (oldChildren == None)
+		{
+			throw new InvalidOperationException("Expected children");
+		}
+
+		// NewBrood: numbered in child order; depth and offsets are reset by Init below.
+		int newChildren = Allocate(ChildCount);
+		for (int idx = 0; idx < ChildCount; idx++)
+		{
+			int child = newChildren + idx;
+			firstChild[child] = None;
+			nodeIndex[child] = NodeCount++;
+			flags[child] = 0;
+		}
+
+		int last = oldChildren + ChildCount - 1;
+		if (firstChild[last] != None)
+		{
+			for (int c = 0; c < ChildCount; c++)
+			{
+				parent[firstChild[last] + c] = oldChildren;
+			}
+
+			firstChild[oldChildren] = firstChild[last];
+			firstChild[last] = None;
+		}
+
+		for (int c = 0; c < ChildCount; c++)
+		{
+			parent[oldChildren + c] = newChildren + ChildCount - 1;
+		}
+
+		firstChild[newChildren + ChildCount - 1] = oldChildren;
+		for (int c = 0; c < ChildCount; c++)
+		{
+			parent[newChildren + c] = Root;
+		}
+
+		firstChild[Root] = newChildren;
+		DepthOffset++;
+	}
+
+	/// <summary>
+	/// Renumbers depths and offsets from the global root and finds the space root: the root's
+	/// last child, then first children down to the depth offset. Port of <c>FEMTree::_init</c>.
+	/// </summary>
+	public void Init()
+	{
+		ResetDepthAndOffset(Root, 0, 0, 0, 0);
+		int spaceRoot = Root;
+		for (int d = 0; d < DepthOffset; d++)
+		{
+			if (firstChild[spaceRoot] == None)
+			{
+				throw new InvalidOperationException($"Expected child node: {d} / {DepthOffset}");
+			}
+
+			spaceRoot = d == 0 ? firstChild[spaceRoot] + ChildCount - 1 : firstChild[spaceRoot];
+		}
+
+		SpaceRoot = spaceRoot;
+	}
+
+	/// <summary>
+	/// Sets or clears the ghost flag of the node's parent (children of a ghost are pruned).
+	/// Port of <c>SetGhostFlag&lt;Dim&gt;( node , flag )</c>.
+	/// </summary>
+	public void SetGhostFlag(int node, bool flag)
+	{
+		if (node != None && parent[node] != None)
+		{
+			int p = parent[node];
+			flags[p] = flag ? (byte)(flags[p] | GhostFlag) : (byte)(flags[p] & ~GhostFlag);
+		}
+	}
 
 	/// <summary>The next node index to hand out (FEMTree::_nodeCount).</summary>
 	public int NodeCount { get; private set; }
@@ -233,7 +340,7 @@ public sealed class FemTree
 
 	/// <summary>
 	/// Makes <paramref name="node"/> look like a root until the returned scope is disposed: no
-	/// parent, depth 0, offset 0, its subtree renumbered to match. Port of
+	/// parent, depth 0, offset 0, its subtree renumbered to match, and a depth offset of 0. Port of
 	/// <c>FEMTree::SubTreeExtractor</c> (and <c>RegularTreeNode::SubTreeExtractor</c>), which
 	/// every FEMTree stage wraps around its work on the space root, so depths inside are local
 	/// (unit-cube) depths and neighbor windows stop at the cube's faces.
@@ -250,6 +357,7 @@ public sealed class FemTree
 		private readonly int savedX;
 		private readonly int savedY;
 		private readonly int savedZ;
+		private readonly int savedDepthOffset;
 
 		internal SubTreeScope(FemTree tree, int node)
 		{
@@ -260,8 +368,13 @@ public sealed class FemTree
 			savedX = tree.offsets[3 * node];
 			savedY = tree.offsets[3 * node + 1];
 			savedZ = tree.offsets[3 * node + 2];
+			savedDepthOffset = tree.DepthOffset;
 			tree.parent[node] = None;
 			tree.ResetDepthAndOffset(node, 0, 0, 0, 0);
+
+			// FEMTree::SubTreeExtractor zeroes the depth offset too, so local depths are the
+			// extracted subtree's depths.
+			tree.DepthOffset = 0;
 		}
 
 		/// <summary>Restores the node's parent, depth and offset (and its subtree's).</summary>
@@ -269,6 +382,7 @@ public sealed class FemTree
 		{
 			tree.ResetDepthAndOffset(node, savedDepth, savedX, savedY, savedZ);
 			tree.parent[node] = savedParent;
+			tree.DepthOffset = savedDepthOffset;
 		}
 	}
 
