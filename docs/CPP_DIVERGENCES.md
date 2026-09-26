@@ -386,3 +386,28 @@ same way.
 
 **Evidence.** `CameraTests.Camera_ParamsFromString` and `Camera_ParamsToString` pass 1:1,
 which read and write parameter lists in exactly the notation both parsers agree on.
+
+## 21. Reconstruction iterates its objects in ascending id order
+
+**What differs.** COLMAP's `Reconstruction` keeps rigs, cameras, frames, images and 3D points
+in `NodeHashMap`s, whose iteration order is unspecified (it depends on the hash-map backend
+and its history). `Scene/Reconstruction*.cs` keeps them in `Util/IdMap.cs`, which iterates
+in ascending id order. Where that order reaches an output, the result can differ from a
+given COLMAP build:
+- `Crop` hands out new 3D point ids in the order it visits the old points (here: ascending
+  old id), and registers the copied frames in frame-id order, so `RegFrameIds` of a cropped
+  reconstruction is ascending.
+- `FindImageWithName` returns the smallest-id image when several share a name.
+- `Rigs`/`Cameras`/`Frames`/`Images`/`Points3D` enumerate in ascending id order for every
+  caller (later ports that iterate them inherit this order).
+`RegFrameIds` itself is COLMAP's vector in registration order, unchanged. (The centroid of
+`Normalize`/`ComputeCentroid` differs separately, by summation order: entry 15.)
+
+**Why.** CLAUDE.md requires deterministic iteration. COLMAP relies on no particular order
+(its tests only use order-free properties), so ascending id is the natural deterministic
+choice and needs no extra state.
+
+**Evidence.** All ported `ReconstructionTests` (`Crop`, `Normalize`,
+`ComputeBoundsAndCentroid`, ...) pass with COLMAP's expectations;
+`ReconstructionTests.CSharpOnly_IterationIsInAscendingIdOrder` and `IdMapTests` pin the
+order.

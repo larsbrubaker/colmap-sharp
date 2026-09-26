@@ -126,6 +126,18 @@ public sealed class Rig : IEquatable<Rig>
 	/// <summary>Clears a non-reference sensor's sensor_from_rig transform.</summary>
 	public void ResetSensorFromRig(SensorId sensorId) => SetSensorFromRig(sensorId, null);
 
+	/// <summary>A copy (C++ copy construction): same id, reference sensor and transforms.</summary>
+	public Rig Clone()
+	{
+		var copy = new Rig { RigId = RigId, RefSensorId = RefSensorId };
+		foreach (var (sensorId, sensorFromRig) in _sensorsFromRig)
+		{
+			copy._sensorsFromRig.Add(sensorId, sensorFromRig);
+		}
+
+		return copy;
+	}
+
 	/// <summary>The C++ operator==: same id, reference sensor and transforms (exact).</summary>
 	public bool Equals(Rig? other)
 	{

@@ -36,7 +36,13 @@ resize (Apache-2.0) would make it exact if a fixture ever needs that.
 ### Phase 4 — Scene
 `rig` (scene/rig: `ReadRigConfig`/`ApplyRigConfig` + `rig_test.cc`; needs database,
 reconstruction and synthetic), `pose_graph` (+ `pose_graph_test.cc`; its component functions take a
-`Reconstruction`), `reconstruction`, `reconstruction_io` (COLMAP binary and text
+`Reconstruction`), `reconstruction` remainder (`Load`, `TranscribeImageIdsToDatabase`,
+Read/Write*, ConvertToPLY/ImportPLY, ExtractColors*; deferred `reconstruction_test.cc` cases
+ConstructCopy, AssignCopy, Print, SetRigsAndFramesResetsNumRegImages,
+DeleteAllPoints2DAndPoints3D, TearDown, SetRigsAndFrames, TranscribeImageIdsToDatabase,
+ConvertToPLY, ImportPLYFromVector, ReadWriteTextRoundtrip, ReadWriteBinaryRoundtrip,
+ReadAutoDetectFormat, ExtractColorsForAllImages; `reconstruction_matchers_test.cc` Eq/Near;
+add an IdMap test that reaches `Compact()`), `reconstruction_io` (COLMAP binary and text
 formats, so pycolmap-written models become fixtures), `reconstruction_manager`,
 `reconstruction_pruning`, `synthetic` (the synthetic dataset generator that most downstream
 tests use), `database` (in-memory store with COLMAP's API), `database_cache`,

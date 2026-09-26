@@ -37,6 +37,14 @@ public readonly struct AlignedBox3d : IEquatable<AlignedBox3d>
 		Max = max;
 	}
 
+	/// <summary>
+	/// Whether the point lies in the box, borders included: Eigen's contains(p), min &lt;= p
+	/// and p &lt;= max coefficient-wise (so a NaN coordinate is never contained).
+	/// </summary>
+	public bool Contains(Vector3d point) =>
+		Min.X <= point.X && Min.Y <= point.Y && Min.Z <= point.Z
+		&& point.X <= Max.X && point.Y <= Max.Y && point.Z <= Max.Z;
+
 	/// <summary>max - min, Eigen's diagonal().</summary>
 	public Vector3d Diagonal() => Max - Min;
 
