@@ -60,7 +60,8 @@ Open: `essential_matrix` (5-pt via PoseLib relpose_5pt, >5-pt poly solver, 8-pt,
 Sampson refiner), `generalized_absolute_pose` (GP3P; reuses PoseLib p3p/re3q3/sturm),
 `relpose_shared_focal`, `relpose_one_sided_focal`, the rest of `tiny_sampson_error.h`
 (Tangent, Focal, OneSidedFocalTangent functors + their 7 `tiny_sampson_error_test.cc`
-cases) and `sampson_error.h`.
+cases) and `sampson_error.h`. Verify PoseLib re3q3's random-change branch against a C++
+harness on a system with 4 finite solutions (x²=1, y²=4, z=x+y returns none here).
 Estimators implement `IEstimator<TX,TY,TModel>` (+ `ILocalEstimator` for LO-RANSAC) as
 `readonly struct`s — see `Optim/Estimator.cs` and `Estimators/Solvers/SimilarityTransform.cs`.
 `LoRansac.Estimate` hides (does not override) `Ransac.Estimate`: call it on the LoRansac type.

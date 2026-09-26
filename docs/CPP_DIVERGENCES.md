@@ -437,3 +437,29 @@ no model for that RANSAC hypothesis.
 **Evidence.** `FundamentalMatrixTests.FundamentalSevenPointEstimator_Reference` (COLMAP's
 Matlab reference values, 1e-6) and `FundamentalSevenPointEstimator_Nominal` (100 random
 problems, at least one model equal to the true F up to scale) pass 1:1.
+
+## 26. re3q3's random change of variables uses a fixed-seed mt19937, not std::rand
+
+**What differs.** PoseLib's `re3q3` (P4Pf's three-quadratics solver,
+`Estimators/Solvers/PoseLib/Re3q3.cs`) retries a near-degenerate system (all three
+elimination determinants below 1e-10) after a random affine change of variables. PoseLib
+draws that from Eigen's `Quaternion::UnitRandom()` and `setRandom()`, which read the C
+library's global `std::rand()`. The port draws a uniform rotation (Shoemake, Graphics Gems
+III) and a shift in [-1, 1]^3 from a fresh `Mt19937` seeded with 0 on every call, through
+`LibcxxRandom.UniformReal`.
+
+**Why.** `std::rand()` is a process-global stream whose sequence depends on the C library
+and on every earlier call in the process, so COLMAP's result in this branch is not
+reproducible even against itself; porting it would add hidden global state shared across
+threads, which CLAUDE.md rules out (sequential and parallel runs must agree). Eigen's
+`UnitRandom` code is MPL-2.0 and is not ported, so the rotation follows the published method
+it cites. A fixed per-call seed keeps the result a pure function of the input. Only the
+degenerate branch is affected; the regular path is a straight port.
+
+**Evidence.** The branch is only reached for near-singular inputs; the 1:1
+`AbsolutePoseTests.AbsolutePose_P4PF*` cases (regular path) pass with COLMAP's tolerances.
+A change of variables followed by `refine_3q3` against the original coefficients targets the
+same system, so the solution set should agree up to solver tolerance whichever random matrix
+is drawn. The C#-only `Re3q3Tests.CSharpOnly_DegenerateEliminationUsesRandomVarChange`
+(x^2 = 1, y^2 = 4, z^2 = 9: every elimination determinant is 0) finds all eight solutions and
+each satisfies the original system to 1e-8. Not compared against C++ PoseLib.

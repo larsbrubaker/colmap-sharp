@@ -100,7 +100,12 @@ fa7280fee27f97aff31ae7f98bab7f583fac7d08, the version COLMAP's
 Ported in `ColmapSharp/Estimators/Solvers/PoseLib/`, one file (or partial-class
 group) per PoseLib source file it ports: the generalized relative pose solver of
 `PoseLib/solvers/gen_relpose_6pt.cc` in `GenRelpose6pt*.cs` (with the helpers it
-uses from `misc/quaternion.h` and `misc/essential.cc`).
+uses from `misc/quaternion.h` and `misc/essential.cc`); `CameraPose` (`PoseLib/camera_pose.h`,
+`misc/quaternion.h`); the camera description of `misc/camera_models.h/.cc`
+(`PoseLibCamera.cs`); the Sturm-sequence root finder of `misc/sturm.h`; the
+three-quadratics solver of `misc/re3q3.cc`; the P3P solver of `solvers/p3p.cc` with
+`solvers/p3p_common.h` and `misc/univariate.cc`'s single-real-root cubic; and the P4Pf
+solver of `solvers/p4pf.cc`.
 
 ```
 BSD 3-Clause License
