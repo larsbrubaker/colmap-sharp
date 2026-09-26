@@ -34,7 +34,6 @@ resampler matching OIIO within 1 grey level, `docs/CPP_DIVERGENCES.md`); porting
 resize (Apache-2.0) would make it exact if a fixture ever needs that.
 
 ### Phase 4 — Scene
-- `scene_clustering`, `reconstruction_clustering`.
 
 Skipped `util/types_test.cc` cases: `Span.SizeAndEmpty`, `FilterView.Empty/All/None/Nominal/
 RangeExpression` — COLMAP's `span`/`filter_view` are replaced by `System.Span<T>` and LINQ, so

@@ -1656,3 +1656,50 @@ the batch in reader order, so the ids always equal COLMAP's single-threaded run.
 
 **Evidence.** `FeatureExtractionTests.CSharpOnly_ThreadCountIndependentAndReportsProgress`:
 1 and 3 threads give identical image ids, keypoints and descriptors.
+
+## 93. Scene and reconstruction clustering break sort ties deterministically
+
+**What differs.** Three `std::sort` calls leave equal keys in an unspecified order:
+`SceneClustering::PartitionHierarchicalCluster` sorts the overlap-candidate edges of each
+child by descending weight, `SceneClustering::PartitionFlatCluster` sorts each image's
+related images by descending weight (scene_clustering.cc), and `EstablishStrongClusters`
+(reconstruction_clustering.cc) sorts the union-find clusters by descending size after
+collecting them from a `NodeHashMap`, so equal-size clusters are numbered in hash order. The
+port (`Scene/SceneClustering.cs`, `Scene/ReconstructionClustering.cs`) keeps equal weights in
+edge order (a stable sort) and numbers equal-size clusters by ascending smallest frame id.
+When a weight tie straddles the overlap budget, a different overlap image can be chosen;
+equal-size reconstruction clusters can get swapped ids.
+
+**Why.** The translation rules require an explicit, deterministic tie-break wherever tie
+order reaches an output. Edge order is what the macOS SDK's libc++ `std::sort`
+(`__algorithm/sort.h`) gives for short lists: lengths 2-5 go through `__sort3/4/5`, which
+never reorder equal elements under these `>` comparators; lengths 6-23 go through insertion
+sort, which is stable; lengths of 24 or more go through pdqsort, which is not. (Older libc++
+was already unstable from 7 elements for non-trivially-copyable types.) So an overlap list or
+related-image list of 24+ entries with tied weights can come out in a different order than
+COLMAP's; every such list in COLMAP's tests has at most 12 entries. Reproducing pdqsort and
+absl's hash order would tie the result to one library version.
+
+**Evidence.** All eight scene_clustering_test.cc cases and all nine
+reconstruction_clustering_test.cc cases pass (SceneClusteringTests,
+ReconstructionClusteringTests); a reviewer's scratch run over the scene tests with the same
+stable order also matched every expected membership.
+
+## 94. Flat scene clusters are ordered by size, then smallest image id
+
+**What differs.** `SceneClustering::PartitionFlatCluster` sorts the child clusters with the
+comparator `size(a) >= size(b) && min(a) < min(b)`, which is not a strict weak ordering
+(`std::sort` then has undefined behavior) and dereferences `min_element` of an empty cluster.
+The port orders the children by what COLMAP's comment says it intends: descending size, then
+ascending smallest image id, with empty clusters last (stable among themselves). Only the
+order of `GetRootCluster().ChildClusters` / `GetLeafClusters()` is affected; each child's
+overlap images depend only on its own members. In practice the orders do differ: with 3-5
+children libc++'s `__sort3/4/5` only swap when the comparator says so, so a child of size 2
+with smallest id 1 stays ahead of a child of size 3 with smallest id 5 (neither compares
+"less" than the other), while the port puts the larger child first.
+
+**Why.** Undefined behavior cannot be ported; the comment states the intent.
+
+**Evidence.** `SceneClusteringTests.CSharpOnly_FlatChildClustersOrderedBySizeThenSmallestId`
+pins the order; `SceneClustering_ThreeFlatClusters` and `_ThreeFlatClustersTwoOverlap`
+(1:1, order-insensitive as in COLMAP) pass.
