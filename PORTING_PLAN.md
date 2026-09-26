@@ -18,102 +18,92 @@ Caspar GPU BA, LSD line detection and `estimators/coordinate_frame` (AGPL), CGAL
 SQLite database files, `download` support, `retrieval/` vocabulary-tree matching (revisit
 only if exhaustive/sequential/spatial matching proves too slow for MatterCAD photo sets).
 
-## Phases (dependency order)
+## Open work
 
-Each phase ends with its ported tests green. Test names follow COLMAP's.
-
-### Phase 3 — Sensor
-Skipped `bitmap_test.cc` cases (the host decodes and encodes images, so OIIO file I/O is not
-ported; C# `Bitmap` is a reference type, so C++ move semantics have no counterpart):
-`MoveConstructEmpty`, `MoveConstruct`, `MoveAssignEmpty`, `MoveAssign`, `ReadWriteAsRGB`,
-`ReadWriteUnicodePath`, `ReadWriteAsGrey`, `ReadWriteAsGreyNonLinear`,
-`ReadWriteLinearColorspace`, `WriteJpegWithQuality`, `WriteInvalidFormat`, `ReadNonImageFile`,
-`ReadNonExistentFile`, `ReadUnsupportedChannels`, all `ParameterizedBitmapFormatTests`, and
-the PNG round-trip tails of `CloneAsRGB` / `CloneAsGrey`. `Bitmap.Rescale` is Tier B (managed
-resampler matching OIIO within 1 grey level, `docs/CPP_DIVERGENCES.md`); porting OIIO's
-resize (Apache-2.0) would make it exact if a fixture ever needs that.
-
-### Phase 4 — Scene
-
-Skipped `util/types_test.cc` cases: `Span.SizeAndEmpty`, `FilterView.Empty/All/None/Nominal/
-RangeExpression` — COLMAP's `span`/`filter_view` are replaced by `System.Span<T>` and LINQ, so
-there is no ColmapSharp code under test.
-Skipped `scene/database_test.cc` cases: `OpenFile`, `OpenCloseFile`, `OpenFileWithNonASCIIPath`
-— SQLite database files are out of scope (the database is `InMemoryDatabase`).
-
-### Phase 6 — Minimal solvers and estimators
-The four TinySolver callers (essential / fundamental refinement, relpose shared and one-sided
-focal) use `Optim/TinySolver.cs` with `TinyProductManifold<…, TinyEuclideanManifold1>`.
-Estimators implement `IEstimator<TX,TY,TModel>` (+ `ILocalEstimator` for LO-RANSAC) as
-`readonly struct`s — see `Optim/Estimator.cs` and `Estimators/Solvers/SimilarityTransform.cs`.
-`LoRansac.Estimate` hides (does not override) `Ransac.Estimate`: call it on the LoRansac type.
-All estimators are ported.
-
-### Phase 7 — Nonlinear least-squares solver (Ceres replacement)
-Done: Jet/autodiff, losses, manifolds, Problem, LM trust region, DENSE_QR,
-DENSE_NORMAL_CHOLESKY, SPARSE_NORMAL_CHOLESKY, DENSE_SCHUR, SPARSE_SCHUR, ITERATIVE_SCHUR
-(Jacobi/SchurJacobi), automatic and user (multi-group) Schur ordering, parameter bounds with
-Ceres' projected line search, `Problem.Evaluate` (`Solver/`). Not ported on purpose: `Summary.FullReport`
-(log-only), Dogleg, inner iterations, SuiteSparse/LAPACK/Accelerate/NESDIS/SPSE/SUBSET/CGNR
-variants and their Ceres tests, Ceres' line search minimizer and its tests, static-size Schur specializations
-(SchurEliminatorForOneFBlock), unstable independent-set ordering, visibility-clustering
-preconditioners, Ceres' bit-packed cell-key tests.
-Performance (before BA at scale), keeping results bit-identical and thread-count independent:
-the Schur eliminator is ~88% of SPARSE_SCHUR (0.32 s/solve at 200 cams/20k pts, Release):
-fixed-size kernels for the 2/3/6 BA shapes, precomputed cell offsets (no Dictionary lookups),
-two-phase parallel elimination (per-chunk slots, then per-camera block rows in chunk order),
-cached E'E inverses for back substitution, parallel implicit products for ITERATIVE_SCHUR,
-blocked LLT for DENSE_SCHUR; supernodal/blocked simplicial Cholesky for large reduced systems.
-Cancellation is checked between iterations only (like COLMAP). Optional: Vector128 lanes in
-`Jet` (IEEE-exact, no FMA) need a CLAUDE.md rule clarification first.
-
-### Phase 8 — Bundle adjustment
-Done: default and pose-prior Ceres bundle adjusters, cost functions, `ceres::Covariance` subset
-(dense QR, divergence 45), BA covariance (`Estimators/Covariance*.cs`).
-Skipped: CeresBundleAdjustmentOptions.FallsBackToCpuWithoutCudaDevice (CUDA), the CASPAR
-instantiations of the backend suites and `bundle_adjustment_caspar_test.cc` (GPU backend out of
-scope). Performance: ~2.6× slower than native Ceres on a 100-image synthetic scene (7.6 s vs
-2.9 s) — the Schur eliminator speedups in Phase 7 close most of this.
-
-### Phase 9 — Features
-Skipped (SiftGPU excluded): `sift_test.cc` ExtractSiftFeaturesGPU.Nominal,
-CreateSiftGPUMatcherOpenGL/CUDA.Nominal, MatchSiftFeaturesGPU.{Nominal,TypeMismatch},
-MatchSiftFeaturesCPUvsGPU.Nominal, MatchGuidedSiftFeaturesGPU.* (7),
-MatchGuidedSiftFeaturesCPUvsGPUGuided.EssentialMatrix. Skipped (ONNX learned features out of
-scope): `matcher_test.cc` Check for the 9 non-SIFT-bruteforce types and the aliked lines of
-Copy/CopyAssignment; `extractor_test.cc` Move and MoveAssignment (they only move the LoMa
-shared_ptr), Check for ALIKED_N16ROT/ALIKED_N32/LOMA_B/LOMA_B128, and the aliked/loma lines of
-Copy/CopyAssignment. The feature index is exact (divergence 42), not faiss.
-Memory: VLFeat's scale space for a 6400×4800 upsampled first octave is multi-GB (as in COLMAP);
-MatterCAD (esp. wasm32) must cap `max_image_size` accordingly.
-
-### Phase 10 — Incremental SfM
-End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us (also the
-first chance to reach the structure-based → structure-less registration fallback, which no
-synthetic scene triggers).
-Skipped (Caspar GPU BA out of scope): the `caspar` assertion lines in
-`incremental_pipeline_test.cc` IncrementalPipelineOptions.PropagatesExplicitMaxNumIterations and
-DefaultMaxNumIterationsUsesBackendDefaults.
+Each step ends with its ported tests green. Test names follow COLMAP's.
 
 ### Phase 11 — Pipeline controllers
-`automatic_reconstruction` (minus CGAL/GPU branches), cancellation + progress surface.
-Skipped (retrieval out of scope): `pairing_test.cc` VocabTreePairGenerator.Nominal,
-VocabTreePairGenerator.DoesNotDeadlockOnFailedQuery, SequentialPairGenerator.LoopDetectionMinIndexDistance, `feature_matching_test.cc` CreateVocabTreeFeatureMatcher.Nominal.
+`automatic_reconstruction` (minus CGAL/GPU branches), including the step that turns
+`MeshTextureMapping`'s result into a textured mesh.
 
 ### Phase 12 — Dense reconstruction (MVS)
-`patch_match` + a managed CPU port of
-`patch_match_cuda.cu` (parallel over pixels/rows, deterministic),
-`poisson_meshing` (PoissonRecon MIT port, add notice), `delaunay_meshing` (tetrahedralization
-via MIConvexHull (MIT) or MatterCAD's own; graph-cut surface extraction is COLMAP's own code),
-`texture_mapping` (in scope: MatterCAD shows the textured model so
-the user can relate it to their photos; CGAL's AABB tree for occlusion is replaced by a
-managed BVH written here).
+- `patch_match`: CPU port of `patch_match_cuda.cu` in progress (slices 3–5: kernel math,
+  sweep/run, controller + synthetic-scene accuracy test).
+- `poisson_meshing`: PoissonRecon port in progress (slices 3–8: weighted samples, finalize,
+  FEM system, solver, level set, trimmer + public API + `poisson_meshing_test.cc`).
+- `delaunay_meshing`: 3D Delaunay tetrahedralization written here (CGAL excluded), then
+  COLMAP's graph-cut surface extraction.
+- `texture_mapping`: ported; review fixes pending.
 
 ### Phase 13 — Global and hierarchical mapping
-`sfm/global_mapper`, `controllers/global_pipeline`, `hierarchical_pipeline`,
-`rotation_averaging` controller.
+`sfm/global_mapper` and the `rotation_averaging` controller (ported; review fixes pending),
+`controllers/global_pipeline`, `controllers/hierarchical_pipeline`.
 
-### Phase 14 — MatterCAD integration
+### Verification
+- End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us (also the
+  first chance to reach the structure-based → structure-less registration fallback, which no
+  synthetic scene triggers).
+- Rotation averaging pycolmap oracle.
+- Test isolation: COLMAP's gtest_main seeds the PRNG with 0 before every test; ours is
+  `[ThreadStatic]`, so tests that draw without seeding depend on which tests ran before them
+  on the same thread. Seed per test in one place.
+
+### Performance (keep results bit-identical and thread-count independent)
+- Schur eliminator (~88% of SPARSE_SCHUR, 0.32 s/solve at 200 cams/20k pts, Release; BA is
+  ~2.6× slower than native Ceres): fixed-size kernels for the 2/3/6 BA shapes, precomputed
+  cell offsets instead of Dictionary lookups, two-phase parallel elimination (per-chunk slots,
+  then per-camera block rows in chunk order), cached E'E inverses for back substitution,
+  parallel implicit products for ITERATIVE_SCHUR, blocked LLT for DENSE_SCHUR.
+- Fusion is single-threaded (divergence 87): per-image parallel precompute of per-pixel
+  world points/normals first, then a speculative band-parallel traversal with in-order commit,
+  which reproduces the one-thread result.
+- Optional: Vector128 lanes in `Jet` (IEEE-exact, no FMA) need a CLAUDE.md rule
+  clarification first.
+- Evaluate a faithful port of libc++ `std::sort` (sort3/4/5, insertion sort below 24, pdqsort
+  above) so tie-sensitive sorts match COLMAP instead of carrying divergence entries.
+
+## Skipped tests
+Every COLMAP test not ported, with the reason.
+
+- **Bitmap file I/O** (the host decodes and encodes images, so OIIO is not ported; C# `Bitmap`
+  is a reference type, so move semantics have no counterpart) — `bitmap_test.cc`:
+  `MoveConstructEmpty`, `MoveConstruct`, `MoveAssignEmpty`, `MoveAssign`, `ReadWriteAsRGB`,
+  `ReadWriteUnicodePath`, `ReadWriteAsGrey`, `ReadWriteAsGreyNonLinear`,
+  `ReadWriteLinearColorspace`, `WriteJpegWithQuality`, `WriteInvalidFormat`,
+  `ReadNonImageFile`, `ReadNonExistentFile`, `ReadUnsupportedChannels`, all
+  `ParameterizedBitmapFormatTests`, and the PNG round-trip tails of `CloneAsRGB` /
+  `CloneAsGrey`.
+- **Replaced by .NET types** — `util/types_test.cc`: `Span.SizeAndEmpty`,
+  `FilterView.Empty/All/None/Nominal/RangeExpression` (`System.Span<T>` and LINQ).
+- **SQLite files** (the database is `InMemoryDatabase`) — `scene/database_test.cc`:
+  `OpenFile`, `OpenCloseFile`, `OpenFileWithNonASCIIPath`.
+- **Ceres internals not ported** (SuiteSparse/LAPACK/Accelerate/NESDIS/SPSE/SUBSET/CGNR
+  variants, Dogleg, inner iterations, line search minimizer, bit-packed cell keys): their
+  Ceres tests.
+- **CUDA / GPU** — `CeresBundleAdjustmentOptions.FallsBackToCpuWithoutCudaDevice`, the CASPAR
+  instantiations of the BA backend suites, `bundle_adjustment_caspar_test.cc`, the `caspar`
+  lines of `incremental_pipeline_test.cc` IncrementalPipelineOptions
+  PropagatesExplicitMaxNumIterations / DefaultMaxNumIterationsUsesBackendDefaults, and
+  pycolmap `mvs_test.py`'s PatchMatch cases.
+- **SiftGPU** — `sift_test.cc`: ExtractSiftFeaturesGPU.Nominal,
+  CreateSiftGPUMatcherOpenGL/CUDA.Nominal, MatchSiftFeaturesGPU.{Nominal,TypeMismatch},
+  MatchSiftFeaturesCPUvsGPU.Nominal, MatchGuidedSiftFeaturesGPU.* (7),
+  MatchGuidedSiftFeaturesCPUvsGPUGuided.EssentialMatrix.
+- **ONNX learned features** — `matcher_test.cc` Check for the 9 non-SIFT-bruteforce types and
+  the aliked lines of Copy/CopyAssignment; `extractor_test.cc` Move and MoveAssignment,
+  Check for ALIKED_N16ROT/ALIKED_N32/LOMA_B/LOMA_B128, and the aliked/loma lines of
+  Copy/CopyAssignment.
+- **Vocabulary-tree retrieval** — `pairing_test.cc` VocabTreePairGenerator.Nominal,
+  VocabTreePairGenerator.DoesNotDeadlockOnFailedQuery,
+  SequentialPairGenerator.LoopDetectionMinIndexDistance; `feature_matching_test.cc`
+  CreateVocabTreeFeatureMatcher.Nominal.
+
+## Notes for MatterCAD
+- VLFeat's scale space for a 6400×4800 upsampled first octave is multi-GB (as in COLMAP);
+  cap `max_image_size`, especially on wasm32.
+- `Bitmap.Rescale` is Tier B (managed resampler within 1 grey level of OIIO); porting OIIO's
+  resize (Apache-2.0) would make it exact if a fixture ever needs that.
+
+### Phase 14 — MatterCAD integration (not started; needs Lars)
 Reference `ColmapSharp` from MatterCAD, host-side image decoding into the library's pixel
 buffer, a "photos → mesh" design operation with progress and cancel.
-
