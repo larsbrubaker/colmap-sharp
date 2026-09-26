@@ -117,6 +117,17 @@ public sealed class GlobalMapperOptions
 	/// <summary>Skips retriangulation.</summary>
 	public bool SkipRetriangulation { get; set; }
 
+	/// <summary>A deep copy (C++ copies the options struct by value).</summary>
+	public GlobalMapperOptions Clone()
+	{
+		var copy = (GlobalMapperOptions)MemberwiseClone();
+		copy.RotationAveragingOptions = RotationAveragingOptions.Clone();
+		copy.GlobalPositioningOptions = GlobalPositioningOptions.Clone();
+		copy.BundleAdjustmentOptions = BundleAdjustmentOptions.Clone();
+		copy.RetriangulationOptions = RetriangulationOptions.Clone();
+		return copy;
+	}
+
 	// The C++ member initializer lambda of bundle_adjustment.
 	private static BundleAdjustmentOptions DefaultBundleAdjustmentOptions()
 	{

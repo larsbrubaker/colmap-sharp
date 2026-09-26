@@ -1994,6 +1994,19 @@ order to match. The single-threaded order is the one reproducible reference.
 density6) matches a single-threaded run of the vendored C++ bit for bit: the normal field,
 the sample depth/weight sums, the colour field and the node numbering.
 
+## 107. GlobalPipeline orders equally large reconstructions by component
+
+**What differs.** COLMAP's `GlobalPipeline::Run` sorts the new reconstructions by registered
+frame count with `std::sort`, which is unstable, so reconstructions with equal counts end up
+in an order that depends on the standard library. The port
+(`Controllers/GlobalPipeline.cs`) sorts stably, so equally large reconstructions keep the
+order of their view-graph components (largest component first, then smallest frame id).
+
+**Why.** CLAUDE.md requires ties whose order reaches an output to be broken explicitly.
+
+**Evidence.** `GlobalPipelineTests.GlobalPipeline_MultiComponents` and the other
+multi-component cases (1:1, order-insensitive as in COLMAP) pass.
+
 ## 113. Reading a truncated binary PLY mesh throws inside the texcoord lists
 
 **What differs.** COLMAP's `ReadPlyMesh` (util/ply.cc) checks `file.good()` after every vertex,

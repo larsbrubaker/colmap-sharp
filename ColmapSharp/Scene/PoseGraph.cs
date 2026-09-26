@@ -74,6 +74,18 @@ public sealed class PoseGraph
 	/// <summary>Removes every edge.</summary>
 	public void Clear() => edges.Clear();
 
+	/// <summary>A deep copy with the edges in the same order (C++'s copy constructor).</summary>
+	public PoseGraph Clone()
+	{
+		var copy = new PoseGraph();
+		foreach ((ulong pairId, Edge edge) in edges)
+		{
+			copy.edges.Add(pairId, edge.Clone());
+		}
+
+		return copy;
+	}
+
 	/// <summary>
 	/// Load edges from the correspondence graph: one edge per image pair with matches whose
 	/// two-view geometry has a relative pose, with its number of matches.

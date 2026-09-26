@@ -12,12 +12,33 @@
 //   and returning true stops the pipeline early with the current result. A controller wires
 //   it to its CancellationToken; to stop inside a long bundle adjustment as well, set
 //   BundleAdjustmentOptions.CheckIfStopped on the options.
+// - onStageStarted (C#-only) replaces the LOG_HEADING1 stage headings, so a host can show
+//   which stage is running.
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Scene;
 using ColmapSharp.Util;
 
 namespace ColmapSharp.Sfm;
+
+/// <summary>The stages of <see cref="GlobalMapper.Solve"/>, in the order they run (C#-only).</summary>
+public enum GlobalMapperStage
+{
+	/// <summary>Rotation averaging.</summary>
+	RotationAveraging,
+
+	/// <summary>Track establishment and selection.</summary>
+	TrackEstablishment,
+
+	/// <summary>Global positioning.</summary>
+	GlobalPositioning,
+
+	/// <summary>Iterative bundle adjustment.</summary>
+	BundleAdjustment,
+
+	/// <summary>Iterative retriangulation and refinement.</summary>
+	Retriangulation,
+}
 
 public sealed partial class GlobalMapper
 {
@@ -232,9 +253,12 @@ public sealed partial class GlobalMapper
 	/// <paramref name="options"/>. The optional <paramref name="onProgress"/> callback is
 	/// invoked after global positioning, after each bundle-adjustment iteration, and after
 	/// retriangulation/refinement; it returns true if a stop has been requested, in which case
-	/// the pipeline terminates early and keeps the current result.
+	/// the pipeline terminates early and keeps the current result. The optional
+	/// <paramref name="onStageStarted"/> (C#-only) is called as each stage starts, where COLMAP
+	/// logs the stage heading.
 	/// </summary>
-	public bool Solve(GlobalMapperOptions options, Func<bool>? onProgress = null)
+	public bool Solve(
+		GlobalMapperOptions options, Func<bool>? onProgress = null, Action<GlobalMapperStage>? onStageStarted = null)
 	{
 		Reconstruction recon = Check.NotNull(reconstruction);
 		PoseGraph graph = Check.NotNull(poseGraph);
@@ -261,20 +285,26 @@ public sealed partial class GlobalMapper
 		}
 
 		// Run rotation averaging
-		if (!options.SkipRotationAveraging && !RotationAveraging(options.RotationAveraging()))
+		if (!options.SkipRotationAveraging)
 		{
-			return false;
+			onStageStarted?.Invoke(GlobalMapperStage.RotationAveraging);
+			if (!RotationAveraging(options.RotationAveraging()))
+			{
+				return false;
+			}
 		}
 
 		// Track establishment and selection
 		if (!options.SkipTrackEstablishment)
 		{
+			onStageStarted?.Invoke(GlobalMapperStage.TrackEstablishment);
 			EstablishTracks(options);
 		}
 
 		// Global positioning
 		if (!options.SkipGlobalPositioning)
 		{
+			onStageStarted?.Invoke(GlobalMapperStage.GlobalPositioning);
 			if (!GlobalPositioning(
 				options.GlobalPositioning(),
 				options.MaxAngularReprojErrorDeg,
@@ -292,8 +322,10 @@ public sealed partial class GlobalMapper
 		}
 
 		// Bundle adjustment
-		if (!options.SkipBundleAdjustment
-			&& !IterativeBundleAdjustment(
+		if (!options.SkipBundleAdjustment)
+		{
+			onStageStarted?.Invoke(GlobalMapperStage.BundleAdjustment);
+			if (!IterativeBundleAdjustment(
 				options.BundleAdjustment(),
 				options.MaxNormalizedReprojError,
 				options.MinTriAngleDeg,
@@ -301,13 +333,15 @@ public sealed partial class GlobalMapper
 				options.BaSkipFixedRotationStage,
 				options.BaSkipJointOptimizationStage,
 				onProgress))
-		{
-			return false;
+			{
+				return false;
+			}
 		}
 
 		// Retriangulation
 		if (!options.SkipRetriangulation)
 		{
+			onStageStarted?.Invoke(GlobalMapperStage.Retriangulation);
 			if (!IterativeRetriangulateAndRefine(
 				options.Retriangulation(),
 				options.BundleAdjustment(),
