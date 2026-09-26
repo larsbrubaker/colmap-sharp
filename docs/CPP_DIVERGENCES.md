@@ -455,6 +455,33 @@ optimum, cost, iteration count and number of rejected steps with SPARSE_NORMAL_C
 with DENSE_QR, and `BundleAdjustmentProblemTests.RecoversGroundTruth` recovers the ground
 truth with all three linear solvers.
 
+## 23. The in-memory database applies a failing write completely or not at all
+
+**What differs.** `Scene/InMemoryDatabase` replaces COLMAP's SQLite database and enforces
+the same constraints (UNIQUE indices, primary keys, foreign keys, the image id CHECK), but it
+validates a whole write before storing anything. COLMAP's `WriteRig`/`UpdateRig` and
+`WriteFrame`/`UpdateFrame` issue one INSERT for the rig or frame row and then one INSERT per
+sensor or data id, each in SQLite's autocommit mode; when a later INSERT violates a
+constraint (say, a sensor already in another rig), COLMAP throws after the earlier rows have
+been committed, leaving a rig or frame with part of its sensors or data. Here the same call
+throws and leaves the database unchanged. Consequences:
+- On successful writes the assigned ids, what is stored and every read are the same.
+- After such a partially failed `WriteRig`/`WriteFrame`, COLMAP has consumed the new id (the
+  rig or frame row exists), so its next automatic id is one higher; here the id was never
+  used and the next write gets it. A write whose first INSERT fails consumes no id in either.
+- The same calls throw, but the exception types and messages differ. COLMAP throws a
+  `std::runtime_error` with `sqlite3_errstr`'s text ("SQLite error: constraint failed");
+  here it is an `InvalidOperationException` worded like SQLite's extended messages
+  ("SQLite error: UNIQUE constraint failed: images.name", "... FOREIGN KEY constraint
+  failed"). THROW_CHECK sites use `Util/Check` as everywhere else.
+
+**Why.** The partially written state is an accident of statement-at-a-time execution, not
+behavior any COLMAP caller relies on (all of them treat the exception as fatal), and
+reproducing it would mean emulating SQLite's statement boundaries.
+
+**Evidence.** `DatabaseTests` (database_test.cc 1:1) passes, including the cases that
+expect a constraint violation to throw (`PosePrior`, `TwoViewGeometry`).
+
 ## 24. The 7-point fundamental solver takes its null space from unpivoted Householder QR
 
 **What differs.** `FundamentalMatrixSevenPointEstimator::Estimate` gets the 2D null space of

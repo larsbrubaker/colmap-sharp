@@ -45,13 +45,15 @@ ReadAutoDetectFormat, ExtractColorsForAllImages; `reconstruction_matchers_test.c
 add an IdMap test that reaches `Compact()`), `reconstruction_io` (COLMAP binary and text
 formats, so pycolmap-written models become fixtures), `reconstruction_manager`,
 `reconstruction_pruning`, `synthetic` (the synthetic dataset generator that most downstream
-tests use), `database` (in-memory store with COLMAP's API), `database_cache`,
+tests use), `database_cache`,
 `scene_clustering`, `reconstruction_clustering`. Before the pipeline phases, decide how the
 library surfaces COLMAP's `LOG(WARNING)` messages (dropped for now).
 
 Skipped `util/types_test.cc` cases: `Span.SizeAndEmpty`, `FilterView.Empty/All/None/Nominal/
 RangeExpression` — COLMAP's `span`/`filter_view` are replaced by `System.Span<T>` and LINQ, so
 there is no ColmapSharp code under test.
+Skipped `scene/database_test.cc` cases: `OpenFile`, `OpenCloseFile`, `OpenFileWithNonASCIIPath`
+— SQLite database files are out of scope (the database is `InMemoryDatabase`).
 
 ### Phase 6 — Minimal solvers and estimators
 The four TinySolver callers (essential / fundamental refinement, relpose shared and one-sided
@@ -91,7 +93,7 @@ Vector128 lanes in `Jet` (IEEE-exact, no FMA) need a CLAUDE.md rule clarificatio
 
 ### Phase 9 — Features
 `feature/sift` (VLFeat CPU SIFT port, BSD-2, add its notice; DSP-SIFT and domain-size
-pooling options), `feature/types`, `feature/utils`, `feature/matcher` (brute force + managed
+pooling options), `feature/utils`, `feature/matcher` (brute force + managed
 kd-tree for approximate NN, cross-check, ratio test, guided matching), `feature/extractor`,
 `feature/index`.
 
