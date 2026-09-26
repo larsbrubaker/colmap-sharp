@@ -341,7 +341,7 @@ public class Workspace
 	}
 
 	/// <summary>COLMAP's ReadTextFileLines: std::getline lines, StringTrim'd, empty lines skipped.</summary>
-	private static List<string> ReadTextFileLines(string path)
+	internal static List<string> ReadTextFileLines(string path)
 	{
 		var lines = new List<string>();
 		foreach (string rawLine in File.ReadAllText(path).Split('\n'))

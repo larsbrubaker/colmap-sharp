@@ -1657,6 +1657,60 @@ the batch in reader order, so the ids always equal COLMAP's single-threaded run.
 **Evidence.** `FeatureExtractionTests.CSharpOnly_ThreadCountIndependentAndReportsProgress`:
 1 and 3 threads give identical image ids, keypoints and descriptors.
 
+## 87. StereoFusion traverses on one thread
+
+**What differs.** COLMAP's `mvs::StereoFusion::Run` (fusion.cc) splits each image into 10-row
+tasks on a `ThreadPool` of `num_threads` threads (when the workspace is pre-loaded). The tasks
+read and write the shared fused-pixel masks without synchronization, and each thread appends to
+its own point list, concatenated by thread id at the end. Which task claims a pixel first, and
+so which points are produced and in what order, depends on scheduling. The port
+(`Mvs/Fusion.cs`) runs the traversal on one thread in row order.
+`StereoFusionOptions.NumThreads` only sets the workspace loading parallelism.
+
+**Why.** CLAUDE.md requires the same result for every thread count. The one-thread traversal
+is exactly COLMAP's own behavior with `num_threads = 1` and with `use_cache = true` (which
+always fuses on one thread), so the result is one COLMAP can produce. A parallel version that
+reproduces the one-thread run bit for bit is possible (for example, row bands traversed
+speculatively in parallel and committed in row order, redoing a band whose traversal touched
+pixels an earlier band claimed); that is future work if fusion time matters.
+
+**Evidence.** `FusionOracleTests.StereoFusion_MatchesPycolmap` (C#-only): against pycolmap
+4.2.0's `stereo_fusion` with `num_threads = 1` on the checked-in workspace, the same 154 points
+in the same order, colors exact, positions within 1e-6 (a couple of float ulps).
+`StereoFusion_MatchesPycolmapWithOptions` does the same for 129 points with noisy normals, a
+bounding box, `max_image_size`, masks and short traversals.
+`StereoFusion_CachedWorkspaceMatchesLoaded` pins identical output for the cached and
+pre-loaded workspaces.
+
+## 88. StereoFusion lists each point's visible images in ascending index order
+
+**What differs.** COLMAP collects a fused point's image indices in a `FlatHashSet<int>`
+(`std::unordered_set` in the default build) and copies it into the visibility vector, so the
+order within each list is the hash set's iteration order. The port lists them in ascending
+image index. `GetFusedPointsVisibility` and the `.vis` file (`WritePointsVisibility`) carry the
+same sets; only the order within a list can differ.
+
+**Why.** Hash iteration order is implementation-defined (libc++, libstdc++ and the Boost
+backend all differ); CLAUDE.md asks for a deterministic order. Consumers that read the lists
+(the meshers, not yet ported) should be checked for order sensitivity when they are ported.
+
+**Evidence.** `FusionOracleTests.StereoFusion_MatchesPycolmap` compares each point's list with
+pycolmap's, sorted.
+
+## 89. StereoFusion throws on a mask it cannot decode
+
+**What differs.** In `StereoFusion::InitFusedPixelMask` (fusion.cc), a mask file that exists but
+fails `Bitmap::Read` is ignored: the image is fused as if it had no mask. The port
+(`Mvs/Fusion.cs`) lets the host's `IBitmapSource.Read` exception propagate out of `Run`.
+
+**Why.** A user who supplied masks expects the masked background to stay out of the point
+cloud; silently fusing it produces a wrong result with no hint why. An error that names the
+mask tells them what to fix. `IBitmapSource.Read` is also specified to throw on an unreadable
+image, so there is no "false" return to mirror.
+
+**Evidence.** `FusionTests.CSharpOnly_UnreadableMaskThrows` (C#-only): a source whose `Exists`
+reports the mask and whose `Read` throws makes `Run` throw that exception.
+
 ## 93. Scene and reconstruction clustering break sort ties deterministically
 
 **What differs.** Three `std::sort` calls leave equal keys in an unspecified order:

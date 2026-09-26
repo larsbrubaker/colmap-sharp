@@ -103,7 +103,7 @@ VocabTreePairGenerator.DoesNotDeadlockOnFailedQuery, SequentialPairGenerator.Loo
 
 ### Phase 12 — Dense reconstruction (MVS)
 `patch_match` + a managed CPU port of
-`patch_match_cuda.cu` (parallel over pixels/rows, deterministic), `fusion`,
+`patch_match_cuda.cu` (parallel over pixels/rows, deterministic),
 `poisson_meshing` (PoissonRecon MIT port, add notice), `delaunay_meshing` (tetrahedralization
 via MIConvexHull (MIT) or MatterCAD's own; graph-cut surface extraction is COLMAP's own code),
 `texture_mapping` (in scope: MatterCAD shows the textured model so
