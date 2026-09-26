@@ -15,7 +15,7 @@
 // - Which calls fail must match exactly, for every model and field.
 // - Bit-identical: CamFromImg of the pinhole models that unproject through the iterative
 //   undistortion (SIMPLE_RADIAL, RADIAL, OPENCV, FULL_OPENCV) and the plain pinholes, all of
-//   EQUIRECTANGULAR, and the pixel threshold. This pins Jet2, the 2x2 LU solve and the
+//   EQUIRECTANGULAR, and the pixel threshold. This pins Jet<Grad2>, the 2x2 LU solve and the
 //   Newton iteration bit for bit.
 // - Everything else within 2e-14 * max(1, |expected|): the macOS arm64 pycolmap wheel fuses
 //   single-statement multiply-adds (f * x + c1, u*u + v*v) into FMAs, which ColmapSharp

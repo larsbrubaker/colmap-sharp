@@ -19,7 +19,7 @@
 //   and, later, templated cost functions port one to one.
 // - The projection math (`template <typename T> ImgFromCam`, Distortion, the fisheye
 //   helpers) is generic over `T : struct, IScalar<T>` (Solver/Scalar.cs): Real for double
-//   evaluation, Jet2 now for IterativeUndistortion, and Phase 7's Jet<N> for bundle
+//   evaluation, Jet<TGrad> (Solver/Jet.cs) for IterativeUndistortion and bundle
 //   adjustment. Functions COLMAP only defines for double (CamFromImg, thresholds, bogus
 //   checks) take double.
 // - Parameter arrays are spans: `const T* params` is ReadOnlySpan<T>, `&params[4]` is

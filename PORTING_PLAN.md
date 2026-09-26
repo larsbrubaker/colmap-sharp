@@ -70,20 +70,17 @@ generalized pose, focal solvers; the PoseLib parts are BSD-3, add its notice),
 `gravity_refinement`, `view_graph_calibration`.
 
 ### Phase 7 — Nonlinear least-squares solver (Ceres replacement)
-`Solver/`: `Jet<N>` forward-mode autodiff, cost function / residual block model,
-parameter blocks with manifolds (quaternion, sphere, subset), loss functions (trivial,
-Huber, soft-L1, Cauchy, Tolerant…), Levenberg–Marquardt trust region, Schur complement with
-dense and sparse Cholesky and iterative (PCG with Jacobi/Schur-Jacobi preconditioner) linear
-solvers, solver summary. Ported from Ceres (BSD-3, add its notice), subset only. This is the
-riskiest phase; validate against pycolmap BA on synthetic scenes (Tier C).
-Build on `Solver/Scalar.cs`'s `IScalar<T>` (camera models are already generic over it):
-`Jet<TGrad>` with `TGrad` an `[InlineArray(N)]` gradient struct exposing a static `Length`
-(no const generics in C#), `in` parameters for large N (benchmark N=6/9/15), Ceres's
-mixed scalar operators (`T*double`, `double/T`, … — not the same as `FromDouble(s) op x`),
-Exp/Log/Pow/Acos/Asin/Hypot/IsFinite/Min/Max, and generic k-th-variable seeding.
+Done: `Jet<TGrad>` (widths 1–33), `IScalar<T>`, rotation helpers, loss functions, manifolds,
+`AutoDiffCostFunction` (views via `ArraySegment`). Open: problem / residual-block model with
+parameter blocks, constant blocks and manifolds; Levenberg–Marquardt trust region; linear
+solvers (dense QR/normal Cholesky, sparse normal Cholesky, dense and sparse Schur, iterative
+Schur with PCG + Jacobi/Schur-Jacobi); multi-threaded evaluation writing per-thread slots;
+solver summary. Ported from Ceres 2.2.0 (BSD-3; notice already present). This is the riskiest
+phase; validate against pycolmap BA on synthetic scenes (Tier C).
 The simplicial sparse Cholesky (`LinearAlgebra/SimplicialCholesky.cs`) factors a 1000-camera
 Schur-like pattern in ~3.5 s (scalar, ~1.3 GFLOP/s): add a supernodal or 6x6-blocked numeric
-phase behind the same API before BA at that scale.
+phase behind the same API before BA at that scale. Optional later speedup: Vector128 lanes
+in `Jet` (IEEE-exact, no FMA) need a CLAUDE.md rule clarification first.
 
 ### Phase 8 — Bundle adjustment
 `estimators/bundle_adjustment*` (the non-GPU paths), `cost_functions/*`,

@@ -46,8 +46,16 @@ POSSIBILITY OF SUCH DAMAGE.
 
 Source: http://ceres-solver.org (https://github.com/ceres-solver/ceres-solver)
 
-Ported in `ColmapSharp/Solver/Jet2.cs`: the dual-number arithmetic and elementary-function
-rules of `ceres::Jet` (`include/ceres/jet.h`), for the N = 2 case.
+Ported from Ceres 2.2.0 in `ColmapSharp/Solver/`: the dual-number arithmetic and
+elementary-function rules of `ceres::Jet` (`include/ceres/jet.h`) in `Jet.cs`; the
+angle-axis/quaternion conversions of `include/ceres/rotation.h` in `Rotation.cs`; the loss
+functions of `internal/ceres/loss_function.cc` in `LossFunctions.cs` (with
+`loss_function_test.cc` ported in the tests); the Euclidean, subset, quaternion, sphere and
+product manifolds of `internal/ceres/manifold.cc`, `include/ceres/sphere_manifold.h`,
+`include/ceres/internal/sphere_manifold_functions.h`,
+`include/ceres/internal/householder_vector.h` and `include/ceres/product_manifold.h` in
+`Manifolds.cs`; and the cost-function contract of `include/ceres/cost_function.h` and
+`include/ceres/autodiff_cost_function.h` in `AutoDiffCostFunction.cs`.
 
 ```
 Ceres Solver - A fast non-linear least squares minimizer

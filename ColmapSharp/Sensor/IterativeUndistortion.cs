@@ -3,7 +3,7 @@
 //
 // BasePerspectiveCameraModel::IterativeUndistortion (colmap/sensor/models.h): inverts a
 // model's additive distortion x + d(x) = x0 by a trust-region Newton iteration. The
-// Jacobian of d comes from evaluating the model's Distortion on Jet2 (Solver/Jet2.cs), as
+// Jacobian of d comes from evaluating the model's Distortion on Jet<Grad2> (Solver/Jet.cs), as
 // COLMAP does with ceres::Jet<double, 2>, and each step solves the 2x2 system with LU
 // decomposition and partial (row) pivoting, which is what COLMAP's
 // `J.partialPivLu().solve(...)` computes. The 2x2 solve is written here from the textbook
@@ -47,22 +47,22 @@ public static partial class CameraModelMath
 		double x1 = v;
 
 		int numExtraParams = TModel.ExtraParamsIdxs.Length;
-		Span<Jet2> paramsJet = stackalloc Jet2[numExtraParams];
+		Span<Jet<Grad2>> paramsJet = stackalloc Jet<Grad2>[numExtraParams];
 		for (int i = 0; i < numExtraParams; i++)
 		{
-			paramsJet[i] = Jet2.FromDouble(extraParams[i]);
+			paramsJet[i] = Jet<Grad2>.FromDouble(extraParams[i]);
 		}
 
 		for (int i = 0; i < kNumIterations; i++)
 		{
 			// Get Jacobian
-			TModel.Distortion<Jet2>(paramsJet, Jet2.Variable(x0, 0), Jet2.Variable(x1, 1), out Jet2 dxJet0, out Jet2 dxJet1);
+			TModel.Distortion<Jet<Grad2>>(paramsJet, Jet<Grad2>.Variable(x0, 0), Jet<Grad2>.Variable(x1, 1), out Jet<Grad2> dxJet0, out Jet<Grad2> dxJet1);
 			double dx0 = dxJet0.A;
 			double dx1 = dxJet1.A;
-			double j00 = dxJet0.V0 + 1;
-			double j01 = dxJet0.V1;
-			double j10 = dxJet1.V0;
-			double j11 = dxJet1.V1 + 1;
+			double j00 = dxJet0.V[0] + 1;
+			double j01 = dxJet0.V[1];
+			double j10 = dxJet1.V[0];
+			double j11 = dxJet1.V[1] + 1;
 
 			// Update
 			SolvePartialPivLu2(j00, j01, j10, j11, x0 + dx0 - x00, x1 + dx1 - x01, out double step0, out double step1);

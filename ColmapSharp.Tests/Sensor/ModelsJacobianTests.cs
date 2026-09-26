@@ -7,10 +7,8 @@
 // CameraModels.CameraModelImgFromCamWithJac and CameraModels.CamRayFromImgJacobian.
 //
 // COLMAP checks the analytic Jacobians against ImgFromCam evaluated on
-// ceres::Jet<double, num_params + 3>. Until Phase 7 brings Jet<N>, the reference here is the
-// same forward-mode autodiff run as ceil(N / 2) passes of Jet2, each seeding two of the N
-// variables. Jet arithmetic computes every derivative component independently of the
-// others, so each pass's components equal the matching components of the N-wide Jet.
+// ceres::Jet<double, num_params + 3>; here that is Jet<TGrad> with the same width
+// (Solver/JetGradients.cs), in one pass.
 //
 // Failed expectations are collected in an ExpectationLog (see ModelsTests.cs), so one run
 // reports all of them; ASSERT_* return early from the helper after recording.
@@ -29,40 +27,53 @@ public class ModelsJacobianTests
 {
 	/// <summary>
 	/// ImgFromCam differentiated by forward-mode autodiff: derivatives with respect to the
-	/// params first, then u, v, w (the seeding of COLMAP's TestImgFromCamWithJac).
+	/// params first, then u, v, w (the seeding of COLMAP's TestImgFromCamWithJac), in one
+	/// pass of a Jet exactly num_params + 3 wide, as COLMAP's
+	/// ceres::Jet&lt;double, num_params + 3&gt;.
 	/// </summary>
 	private static bool AutodiffImgFromCam<TModel>(double[] parameters, double u, double v, double w, out double x, out double y, double[] dx, double[] dy)
 		where TModel : struct, ICameraModel<TModel>
 	{
+		return (parameters.Length + 3) switch
+		{
+			5 => AutodiffImgFromCam<TModel, Grad5>(parameters, u, v, w, out x, out y, dx, dy),
+			6 => AutodiffImgFromCam<TModel, Grad6>(parameters, u, v, w, out x, out y, dx, dy),
+			7 => AutodiffImgFromCam<TModel, Grad7>(parameters, u, v, w, out x, out y, dx, dy),
+			8 => AutodiffImgFromCam<TModel, Grad8>(parameters, u, v, w, out x, out y, dx, dy),
+			9 => AutodiffImgFromCam<TModel, Grad9>(parameters, u, v, w, out x, out y, dx, dy),
+			11 => AutodiffImgFromCam<TModel, Grad11>(parameters, u, v, w, out x, out y, dx, dy),
+			15 => AutodiffImgFromCam<TModel, Grad15>(parameters, u, v, w, out x, out y, dx, dy),
+			19 => AutodiffImgFromCam<TModel, Grad19>(parameters, u, v, w, out x, out y, dx, dy),
+			_ => throw new ArgumentOutOfRangeException(nameof(parameters), $"no Jet width for {parameters.Length} params"),
+		};
+	}
+
+	private static bool AutodiffImgFromCam<TModel, TGrad>(double[] parameters, double u, double v, double w, out double x, out double y, double[] dx, double[] dy)
+		where TModel : struct, ICameraModel<TModel>
+		where TGrad : unmanaged, IJetGradient
+	{
 		int numParams = parameters.Length;
 		int numDerivs = numParams + 3;
 		double[] values = [.. parameters, u, v, w];
+		var jets = new Jet<TGrad>[numDerivs];
+		for (int i = 0; i < numDerivs; i++)
+		{
+			jets[i] = Jet<TGrad>.Variable(values[i], i);
+		}
+
 		x = 0;
 		y = 0;
-		var jets = new Jet2[numDerivs];
-		for (int first = 0; first < numDerivs; first += 2)
+		if (!TModel.ImgFromCam<Jet<TGrad>>(jets.AsSpan(0, numParams), jets[numParams], jets[numParams + 1], jets[numParams + 2], out Jet<TGrad> xJet, out Jet<TGrad> yJet))
 		{
-			for (int i = 0; i < numDerivs; i++)
-			{
-				jets[i] = i == first ? Jet2.Variable(values[i], 0)
-					: i == first + 1 ? Jet2.Variable(values[i], 1)
-					: Jet2.FromDouble(values[i]);
-			}
+			return false;
+		}
 
-			if (!TModel.ImgFromCam<Jet2>(jets.AsSpan(0, numParams), jets[numParams], jets[numParams + 1], jets[numParams + 2], out Jet2 xJet, out Jet2 yJet))
-			{
-				return false;
-			}
-
-			x = xJet.A;
-			y = yJet.A;
-			dx[first] = xJet.V0;
-			dy[first] = yJet.V0;
-			if (first + 1 < numDerivs)
-			{
-				dx[first + 1] = xJet.V1;
-				dy[first + 1] = yJet.V1;
-			}
+		x = xJet.A;
+		y = yJet.A;
+		for (int i = 0; i < numDerivs; i++)
+		{
+			dx[i] = xJet.Derivative(i);
+			dy[i] = yJet.Derivative(i);
 		}
 
 		return true;
