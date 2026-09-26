@@ -34,12 +34,9 @@ resampler matching OIIO within 1 grey level, `docs/CPP_DIVERGENCES.md`); porting
 resize (Apache-2.0) would make it exact if a fixture ever needs that.
 
 ### Phase 4 — Scene
-- `rig` (scene/rig: `ReadRigConfig`/`ApplyRigConfig` + `rig_test.cc`).
 - `Reconstruction.ExtractColors*` (the host decodes images; take a Bitmap provider).
 - `scene_clustering`, `reconstruction_clustering`.
-- Deferred tests: `reconstruction_test.cc` ExtractColorsForAllImages;
-  an IdMap test that reaches
-  `Compact()`.
+- Deferred test: `reconstruction_test.cc` ExtractColorsForAllImages.
 - Before the pipeline phases, decide how the library surfaces COLMAP's `LOG(WARNING)`
   messages (dropped for now).
 

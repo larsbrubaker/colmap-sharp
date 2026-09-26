@@ -1438,3 +1438,35 @@ that the partitioner's step count grows less than 6x from n = 5k to 20k on a sta
 Apple arm64 laptop, k = 2 takes 42-162 ms for stars of 10k-40k leaves, 21-58 ms for
 10k-40k leaves on 20 hubs, 2-22 ms for 10k-40k disconnected pairs, and 0.11 s / 2.4 s for
 random graphs of 10k / 100k vertices with 5 edges per vertex.
+
+## 80. ReadRigConfig requires exactly 4 rotation and 3 translation entries
+
+**What differs.** COLMAP's `ReadRigConfig` (scene/rig.cc) writes the entries of
+`cam_from_rig_rotation` and `cam_from_rig_translation` into a fixed-size `Eigen::Vector4d` and
+`Rigid3d::translation()` by running index, without checking the count. The port
+(`Scene/RigConfig.cs`) throws a "Check failed" error unless there are exactly 4 and 3 entries.
+
+**Why.** Fewer entries leave COLMAP with uninitialized coefficients and more entries write out
+of bounds; both are undefined behavior with no result to match. Every well-formed config reads
+the same.
+
+**Evidence.** `RigConfigTests` (rig_test.cc 1:1) pass, including `ReadRigConfig_Nominal`,
+which reads a 4-entry rotation and a 3-entry translation.
+
+## 81. ApplyRigConfig hands the reconstruction its rigs and frames in id order
+
+**What differs.** COLMAP's `UpdateRigsAndFramesFromDatabase` (scene/rig.cc) collects the
+reconstruction's rigs and frames in `NodeHashMap`s and passes them to
+`Reconstruction::SetRigsAndFrames` in the maps' iteration order, and `AddFrame` registers posed
+frames in that order, so it decides the order of `RegFrameIds()`. The port
+(`Scene/RigConfig.Apply.cs`) collects them in sorted maps, so the frames are registered in
+ascending frame id order.
+
+**Why.** In COLMAP 4.2.0 `NodeHashMap` is `boost::unordered_node_map` or `std::unordered_map`,
+depending on the build (util/hash_containers.h). Either way its iteration order is
+implementation-defined: it depends on the build configuration, the hash and the standard
+library, so there is no single order to match. CLAUDE.md requires a deterministic order. The
+sets of rigs, frames and registered frames do not depend on it.
+
+**Evidence.** `RigConfigTests.ApplyRigConfig_*` (rig_test.cc 1:1) pass with COLMAP's counts of
+rigs, frames and registered frames. None of them checks the registration order.
