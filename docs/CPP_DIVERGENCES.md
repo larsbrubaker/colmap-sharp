@@ -95,3 +95,36 @@ the flow and the labels with exhaustive search on 300 random graphs, and the sin
 equal the unique minimal sink-side min cut, which is the same for every maximum flow and so
 for Boost too. MinSTGraphCutScalingTests checks, for a 200k-node float grid, that the labeled
 cut's capacity equals the returned flow within 1e-3 relative.
+
+## 6. FMA contraction in the macOS arm64 pycolmap wheel (quaternion-vector rotation)
+
+**What differs.** `Quaterniond * Vector3d` (Eigen's quaternion-vector rotation) differs from
+the pycolmap 4.2.0 macOS arm64 wheel by 1-2 ulps on about half of the inputs.
+
+**Why.** Same cause as entry 1: the wheel is built with contraction on, and it evaluates
+the cross products inside the rotation, `a1*b2 - a2*b1`, as `fma(a1, b2, -(a2*b1))`.
+ColmapSharp never uses FMA in math paths (CLAUDE.md, "No FMA"), so its results are the
+same on every platform. They are expected to match a C++ build that does not contract,
+which has not been checked here.
+
+**Evidence.** `oracle/linear_algebra_rotations.py` prints it: re-deriving `q * v` with
+ColmapSharp's formula gives 69/138 mismatches against the wheel with plain cross products
+and 0/138 with the cross products fused as above.
+`RotationOracleTests.ToleranceFields("rotated")` pins the C# result at 1e-14 relative.
+The other quaternion operations in that fixture are bit-identical
+(`RotationOracleTests.ExactFields`).
+
+## 7. sin(a/2) in the angle-axis to quaternion conversion
+
+**What differs.** `AngleAxisd.ToQuaternion` can differ from the wheel by 1 ulp in the vector
+part.
+
+**Why.** .NET's `Math.Sin` calls the platform libm `sin`. On some inputs the wheel's
+`sin(a/2)` rounds one ulp away from libm `sin`. The cause is not established. One
+hypothesis is that the compiler fused the adjacent `sin` and `cos` of the same argument into
+a `sincos` call that rounds differently. We do not emulate a compiler's choice of math
+routine.
+
+**Evidence.** `oracle/linear_algebra_rotations.py`: all fixture cases but one are
+bit-identical with libm `sin`, and that one becomes identical when `sin(a/2)` moves one
+ulp. `RotationOracleTests.ToleranceFields("from_axis_angle")` pins it at 1e-14 relative.
