@@ -155,4 +155,36 @@ public class SparseMatrixTests
 			await Assert.That(shifted[2, 1]).IsEqualTo(6.0);
 		}
 	}
+
+	[Test]
+	public async Task Block_KeepsEntriesInsideWithRowAndColumnOffset()
+	{
+		// 4x4 with entries in and around the 2x2 block at (1, 2).
+		SparseMatrixCsc a = SparseMatrixCsc.FromTriplets(4, 4,
+		[
+			new SparseTriplet(0, 2, 1.0), new SparseTriplet(1, 2, 2.0), new SparseTriplet(2, 3, 3.0),
+			new SparseTriplet(3, 3, 4.0), new SparseTriplet(1, 1, 5.0), new SparseTriplet(2, 2, 6.0),
+		]);
+		SparseMatrixCsc block = a.Block(1, 2, 2, 2);
+		await Assert.That(block.Rows).IsEqualTo(2);
+		await Assert.That(block.Cols).IsEqualTo(2);
+		await Assert.That(block.NonZeros).IsEqualTo(3);
+		await Assert.That(block.ToDense().IsApprox(a.ToDense().Block(1, 2, 2, 2), 0.0)).IsTrue();
+		await Assert.That(block[0, 0]).IsEqualTo(2.0);
+		await Assert.That(block[1, 0]).IsEqualTo(6.0);
+		await Assert.That(block[1, 1]).IsEqualTo(3.0);
+	}
+
+	[Test]
+	public async Task Subtract_UnionOfNonOverlappingPatterns()
+	{
+		SparseMatrixCsc a = SparseMatrixCsc.FromTriplets(3, 2, [new SparseTriplet(0, 0, 1.0), new SparseTriplet(2, 1, 2.0)]);
+		SparseMatrixCsc b = SparseMatrixCsc.FromTriplets(3, 2, [new SparseTriplet(1, 0, 3.0), new SparseTriplet(0, 1, 4.0)]);
+		SparseMatrixCsc difference = a - b;
+		await Assert.That(difference.NonZeros).IsEqualTo(4);
+		await Assert.That(difference.RowIndices.ToArray()).IsEquivalentTo(new[] { 0, 1, 0, 2 }, CollectionOrdering.Matching);
+		await Assert.That(difference.ToDense().IsApprox(a.ToDense() - b.ToDense(), 0.0)).IsTrue();
+		await Assert.That(difference[1, 0]).IsEqualTo(-3.0);
+		await Assert.That(difference[0, 1]).IsEqualTo(-4.0);
+	}
 }

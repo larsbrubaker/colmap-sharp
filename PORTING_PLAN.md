@@ -77,7 +77,7 @@ Cancellation is checked between iterations only (like COLMAP). Optional: Vector1
 
 ### Phase 8 — Bundle adjustment
 Done: default and pose-prior Ceres bundle adjusters, cost functions, `ceres::Covariance` subset
-(dense QR, divergence 45); `covariance` (BA covariance) is on a branch pending merge.
+(dense QR, divergence 45), BA covariance (`Estimators/Covariance*.cs`).
 Skipped: CeresBundleAdjustmentOptions.FallsBackToCpuWithoutCudaDevice (CUDA), the CASPAR
 instantiations of the backend suites and `bundle_adjustment_caspar_test.cc` (GPU backend out of
 scope). Performance: ~2.6× slower than native Ceres on a 100-image synthetic scene (7.6 s vs

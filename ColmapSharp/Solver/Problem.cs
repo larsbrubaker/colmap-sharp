@@ -123,6 +123,14 @@ public sealed partial class Problem
 	/// <summary>True if the block starting at <paramref name="values"/> is in the problem.</summary>
 	public bool HasParameterBlock(ArraySegment<double> values) => Find(values) is not null;
 
+	/// <summary>
+	/// Problem::GetParameterBlocks: every parameter block, in insertion order. Ceres lists
+	/// them in the order of its std::map keyed by address, which has no C# counterpart;
+	/// insertion order is the reproducible choice (docs/CPP_DIVERGENCES.md, entry 53).
+	/// </summary>
+	public List<ArraySegment<double>> GetParameterBlocks() =>
+		Program.ParameterBlocks.Select(block => block.UserState).ToList();
+
 	/// <summary>Holds the block constant during optimization.</summary>
 	public void SetParameterBlockConstant(ArraySegment<double> values) =>
 		FindOrThrow(values, "set constant").IsSetConstant = true;

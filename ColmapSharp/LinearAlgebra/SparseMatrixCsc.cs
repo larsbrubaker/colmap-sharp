@@ -434,6 +434,85 @@ public sealed class SparseMatrixCsc
 	/// <summary>A^T A with only the <paramref name="part"/> triangle stored.</summary>
 	public SparseMatrixCsc TransposeTimesSelf(SymmetricPart part) => TransposeTimesSelf().TriangularPart(part);
 
+	/// <summary>
+	/// The stored entries inside the <paramref name="rows"/> x <paramref name="cols"/> block at
+	/// (<paramref name="row"/>, <paramref name="col"/>), as a new matrix (Eigen's
+	/// SparseMatrix::block() assigned to a SparseMatrix).
+	/// </summary>
+	public SparseMatrixCsc Block(int row, int col, int rows, int cols)
+	{
+		if (row < 0 || col < 0 || rows < 0 || cols < 0 || row + rows > Rows || col + cols > Cols)
+		{
+			throw new ArgumentOutOfRangeException(
+				nameof(row), $"Block ({row}, {col}, {rows}, {cols}) is outside a {Rows}x{Cols} matrix.");
+		}
+
+		var colPtr = new int[cols + 1];
+		var rowIdx = new List<int>();
+		var values = new List<double>();
+		for (int j = 0; j < cols; j++)
+		{
+			for (int p = _colPtr[col + j]; p < _colPtr[col + j + 1]; p++)
+			{
+				int i = _rowIdx[p] - row;
+				if (i >= 0 && i < rows)
+				{
+					rowIdx.Add(i);
+					values.Add(_values[p]);
+				}
+			}
+
+			colPtr[j + 1] = rowIdx.Count;
+		}
+
+		return new SparseMatrixCsc(rows, cols, colPtr, [.. rowIdx], [.. values]);
+	}
+
+	/// <summary>A - B over the union of both patterns (an entry only in B stores -b).</summary>
+	public static SparseMatrixCsc operator -(SparseMatrixCsc a, SparseMatrixCsc b)
+	{
+		if (a.Rows != b.Rows || a.Cols != b.Cols)
+		{
+			throw new ArgumentException($"Cannot subtract a {b.Rows}x{b.Cols} from a {a.Rows}x{a.Cols} sparse matrix.");
+		}
+
+		var colPtr = new int[a.Cols + 1];
+		var rowIdx = new List<int>(a.NonZeros + b.NonZeros);
+		var values = new List<double>(a.NonZeros + b.NonZeros);
+		for (int j = 0; j < a.Cols; j++)
+		{
+			// Merge the two sorted row lists of column j.
+			int pa = a._colPtr[j];
+			int pb = b._colPtr[j];
+			int ea = a._colPtr[j + 1];
+			int eb = b._colPtr[j + 1];
+			while (pa < ea || pb < eb)
+			{
+				int ia = pa < ea ? a._rowIdx[pa] : int.MaxValue;
+				int ib = pb < eb ? b._rowIdx[pb] : int.MaxValue;
+				if (ia == ib)
+				{
+					rowIdx.Add(ia);
+					values.Add(a._values[pa++] - b._values[pb++]);
+				}
+				else if (ia < ib)
+				{
+					rowIdx.Add(ia);
+					values.Add(a._values[pa++]);
+				}
+				else
+				{
+					rowIdx.Add(ib);
+					values.Add(-b._values[pb++]);
+				}
+			}
+
+			colPtr[j + 1] = rowIdx.Count;
+		}
+
+		return new SparseMatrixCsc(a.Rows, a.Cols, colPtr, [.. rowIdx], [.. values]);
+	}
+
 	/// <summary>Position of entry (i, j) in the value array, or -1 when it is not stored.</summary>
 	private int Find(int i, int j)
 	{

@@ -272,6 +272,53 @@ public sealed class SimplicialCholesky
 	}
 
 	/// <summary>
+	/// D of P A P^T = L D L^T (Eigen's SimplicialLDLT::vectorD()). LDLT only; needs a
+	/// successful factorization.
+	/// </summary>
+	public VectorXd VectorD()
+	{
+		if (!_factorized || _kind != SimplicialCholeskyKind.LDLT)
+		{
+			throw new InvalidOperationException("VectorD needs a successful LDLT factorization.");
+		}
+
+		return new VectorXd(_diag);
+	}
+
+	/// <summary>
+	/// The factor L of the permuted matrix (Eigen's matrixL()), diagonal stored: ones for
+	/// LDLT, L's diagonal for LLT. Needs a successful factorization.
+	/// </summary>
+	public SparseMatrixCsc MatrixL()
+	{
+		if (!_factorized)
+		{
+			throw new InvalidOperationException("MatrixL needs a successful factorization.");
+		}
+
+		// Each column's strict-lower rows were appended in increasing row order by the
+		// up-looking factorization, so putting the diagonal first keeps the rows sorted.
+		var colPtr = new int[_n + 1];
+		var rowIdx = new int[_lRowIdx.Length + _n];
+		var values = new double[_lRowIdx.Length + _n];
+		int q = 0;
+		for (int j = 0; j < _n; j++)
+		{
+			rowIdx[q] = j;
+			values[q++] = _kind == SimplicialCholeskyKind.LLT ? _diag[j] : 1.0;
+			for (int p = _lColPtr[j]; p < _lColPtr[j + 1]; p++)
+			{
+				rowIdx[q] = _lRowIdx[p];
+				values[q++] = _lValues[p];
+			}
+
+			colPtr[j + 1] = q;
+		}
+
+		return SparseMatrixCsc.FromCsc(_n, _n, colPtr, rowIdx, values);
+	}
+
+	/// <summary>
 	/// Builds the upper triangle of C = P A P^T in CSC form from the configured triangle of A,
 	/// and the map from A's entries to C's value slots.
 	/// </summary>

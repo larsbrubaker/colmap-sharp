@@ -1203,6 +1203,39 @@ COLMAP's order carries no meaning and varies run to run.
 **Evidence.** `IncrementalTriangulatorTests` (incremental_triangulator_test.cc 1:1) pass;
 their counts do not depend on the order on the noise-free synthetic scenes.
 
+## 53. Problem.GetParameterBlocks lists blocks in insertion order
+
+**What differs.** Ceres' `Problem::GetParameterBlocks` walks the problem's `std::map` keyed by
+the blocks' addresses, so it lists them in memory-address order. The port
+(`Solver/Problem.cs`) lists them in insertion order. The one caller,
+`GetOtherParams` in `Estimators/Covariance.cs` (colmap/estimators/covariance.cc), uses the order
+to lay out the "other" blocks (camera intrinsics, sensor_from_rig poses) after the poses in
+the Schur complement and in `L_inv`.
+
+**Why.** .NET arrays have no stable address, and address order is an accident of the
+allocator in C++ as well. The layout changes only the elimination order inside the sparse
+factorization, not the covariances beyond round-off.
+
+**Evidence.** `BACovarianceTests` (covariance_test.cc 1:1) checks `GetOtherParamsCov` against
+ceres::Covariance at COLMAP's 1e-8 tolerance.
+
+## 54. BA covariance factors with our sparse products and Cholesky instead of Eigen's
+
+**What differs.** COLMAP's `EstimateBACovariance` (colmap/estimators/covariance.cc) forms the
+Schur complement with `Eigen::SparseMatrix` products, eliminates the other parameters with
+`Eigen::SimplicialLLT`, and factors the result with `Eigen::SimplicialLDLT` (AMD ordering)
+before inverting L densely. The port (`Estimators/Covariance.Schur.cs`) does the same steps
+with `LinearAlgebra/SparseMatrixCsc.cs` and `LinearAlgebra/SimplicialCholesky.cs`, whose AMD
+ordering and summation order differ from Eigen's. The damping, the rank test (|D| > 1e-6),
+the D^-1/2 row scaling with `DBL_MIN` floor and the permutation are COLMAP's. The results
+agree to round-off.
+
+**Why.** Eigen is MPL-2.0 (CLAUDE.md contract 2), so its sparse module is replaced, not ported.
+
+**Evidence.** `BACovarianceTests` (covariance_test.cc 1:1, all seven instantiations) passes at
+COLMAP's 1e-8 element tolerance against ceres::Covariance; the largest observed difference is
+about 2e-12 on pose covariances of about 8e-5.
+
 ## 57. The covariant SIFT extractor orders equal (octave, level) features stably
 
 **What differs.** COLMAP's `CovariantSiftCPUFeatureExtractor` (feature/sift.cc) sorts the
