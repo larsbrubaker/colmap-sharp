@@ -44,9 +44,9 @@ resampler matching OIIO within 1 grey level, `docs/CPP_DIVERGENCES.md`); porting
 resize (Apache-2.0) would make it exact if a fixture ever needs that.
 
 ### Phase 4 — Scene
-`camera` (then add `TwoViewGeometry.camera1/camera2` and their swap in `Invert`), `frame`,
-`image`, `rig`, `pose_graph` (+ `pose_graph_test.cc`; its component functions take a
-`Reconstruction`), `projection`, `reconstruction`, `reconstruction_io` (COLMAP binary and text
+`rig` (scene/rig: `ReadRigConfig`/`ApplyRigConfig` + `rig_test.cc`; needs database,
+reconstruction and synthetic), `pose_graph` (+ `pose_graph_test.cc`; its component functions take a
+`Reconstruction`), `reconstruction`, `reconstruction_io` (COLMAP binary and text
 formats, so pycolmap-written models become fixtures), `reconstruction_manager`,
 `reconstruction_pruning`, `synthetic` (the synthetic dataset generator that most downstream
 tests use), `database` (in-memory store with COLMAP's API), `database_cache`,

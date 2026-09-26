@@ -23,6 +23,21 @@ public class CheckTests
 	}
 
 	[Test]
+	public async Task That_InterpolatedMessageIsFormattedOnlyOnFailure()
+	{
+		// A passing check must not evaluate the holes of its interpolated message (C++ only
+		// streams `<< message` on failure); a failing one appends it like a string message.
+		var formatted = new CountingFormattable();
+		Check.That(true, $"never {formatted}");
+		await Assert.That(formatted.Count).IsEqualTo(0);
+
+		int id = 7;
+		var exception = Assert.Throws<ArgumentException>(() => Check.That(id < 0, $"id={id} {formatted}"));
+		await Assert.That(formatted.Count).IsEqualTo(1);
+		await Assert.That(exception.Message).Matches(@"^\[CheckTests\.cs:\d+\] Check failed: id < 0 id=7 formatted$");
+	}
+
+	[Test]
 	public async Task Ge_FailureMessageMatchesColmap()
 	{
 		double p = -1.5;
@@ -69,5 +84,17 @@ public class CheckTests
 		await Assert.That(Check.NotNull(present)).IsEqualTo("x");
 		var exception = Assert.Throws<ArgumentException>(() => Check.NotNull(missing));
 		await Assert.That(exception.Message).Matches(@"^\[CheckTests\.cs:\d+\] 'missing' Must be non NULL$");
+	}
+
+	// Counts how often the interpolation handler formats it.
+	private sealed class CountingFormattable : IFormattable
+	{
+		public int Count { get; private set; }
+
+		public string ToString(string? format, IFormatProvider? formatProvider)
+		{
+			Count++;
+			return "formatted";
+		}
 	}
 }

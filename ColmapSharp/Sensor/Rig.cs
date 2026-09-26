@@ -80,7 +80,7 @@ public sealed class Rig : IEquatable<Rig>
 	public void AddSensor(SensorId sensorId, Rigid3d? sensorFromRig = null)
 	{
 		Check.Ge(NumSensors, 1, "The reference sensor needs to be added first before other sensors.");
-		Check.That(!HasSensor(sensorId), string.Create(CultureInfo.InvariantCulture, $"Sensor ({sensorId.Type.ToColmapString()}, {sensorId.Id}) is inserted twice into the rig"));
+		Check.That(!HasSensor(sensorId), $"Sensor ({sensorId.Type.ToColmapString()}, {sensorId.Id}) is inserted twice into the rig");
 		_sensorsFromRig.Add(sensorId, sensorFromRig);
 	}
 
@@ -183,7 +183,7 @@ public sealed class Rig : IEquatable<Rig>
 	private Rigid3d? FindSensorFromRigOrThrow(SensorId sensorId)
 	{
 		Check.That(sensorId != RefSensorId, "The reference sensor does not have a SensorFromRig transformation, which is fixed to identity");
-		Check.That(_sensorsFromRig.TryGetValue(sensorId, out Rigid3d? sensorFromRig), string.Create(CultureInfo.InvariantCulture, $"Sensor ({sensorId.Type.ToColmapString()}, {sensorId.Id}) not found in the rig"));
+		Check.That(_sensorsFromRig.TryGetValue(sensorId, out Rigid3d? sensorFromRig), $"Sensor ({sensorId.Type.ToColmapString()}, {sensorId.Id}) not found in the rig");
 		return sensorFromRig;
 	}
 }

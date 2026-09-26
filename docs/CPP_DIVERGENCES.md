@@ -330,3 +330,21 @@ builds and is left for when profiling shows RANSAC is a bottleneck.
 `LoRansacTests.LORANSAC_ParallelSimilarityTransform` (1:1, `num_threads = 4`) pass with
 COLMAP's expectations. The C#-only `RansacTests.CSharpOnly_ParallelRequiresRandomSampler`
 pins the kept validation.
+
+## 20. CSV number parsing uses .NET's invariant parser
+
+**What differs.** `Util/Misc.CsvToDoubleVector` (COLMAP's `CSVToVector<double>`, used by
+`Camera.SetParamsFromString`) parses each element with `double.TryParse(NumberStyles.Float,
+InvariantCulture)` instead of COLMAP's `StringToDouble`, which reads with a classic-locale
+`std::istringstream` and rejects trailing characters. Both accept plain decimal and
+exponent notation ("1", "-0.5", "1e-3", ".5") and reject words ("invalid"). They can disagree
+on edge spellings: .NET accepts "Infinity", "NaN" and "∞", which libc++'s stream parsing
+handles differently, and .NET rejects hexadecimal floats ("0x1p3").
+
+**Why.** Porting libc++'s `num_get` to match those spellings would be porting a C++ standard
+library for inputs COLMAP never writes: every string that reaches this parser in COLMAP's
+own formats is produced by `VectorToCSV` (decimal, `%g`-style), which both parsers read the
+same way.
+
+**Evidence.** `CameraTests.Camera_ParamsFromString` and `Camera_ParamsToString` pass 1:1,
+which read and write parameter lists in exactly the notation both parsers agree on.

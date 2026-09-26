@@ -15,9 +15,9 @@
 //   matrices and pose are nullable value types.
 // - config is an int in COLMAP holding a ConfigurationType; here it is the enum itself, with
 //   COLMAP's numeric values, so storage code can cast it to and from int.
-// - COLMAP 4.2's struct also carries `std::optional<Camera> camera1, camera2` (intrinsics a
-//   two-view solver estimated), which Invert swaps. Camera is not ported yet; those two
-//   members, and the swap in Invert, are added with it.
+// - `std::optional<Camera> camera1, camera2` (intrinsics a two-view solver estimated) are
+//   nullable Camera references; Clone copies them (Camera.Clone), since C++ copies the
+//   optional by value, and Invert swaps them.
 
 using ColmapSharp.Feature;
 using ColmapSharp.Geometry;
@@ -85,6 +85,18 @@ public sealed class TwoViewGeometry
 	/// <summary>Relative pose from the first to the second camera, if estimated.</summary>
 	public Rigid3d? Cam2FromCam1 { get; set; }
 
+	/// <summary>
+	/// Side 1's intrinsics as recovered by the two-view solver, or null if that side was not
+	/// estimated.
+	/// </summary>
+	public Camera? Camera1 { get; set; }
+
+	/// <summary>
+	/// Side 2's intrinsics as recovered by the two-view solver, or null if that side was not
+	/// estimated.
+	/// </summary>
+	public Camera? Camera2 { get; set; }
+
 	/// <summary>Inlier matches of the configuration (FeatureMatches).</summary>
 	public List<FeatureMatch> InlierMatches { get; set; } = [];
 
@@ -101,6 +113,8 @@ public sealed class TwoViewGeometry
 			F = F,
 			H = H,
 			Cam2FromCam1 = Cam2FromCam1,
+			Camera1 = Camera1?.Clone(),
+			Camera2 = Camera2?.Clone(),
 			InlierMatches = new List<FeatureMatch>(InlierMatches),
 			TriAngle = TriAngle,
 		};
@@ -128,6 +142,8 @@ public sealed class TwoViewGeometry
 		{
 			Cam2FromCam1 = cam2FromCam1.Inverse();
 		}
+
+		(Camera1, Camera2) = (Camera2, Camera1);
 
 		System.Span<FeatureMatch> matches = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(InlierMatches);
 		for (int i = 0; i < matches.Length; i++)

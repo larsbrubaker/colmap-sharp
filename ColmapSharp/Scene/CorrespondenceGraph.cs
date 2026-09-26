@@ -173,16 +173,8 @@ public sealed class CorrespondenceGraph
 		// sure that only unique correspondences are counted.
 		ulong pairId = Types.ImagePairToPairId(imageId1, imageId2);
 		var imagePair = new ImagePair();
-		if (!imagePairs.TryAdd(pairId, imagePair))
-		{
-			// The message is only formatted on failure; this runs once per image pair.
-			Check.That(
-				false,
-				string.Create(
-					CultureInfo.InvariantCulture,
-					$"Two view geometry for image pair was already added: image_id1={imageId1}, image_id2={imageId2}"),
-				"inserted");
-		}
+		bool inserted = imagePairs.TryAdd(pairId, imagePair);
+		Check.That(inserted, $"Two view geometry for image pair was already added: image_id1={imageId1}, image_id2={imageId2}");
 
 		imagePair.NumMatches = (uint)inlierMatches.Count;
 

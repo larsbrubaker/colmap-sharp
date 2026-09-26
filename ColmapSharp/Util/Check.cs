@@ -17,6 +17,13 @@
 //
 // COLMAP throws std::invalid_argument for all of these (LogMessageFatalThrowDefault), which
 // maps to ArgumentException.
+//
+// C++'s `THROW_CHECK(x) << a << b` only streams the message when the check fails. A plain
+// string argument would be formatted on every call, so Check.That also takes an interpolated
+// string through CheckMessageHandler (the same trick as Debug.Assert's handler): an
+// interpolated message is only built when the condition is false. Holes are formatted with
+// the invariant culture; a double hole prints C#'s shortest round-trip form, not an
+// ostream's 6 significant digits, so pass CppStreamFormat.FormatDouble(x) where that matters.
 
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -42,6 +49,23 @@ internal static class Check
 		if (!condition)
 		{
 			throw Fail($"Check failed: {expression} ", message, file, line);
+		}
+	}
+
+	/// <summary>
+	/// Port of THROW_CHECK(condition) &lt;&lt; message with an interpolated message, which is only
+	/// formatted when <paramref name="condition"/> is false.
+	/// </summary>
+	public static void That(
+		[DoesNotReturnIf(false)] bool condition,
+		[InterpolatedStringHandlerArgument(nameof(condition))] ref CheckMessageHandler message,
+		[CallerArgumentExpression(nameof(condition))] string expression = "",
+		[CallerFilePath] string file = "",
+		[CallerLineNumber] int line = 0)
+	{
+		if (!condition)
+		{
+			throw Fail($"Check failed: {expression} ", message.ToStringAndClear(), file, line);
 		}
 	}
 
@@ -192,4 +216,41 @@ internal static class Check
 			_ => value.ToString() ?? string.Empty,
 		};
 	}
+}
+
+/// <summary>
+/// Interpolated string handler for <see cref="Check.That(bool, ref CheckMessageHandler, string, string, int)"/>:
+/// appends nothing unless the checked condition is false, so a passing check never formats
+/// its message.
+/// </summary>
+[InterpolatedStringHandler]
+internal ref struct CheckMessageHandler
+{
+	private DefaultInterpolatedStringHandler _builder;
+	private readonly bool _enabled;
+
+	/// <summary>Called by the compiler with the checked condition.</summary>
+	public CheckMessageHandler(int literalLength, int formattedCount, bool condition, out bool shouldAppend)
+	{
+		_enabled = !condition;
+		shouldAppend = _enabled;
+		_builder = _enabled
+			? new DefaultInterpolatedStringHandler(literalLength, formattedCount, CultureInfo.InvariantCulture)
+			: default;
+	}
+
+	/// <summary>Appends a literal part.</summary>
+	public void AppendLiteral(string value) => _builder.AppendLiteral(value);
+
+	/// <summary>Appends a hole, formatted invariantly.</summary>
+	public void AppendFormatted<T>(T value) => _builder.AppendFormatted(value);
+
+	/// <summary>Appends a hole with a format string, formatted invariantly.</summary>
+	public void AppendFormatted<T>(T value, string? format) => _builder.AppendFormatted(value, format);
+
+	/// <summary>Appends a string hole.</summary>
+	public void AppendFormatted(string? value) => _builder.AppendFormatted(value);
+
+	/// <summary>The built message, or "" when the check passed.</summary>
+	internal string ToStringAndClear() => _enabled ? _builder.ToStringAndClear() : string.Empty;
 }

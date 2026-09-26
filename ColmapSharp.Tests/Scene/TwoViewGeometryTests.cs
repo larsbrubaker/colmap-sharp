@@ -9,6 +9,7 @@ using ColmapSharp.Feature;
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Scene;
+using ColmapSharp.Sensor;
 
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
@@ -53,6 +54,25 @@ public class TwoViewGeometryTests
 
 		twoViewGeometry.Invert();
 		await CheckState(twoViewGeometry, new Vector3d(0, 1, 2), [new FeatureMatch(0, 1), new FeatureMatch(2, 3)]);
+	}
+
+	// C#-only (two_view_geometry_test.cc does not cover camera1/camera2): Invert swaps the
+	// per-side intrinsics, and Clone copies them by value like the C++ copy of an optional.
+	[Test]
+	public async Task InvertAndCloneCameras()
+	{
+		Camera camera1 = Camera.CreateFromModelId(1, CameraModelId.SimplePinhole, 100, 10, 10);
+		var twoViewGeometry = new TwoViewGeometry { Camera1 = camera1 };
+		TwoViewGeometry copy = twoViewGeometry.Clone();
+		twoViewGeometry.Invert();
+		using (Assert.Multiple())
+		{
+			await Assert.That(twoViewGeometry.Camera1).IsNull();
+			await Assert.That(ReferenceEquals(twoViewGeometry.Camera2, camera1)).IsTrue();
+			await Assert.That(copy.Camera1 == camera1).IsTrue();
+			await Assert.That(ReferenceEquals(copy.Camera1, camera1)).IsFalse();
+			await Assert.That(copy.Camera2).IsNull();
+		}
 	}
 
 	private static async Task CheckState(TwoViewGeometry twoViewGeometry, Vector3d translation, FeatureMatch[] matches)
