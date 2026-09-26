@@ -223,4 +223,13 @@ public class BaseControllerTests
 		cts.Cancel();
 		await Assert.That(controller.CheckIfStopped()).IsTrue();
 	}
+
+	// C#-only: AddCallback / Callback on an unregistered id fail COLMAP's CHECK.
+	[Test]
+	public async Task CSharpOnly_UnregisteredCallbackIdThrows()
+	{
+		var controller = new TestController();
+		await Assert.That(() => controller.AddCallback(3, () => { })).Throws<ArgumentException>();
+		await Assert.That(() => controller.Callback(3)).Throws<ArgumentException>();
+	}
 }

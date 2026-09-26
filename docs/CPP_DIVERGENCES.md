@@ -1757,3 +1757,49 @@ with smallest id 1 stays ahead of a child of size 3 with smallest id 5 (neither 
 **Evidence.** `SceneClusteringTests.CSharpOnly_FlatChildClustersOrderedBySizeThenSmallestId`
 pins the order; `SceneClustering_ThreeFlatClusters` and `_ThreeFlatClustersTwoOverlap`
 (1:1, order-insensitive as in COLMAP) pass.
+
+## 98. The undistorters hand their images to a host sink, and "copy" re-hands the decoded image
+
+**What differs.** COLMAP's undistorter controllers (`controllers/undistorters.cc`) read
+images from `image_path` with `Bitmap::Read` and write them with `Bitmap::Write`
+(OpenImageIO). The ports (`Controllers/ColmapUndistorter.cs`, `PmvsUndistorter.cs`,
+`StandaloneImageUndistorter.cs`) read through an `IImageSource` (entry 82) and write through
+an `IBitmapSink` (`Controllers/BitmapSink.cs`) under the same output paths; the requested
+JPEG quality travels as the bitmap's "Compression" metadata, as in COLMAP. Where COLMAP
+`FileCopy`s an image that needs no undistortion (already undistorted, or a non-perspective
+camera without `max_image_size`), the port hands the host's decoded image to the sink
+unchanged, so a file-writing host re-encodes it instead of copying its bytes. The
+`copy_type` option (copy / hard link / symlink) of `COLMAPUndistorter` and
+`StandaloneImageUndistorter` is therefore not ported. Text outputs (configs, scripts,
+projection matrices, bundle and visibility files) and directories are written to disk as in
+COLMAP. `ColmapUndistorter.UndistortedReconstruction` (C#-only) exposes the reconstruction it
+writes to `sparse/`.
+
+**Why.** OpenImageIO is native and excluded (docs/LICENSE_AUDIT.md); MatterCAD (also in the
+browser) owns image decoding and encoding. `InMemoryBitmapStore` is both the sink and the MVS
+`IBitmapSource`, so MatterCAD can go from undistortion to `Mvs.Workspace` with no image files.
+
+**Evidence.** `UndistortersTests` (undistorters_test.cc 1:1, image existence checked in the
+store) pass; `CSharpOnly_ColmapTextOutputsMatchPycolmap` and
+`CSharpOnly_PmvsTextOutputsMatchPycolmap` match pycolmap 4.2.0's text files byte for byte;
+`CSharpOnly_UndistortedWorkspaceFeedsMvsWithoutFiles` runs the in-memory hand-off.
+
+## 99. The undistorters run images in batches, so a stop finishes the batch in flight
+
+**What differs.** COLMAP queues every image on a `ThreadPool`, then waits on the futures in
+order, checking `CheckIfStopped` before each; on a stop, `ThreadPool::Stop` drops the tasks no
+thread has picked up, and the ones already running finish. The port (`Undistorters.RunTasks`)
+starts `num_threads` images at a time with `Parallel.For` and checks `CheckIfStopped` before
+consuming each image's result, starting the next batch only when not stopped. Which images
+were already written when a stop is seen can therefore differ; what COLMAP guarantees (no
+sparse model, configs or scripts after a stop, and no exception) is the same. The stop check
+also returns true when the controller's `BaseController.CancellationToken` is cancelled,
+the library's stand-in for COLMAP's Ctrl-C (`ScopedSignalHandler`). PMVS's `option-all`
+writes `Environment.ProcessorCount` where COLMAP writes `std::thread::hardware_concurrency()`.
+
+**Why.** CLAUDE.md maps ThreadPool to `Parallel.For` with per-slot writes and asks for
+sequential and parallel runs to agree, and for cancellation through `CancellationToken`.
+
+**Evidence.** `UndistortersTests.COLMAPUndistorter_StopsPendingWork`,
+`CSharpOnly_CancellationTokenStopsWithoutThrowing`, `CSharpOnly_ThreadCountDoesNotChangeImages`
+and `BaseControllerTests.BaseController_CancellationTokenStops` pass.

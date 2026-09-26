@@ -96,7 +96,6 @@ Skipped (Caspar GPU BA out of scope): the `caspar` assertion lines in
 DefaultMaxNumIterationsUsesBackendDefaults.
 
 ### Phase 11 — Pipeline controllers
-`undistorters`,
 `automatic_reconstruction` (minus CGAL/GPU branches), cancellation + progress surface.
 Skipped (retrieval out of scope): `pairing_test.cc` VocabTreePairGenerator.Nominal,
 VocabTreePairGenerator.DoesNotDeadlockOnFailedQuery, SequentialPairGenerator.LoopDetectionMinIndexDistance, `feature_matching_test.cc` CreateVocabTreeFeatureMatcher.Nominal.
