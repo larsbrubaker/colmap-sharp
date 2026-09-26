@@ -94,6 +94,16 @@ public sealed class FemTree
 		Init();
 	}
 
+	/// <summary>
+	/// The signature the FEM_FLAG_1 flags were last set for, or -1 when they are stale
+	/// (FEMTree::_femSigs1, memset to -1 by the constructor and setSortedTreeNodes). The flags are
+	/// only recomputed when a caller asks for a different signature (PoissonFemConstraints).
+	/// </summary>
+	public int FemSignature1 { get; set; } = -1;
+
+	/// <summary>The same for FEM_FLAG_2 (FEMTree::_femSigs2).</summary>
+	public int FemSignature2 { get; set; } = -1;
+
 	/// <summary>The global root (FEMTree::_tree).</summary>
 	public int Root { get; }
 

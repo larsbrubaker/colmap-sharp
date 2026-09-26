@@ -284,7 +284,7 @@ public static class PoissonFinalize
 	/// <summary>
 	/// Sorts the active nodes (SortedTreeNodes, renumbering them to their sorted positions),
 	/// sets the space flags, sets the index of inactive nodes to -1, and re-keys the node data
-	/// to the new indices. Returns the map (new index to old). Port of
+	/// to the new indices, and marks the FEM validity flags stale. Returns the map (new index to old). Port of
 	/// <c>setSortedTreeNodes( interpolationInfos , data )</c>.
 	/// </summary>
 	public static int[] SetSortedTreeNodes(FemTree tree, SortedTreeNodes sorted, params SparseNodeData?[] data)
@@ -303,6 +303,9 @@ public static class PoissonFinalize
 			field?.RemapIndices(map, sorted.Size);
 		}
 
+		// The FEM validity flags belong to the old order.
+		tree.FemSignature1 = -1;
+		tree.FemSignature2 = -1;
 		return map;
 	}
 

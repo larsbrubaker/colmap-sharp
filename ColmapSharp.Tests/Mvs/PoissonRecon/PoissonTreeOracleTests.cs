@@ -16,7 +16,8 @@
 // the harness printed it. Dumps longer than 1024 values are stored as checksums of 256-value
 // chunks (the harness's PrintChunks); a mismatch there reports the first differing chunk.
 // This file holds the tree-stage tests and the shared helpers; the density, splat,
-// interpolation and finalize stages are in PoissonTreeOracleTests.Stages.cs.
+// interpolation and finalize stages are in PoissonTreeOracleTests.Stages.cs, and the system
+// assembly after finalizing (poisson_system.json) in PoissonTreeOracleTests.System.cs.
 //
 // The harness generates its input points (a noisy ellipsoid shell with some zero, non-finite
 // and coincident samples) and prints them as each run's "input" case, so this test replays

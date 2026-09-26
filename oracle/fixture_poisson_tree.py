@@ -7,6 +7,8 @@
 #                       NeighborKey, SortedTreeNodes, PoissonDensity, PoissonSplat,
 #                       PoissonInterpolation, PoissonFinalize)
 #   poisson_fem.json    oracle/poisson_fem_harness.cc: the FEM integrators and their stencils
+#   poisson_system.json oracle/poisson_system_harness.cc: the system assembly after finalizing
+#                       (PoissonFemConstraints)
 #   poisson_libm.json   oracle/poisson_libm_harness.cc: libm's pow( x , 1./3 ) and logf
 # Tier A, bit-exact. Read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests*.cs.
 #
@@ -20,10 +22,12 @@
 # harness's "powonethird/y" is the platform libm's pow, which is not correctly rounded for every input
 # (docs/CPP_DIVERGENCES.md, entry 75).
 #
-# Usage: oracle/.venv/bin/python oracle/fixture_poisson_tree.py   (any python3 works;
-# COLMAP_REFERENCE=<checkout> when cpp-reference/ is not next to this repo's oracle/)
+# Usage: oracle/.venv/bin/python oracle/fixture_poisson_tree.py [fixture.json ...]   (any
+# python3 works; COLMAP_REFERENCE=<checkout> when cpp-reference/ is not next to this repo's
+# oracle/; naming fixtures regenerates only those)
 
 import math
+import sys
 from decimal import Decimal, getcontext
 
 from fixture_poisson_bspline import write_fixture
@@ -41,7 +45,15 @@ def add_correct_pow(cases):
     cases["powonethird/correct"] = [correctly_rounded_pow_one_third(x) for x in cases["powonethird/x"]]
 
 
+HARNESSES = [
+    ("poisson_tree_harness.cc", "poisson_tree.json", None),
+    ("poisson_fem_harness.cc", "poisson_fem.json", None),
+    ("poisson_libm_harness.cc", "poisson_libm.json", add_correct_pow),
+    ("poisson_system_harness.cc", "poisson_system.json", None),
+]
+
 if __name__ == "__main__":
-    write_fixture("poisson_tree_harness.cc", "poisson_tree.json")
-    write_fixture("poisson_fem_harness.cc", "poisson_fem.json")
-    write_fixture("poisson_libm_harness.cc", "poisson_libm.json", add_correct_pow)
+    wanted = set(sys.argv[1:])
+    for harness, fixture, postprocess in HARNESSES:
+        if not wanted or fixture in wanted:
+            write_fixture(harness, fixture, postprocess)

@@ -212,6 +212,54 @@ public sealed class FemConstraintIntegrator
 		return stencils;
 	}
 
+	/// <summary>
+	/// The child-parent stencils, one per child corner c (the same corner layout as
+	/// <see cref="SetParentChildStencils"/>): entry i holds the CDim integrals of the test function
+	/// at the corner of the brood against constraint function center/2 + overlapStart + i one
+	/// depth coarser. Port of <c>setStencils&lt;false&gt;( CPStencils )</c>.
+	/// </summary>
+	public double[][] SetChildParentStencils()
+	{
+		int n = OverlapSize;
+
+		// [NOTE] We want the center to be at the first node of the brood, which is not the case when childDepth is 1.
+		int center = ((1 << HighDepth) >> 1 >> 1) << 1;
+		int overlapStart = BSplineOverlapSizes.For(FemSignature.Degree(TestSignature), FemSignature.Degree(ConstraintSignature)).OverlapStart;
+		var stencils = new double[8][];
+		Span<int> fineCenter = stackalloc int[Dim];
+		Span<int> cOffset = stackalloc int[Dim];
+		for (int o0 = 0; o0 < 2; o0++)
+		{
+			fineCenter[2] = o0 + center;
+			for (int o1 = 0; o1 < 2; o1++)
+			{
+				fineCenter[1] = o1 + center;
+				for (int o2 = 0; o2 < 2; o2++)
+				{
+					fineCenter[0] = o2 + center;
+					var stencil = new double[n * n * n * CDim];
+					for (int i0 = 0; i0 < n; i0++)
+					{
+						cOffset[0] = i0 + (center / 2) + overlapStart;
+						for (int i1 = 0; i1 < n; i1++)
+						{
+							cOffset[1] = i1 + (center / 2) + overlapStart;
+							for (int i2 = 0; i2 < n; i2++)
+							{
+								cOffset[2] = i2 + (center / 2) + overlapStart;
+								CpIntegrate(fineCenter, cOffset, stencil.AsSpan((((i0 * n) + i1) * n + i2) * CDim, CDim));
+							}
+						}
+					}
+
+					stencils[((o0 * 2) + o1) * 2 + o2] = stencil;
+				}
+			}
+		}
+
+		return stencils;
+	}
+
 	private static int Cube(int x) => x * x * x;
 
 	// Port of _integrate / _integral: 0 = child-child, 1 = parent-child, 2 = child-parent.
