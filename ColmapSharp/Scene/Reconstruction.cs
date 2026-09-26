@@ -7,12 +7,12 @@
 // links on both sides consistent. This file holds the storage, the accessors, copying and
 // the add/delete/register operations (the first half of reconstruction.cc);
 // Reconstruction.Queries.cs holds validation, tear-down, normalization, transforms,
-// cropping, lookups and statistics (the second half). Tests:
+// cropping, lookups and statistics (the second half); Reconstruction.IO.cs holds
+// Read/Write/ReadText/ReadBinary/WriteText/WriteBinary. Tests:
 // ColmapSharp.Tests/Scene/ReconstructionTests*.cs (reconstruction_test.cc).
 //
 // Not ported yet, each waiting on its own port: Load (scene/database_cache),
-// TranscribeImageIdsToDatabase (scene/database), Read/Write/ReadText/ReadBinary/WriteText/
-// WriteBinary (scene/reconstruction_io), ConvertToPLY/ImportPLY (util/ply), and
+// TranscribeImageIdsToDatabase (scene/database), ConvertToPLY/ImportPLY (util/ply), and
 // ExtractColorsForImage/ExtractColorsForAllImages (they read image files through
 // Bitmap::Read, which is not ported: the host decodes images).
 //

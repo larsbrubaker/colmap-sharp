@@ -508,6 +508,38 @@ no model for that RANSAC hypothesis.
 Matlab reference values, 1e-6) and `FundamentalSevenPointEstimator_Nominal` (100 random
 problems, at least one model equal to the true F up to scale) pass 1:1.
 
+## 25. Reconstruction text reading takes whole tokens; image names must be UTF-8
+
+**What differs.** Two things in `Scene/ReconstructionIO*.cs` and `Scene/CppLineTokens.cs`:
+- *Tokens.* COLMAP's text readers extract values with libc++'s `istream >>`, which stops at
+  the first character that cannot continue a number and leaves the rest for the next
+  extraction: `"12abc"` read into an integer gives 12, and the next read sees `"abc"`.
+  `CppLineTokens` takes whitespace-separated tokens whole, so `"12abc"` (or `"1.5"` read as an
+  integer) fails that read. Everything else follows libc++ as probed with a libc++ harness:
+  unsigned reads accept a leading `-` and wrap (`"-1"` is the maximum) and fail above the
+  maximum; double reads accept decimal and hexadecimal floats (`"0x1p3"` = 8), reject `inf`
+  and `nan`, and fail on overflow and on inexact underflow below the normal range (strtod's
+  ERANGE). One corner is approximated: a *decimal* token whose value is an exactly
+  representable subnormal fails here but reads in libc++.
+- *Image names.* COLMAP keeps an image name as a `std::string` of raw bytes, so any byte
+  sequence (Latin-1, Shift-JIS, ...) loads and is written back unchanged. `Image.Name` is a
+  C# string, so both readers decode names as strict UTF-8, and a name that is not valid UTF-8
+  throws `InvalidDataException` naming the file and the image id and telling the user to
+  re-save the name as UTF-8. Writers encode names as UTF-8, so UTF-8 names round-trip byte for
+  byte.
+
+**Why.** Every file COLMAP writes separates values with spaces and never glues a number to
+other text, so whole-token parsing reads every COLMAP-written file exactly as COLMAP does;
+reproducing num_get's partial-token behavior only changes how malformed files fail. For
+names, silently decoding with replacement characters (or Latin-1) would load a model whose
+names no longer match the image files on disk, which the user would only discover later; a
+clear error at load time is the safer behavior, and COLMAP itself writes UTF-8 names on every
+platform that produces them.
+
+**Evidence.** `ReconstructionIOOracleTests` read and re-write pycolmap-written models byte
+for byte. `ReconstructionIORobustnessTests` pin the token rules (the libc++ probe results),
+the multibyte-name round trip (`"café/画像.jpg"`, binary and text) and the non-UTF-8 error.
+
 ## 26. re3q3's random change of variables uses a fixed-seed mt19937, not std::rand
 
 **What differs.** PoseLib's `re3q3` (P4Pf's three-quadratics solver,

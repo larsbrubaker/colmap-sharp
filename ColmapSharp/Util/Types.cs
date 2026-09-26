@@ -153,6 +153,18 @@ public static class SensorTypeExtensions
 		SensorType.Imu => "IMU",
 		_ => throw new ArgumentOutOfRangeException(nameof(type)),
 	};
+
+	/// <summary>
+	/// SensorTypeFromString (MAKE_ENUM_CLASS): the SensorType spelled "INVALID", "CAMERA" or
+	/// "IMU". Anything else throws with COLMAP's std::runtime_error message.
+	/// </summary>
+	public static SensorType SensorTypeFromString(string value) => value switch
+	{
+		"INVALID" => SensorType.Invalid,
+		"CAMERA" => SensorType.Camera,
+		"IMU" => SensorType.Imu,
+		_ => throw new InvalidOperationException($"Unknown string value: {value} for enum: SensorType"),
+	};
 }
 
 /// <summary>

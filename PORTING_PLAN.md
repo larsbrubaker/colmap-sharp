@@ -34,20 +34,23 @@ resampler matching OIIO within 1 grey level, `docs/CPP_DIVERGENCES.md`); porting
 resize (Apache-2.0) would make it exact if a fixture ever needs that.
 
 ### Phase 4 — Scene
-`rig` (scene/rig: `ReadRigConfig`/`ApplyRigConfig` + `rig_test.cc`; needs database,
-reconstruction and synthetic), `pose_graph` (+ `pose_graph_test.cc`; its component functions take a
-`Reconstruction`), `reconstruction` remainder (`Load`, `TranscribeImageIdsToDatabase`,
-Read/Write*, ConvertToPLY/ImportPLY, ExtractColors*; deferred `reconstruction_test.cc` cases
-ConstructCopy, AssignCopy, Print, SetRigsAndFramesResetsNumRegImages,
-DeleteAllPoints2DAndPoints3D, TearDown, SetRigsAndFrames, TranscribeImageIdsToDatabase,
-ConvertToPLY, ImportPLYFromVector, ReadWriteTextRoundtrip, ReadWriteBinaryRoundtrip,
-ReadAutoDetectFormat, ExtractColorsForAllImages; `reconstruction_matchers_test.cc` Eq/Near;
-add an IdMap test that reaches `Compact()`), `reconstruction_io` (COLMAP binary and text
-formats, so pycolmap-written models become fixtures), `reconstruction_manager`,
-`reconstruction_pruning`, `synthetic` (the synthetic dataset generator that most downstream
-tests use), `database_cache`,
-`scene_clustering`, `reconstruction_clustering`. Before the pipeline phases, decide how the
-library surfaces COLMAP's `LOG(WARNING)` messages (dropped for now).
+- `synthetic` (the synthetic dataset generator most downstream tests use).
+- `database_cache`, `reconstruction_manager`, `reconstruction_pruning`, `Reconstruction.Load`,
+  `TranscribeImageIdsToDatabase`.
+- `rig` (scene/rig: `ReadRigConfig`/`ApplyRigConfig` + `rig_test.cc`; needs synthetic).
+- `pose_graph` (+ `pose_graph_test.cc`; component functions take a `Reconstruction`).
+- `util/ply` (+ `ply_test.cc`), `Reconstruction.ConvertToPLY`/`ImportPLY`, and
+  `reconstruction_io.cc`'s exporters (ExportNVM/Cam/Recon3D/Bundler/PLY/VRML).
+- `Reconstruction.ExtractColors*` (the host decodes images; take a Bitmap provider).
+- `scene_clustering`, `reconstruction_clustering`.
+- Deferred tests: all of `reconstruction_io_test.cc` (needs synthetic); `reconstruction_test.cc`
+  ConstructCopy, AssignCopy, Print, SetRigsAndFramesResetsNumRegImages,
+  DeleteAllPoints2DAndPoints3D, TearDown, SetRigsAndFrames, ConvertToPLY, ImportPLYFromVector,
+  ReadWriteTextRoundtrip, ReadWriteBinaryRoundtrip, ReadAutoDetectFormat,
+  ExtractColorsForAllImages; `reconstruction_matchers_test.cc` Eq/Near (Near needs alignment);
+  an IdMap test that reaches `Compact()`.
+- Before the pipeline phases, decide how the library surfaces COLMAP's `LOG(WARNING)`
+  messages (dropped for now).
 
 Skipped `util/types_test.cc` cases: `Span.SizeAndEmpty`, `FilterView.Empty/All/None/Nominal/
 RangeExpression` — COLMAP's `span`/`filter_view` are replaced by `System.Span<T>` and LINQ, so
