@@ -9,8 +9,8 @@
 // MaybeDecomposeRelativePoses.{Nominal, UsesSolverEstimatedIntrinsics,
 // MissingMatrixFromOldDatabase}.
 // The EstimateTwoViewGeometry.* and EstimateMultipleTwoViewGeometries.* cases are in the
-// .Estimate, .Focal and .Multiple partial files. Waiting: EstimateRigTwoViewGeometries.Nominal
-// (needs estimators/generalized_pose).
+// .Estimate, .Focal and .Multiple partial files; EstimateRigTwoViewGeometries.Nominal is in
+// .Rig.
 //
 // Translation notes: gtest's SetPRNGSeed is RandomUtils.SetPRNGSeed; SQLite in-memory
 // databases are InMemoryDatabase. ExtractPointsAndMatches walks Points3D in point-id order

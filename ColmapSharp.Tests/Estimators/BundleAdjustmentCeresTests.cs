@@ -10,9 +10,8 @@
 //
 // Skipped: CeresBundleAdjustmentOptions.FallsBackToCpuWithoutCudaDevice (CUDA only; COLMAP
 // compiles it out without COLMAP_CUDA_ENABLED).
-// Deferred (need estimators/alignment, not ported yet): DefaultBundleAdjuster.
-// NominalMultiCameraRig (ReconstructionNear aligns via AlignReconstructionsViaProjCenters)
-// and the five PosePriorBundleAdjuster cases (AlignReconstructionToPosePriors).
+// DefaultBundleAdjuster.NominalMultiCameraRig and the five PosePriorBundleAdjuster cases
+// are in BundleAdjustmentCeresTests.PosePrior.cs.
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Mathematics;

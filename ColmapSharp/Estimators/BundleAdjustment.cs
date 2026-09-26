@@ -5,7 +5,7 @@
 // of bundle adjustment: the gauge / termination / backend enums, BundleAdjustmentSummary,
 // BundleAdjustmentConfig (which images, points, cameras and poses take part and which are
 // held constant), BundleAdjustmentOptions, the abstract BundleAdjuster and the
-// CreateDefaultBundleAdjuster factory. The Ceres backend (the only one ported; Caspar is a
+// CreateDefaultBundleAdjuster / CreatePosePriorBundleAdjuster factories. The Ceres backend (the only one ported; Caspar is a
 // GPU backend and out of scope) is BundleAdjustmentCeres.cs next to this file, built on
 // Solver/ (the Ceres replacement) and Estimators/CostFunctions/.
 // Tests: ColmapSharp.Tests/Estimators/BundleAdjustmentTests.cs (bundle_adjustment_test.cc).
@@ -20,8 +20,8 @@
 //   constructor; here they are classes and Clone() deep-copies them.
 // - check_if_stopped (std::function<bool()>) becomes Func<bool>?; BundleAdjuster.Solve also
 //   takes a CancellationToken, which stops the solve the same way (USER_SUCCESS).
-// - CreatePosePriorBundleAdjuster is not ported yet: it needs AlignReconstructionToPosePriors
-//   (estimators/alignment), which has not been ported. PosePriorBundleAdjustmentOptions is.
+// - CreatePosePriorBundleAdjuster takes the pose priors as IEnumerable (COLMAP moves a
+//   std::vector in); the adjuster keeps its own filtered copy.
 
 using ColmapSharp.Optim;
 using ColmapSharp.Scene;
@@ -406,6 +406,24 @@ public static class BundleAdjusters
 		return options.Backend switch
 		{
 			BundleAdjustmentBackend.Ceres => CeresBundleAdjusters.CreateDefaultCeresBundleAdjuster(options, config, reconstruction),
+			BundleAdjustmentBackend.Caspar => throw new InvalidOperationException(
+				"Caspar BA backend selected but ColmapSharp has no Caspar (GPU) backend; use the Ceres backend."),
+			_ => throw new InvalidOperationException($"Unknown bundle adjustment backend: {(int)options.Backend}"),
+		};
+	}
+
+	/// <summary>Port of colmap::CreatePosePriorBundleAdjuster.</summary>
+	public static BundleAdjuster CreatePosePriorBundleAdjuster(
+		BundleAdjustmentOptions options,
+		PosePriorBundleAdjustmentOptions priorOptions,
+		BundleAdjustmentConfig config,
+		IEnumerable<Geometry.PosePrior> posePriors,
+		Reconstruction reconstruction)
+	{
+		return options.Backend switch
+		{
+			BundleAdjustmentBackend.Ceres => CeresBundleAdjusters.CreatePosePriorCeresBundleAdjuster(
+				options, priorOptions, config, posePriors, reconstruction),
 			BundleAdjustmentBackend.Caspar => throw new InvalidOperationException(
 				"Caspar BA backend selected but ColmapSharp has no Caspar (GPU) backend; use the Ceres backend."),
 			_ => throw new InvalidOperationException($"Unknown bundle adjustment backend: {(int)options.Backend}"),

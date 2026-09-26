@@ -14,9 +14,11 @@
 //   sets are the caller's IReadOnlySet, iterated in its own order. The order cannot change
 //   any result: filtering one point only deletes that point or its own observations, the
 //   counters are sums, and the projection-center cache holds per-image constants.
-// - Not ported yet: MergeAndFilterReconstructions (it needs estimators/alignment's
-//   MergeReconstructions).
+// - The free function MergeAndFilterReconstructions is a static method here; it merges with
+//   Estimators/Alignment.Merge.cs and then filters through a fresh ObservationManager. COLMAP
+//   has no test for it; ColmapSharp.Tests/Sfm/ObservationManagerTests.Merge.cs is C#-only.
 
+using ColmapSharp.Estimators;
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Mathematics;
@@ -27,6 +29,25 @@ namespace ColmapSharp.Sfm;
 
 public sealed partial class ObservationManager
 {
+	/// <summary>
+	/// Merges <paramref name="srcReconstruction"/> into <paramref name="tgtReconstruction"/>
+	/// (Alignment.MergeReconstructions) and then filters every 3D point observation of the
+	/// target whose reprojection error exceeds <paramref name="maxReprojError"/> (no
+	/// triangulation-angle filter). Returns false, leaving the target untouched, when the
+	/// merge fails. Port of colmap::MergeAndFilterReconstructions.
+	/// </summary>
+	public static bool MergeAndFilterReconstructions(
+		double maxReprojError, Reconstruction srcReconstruction, Reconstruction tgtReconstruction)
+	{
+		if (!Alignment.MergeReconstructions(maxReprojError, srcReconstruction, tgtReconstruction))
+		{
+			return false;
+		}
+
+		new ObservationManager(tgtReconstruction).FilterAllPoints3D(maxReprojError, minTriAngle: 0);
+		return true;
+	}
+
 	/// <summary>
 	/// Filters 3D points with large reprojection error (in pixels) or insufficient
 	/// triangulation angle (in degrees). Returns the number of filtered observations.

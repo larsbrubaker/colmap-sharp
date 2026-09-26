@@ -10,10 +10,9 @@
 // Tier C for the solved values, which the tests check the way COLMAP's do: which parameters
 // moved and which stayed constant.
 //
-// Deferred (need estimators/alignment, not ported yet): BundleAdjusterBackendTest.Nominal and
-// .NominalMultiCameraRigConstantSensorFromRig (ReconstructionNear aligns via
-// AlignReconstructionsViaProjCenters) and PosePriorBundleAdjusterBackendTest.Nominal
-// (CreatePosePriorBundleAdjuster needs AlignReconstructionToPosePriors).
+// BundleAdjusterBackendTest.Nominal, .NominalMultiCameraRigConstantSensorFromRig and
+// PosePriorBundleAdjusterBackendTest.Nominal (the ReconstructionNear cases) are in
+// BundleAdjustmentTests.Nominal.cs.
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Mathematics;
@@ -27,7 +26,7 @@ using TUnit.Core;
 
 namespace ColmapSharp.Tests.Estimators;
 
-public class BundleAdjustmentTests
+public partial class BundleAdjustmentTests
 {
 	private const double ConstantPoseVarEps = 1e-9;
 

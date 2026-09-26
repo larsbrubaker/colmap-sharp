@@ -55,9 +55,7 @@ focal) use `Optim/TinySolver.cs` with `TinyProductManifold<…, TinyEuclideanMan
 Estimators implement `IEstimator<TX,TY,TModel>` (+ `ILocalEstimator` for LO-RANSAC) as
 `readonly struct`s — see `Optim/Estimator.cs` and `Estimators/Solvers/SimilarityTransform.cs`.
 `LoRansac.Estimate` hides (does not override) `Ransac.Estimate`: call it on the LoRansac type.
-Open estimators: `two_view_geometry`'s `EstimateRigTwoViewGeometries` (+ its `Nominal` test;
-`generalized_pose` is now on main), `global_positioning_test.cc` Nominal and MultiCameraRig
-(ReconstructionNear is now available).
+All estimators are ported.
 
 ### Phase 7 — Nonlinear least-squares solver (Ceres replacement)
 Done: Jet/autodiff, losses, manifolds, Problem, LM trust region, DENSE_QR,
@@ -78,12 +76,8 @@ Cancellation is checked between iterations only (like COLMAP). Optional: Vector1
 `Jet` (IEEE-exact, no FMA) need a CLAUDE.md rule clarification first.
 
 ### Phase 8 — Bundle adjustment
-Done: `ceres::Covariance` subset (dense QR, `Solver/Covariance.cs`; divergence 45), default Ceres bundle adjuster (`Estimators/BundleAdjustment*.cs`), cost functions, 7-value
-pose blocks. Open: `CreatePosePriorBundleAdjuster` / `PosePriorBundleAdjuster` (alignment is on
-main) with PosePriorBundleAdjusterBackendTest.Nominal
-and the five PosePriorBundleAdjuster.* cases; BundleAdjusterBackendTest.Nominal,
-.NominalMultiCameraRigConstantSensorFromRig and DefaultBundleAdjuster.NominalMultiCameraRig (their
-`ReconstructionNear` is on main); `covariance` (+ test).
+Done: default and pose-prior Ceres bundle adjusters, cost functions, `ceres::Covariance` subset
+(dense QR, divergence 45); `covariance` (BA covariance) is on a branch pending merge.
 Skipped: CeresBundleAdjustmentOptions.FallsBackToCpuWithoutCudaDevice (CUDA), the CASPAR
 instantiations of the backend suites and `bundle_adjustment_caspar_test.cc` (GPU backend out of
 scope). Performance: ~2.6× slower than native Ceres on a 100-image synthetic scene (7.6 s vs
@@ -102,15 +96,16 @@ Memory: VLFeat's scale space for a 6400×4800 upsampled first octave is multi-GB
 MatterCAD (esp. wasm32) must cap `max_image_size` accordingly.
 
 ### Phase 10 — Incremental SfM
-`sfm/observation_manager.MergeAndFilterReconstructions` (alignment is on main),
 `incremental_mapper(_impl)` (pass copies of modified-point sets to CompleteTracks/MergeTracks),
 `controllers/incremental_pipeline`, `controllers/bundle_adjustment`.
 End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us.
 
 ### Phase 11 — Pipeline controllers
-`controllers/pairing` (exhaustive, sequential, spatial), `feature_extraction`,
-`feature_matching(_utils)`, `matcher_cache`, `image_reader`, `undistorters`,
+`controllers/pairing` + `matcher_cache` (branch pending merge), `feature_extraction`,
+`feature_matching(_utils)`, `image_reader`, `undistorters`,
 `automatic_reconstruction` (minus CGAL/GPU branches), cancellation + progress surface.
+Skipped (retrieval out of scope): `pairing_test.cc` VocabTreePairGenerator.Nominal,
+VocabTreePairGenerator.DoesNotDeadlockOnFailedQuery, SequentialPairGenerator.LoopDetectionMinIndexDistance.
 
 ### Phase 12 — Dense reconstruction (MVS)
 `image/undistortion`, `image/warp`, `mvs/mat`, `image`, `depth_map`, `normal_map`,

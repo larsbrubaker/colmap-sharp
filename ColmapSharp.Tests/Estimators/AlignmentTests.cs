@@ -227,7 +227,7 @@ public class AlignmentTests
 	}
 
 	// Synthesize a reconstruction which has at least two cameras (3 rigs of 1 camera).
-	private static Reconstruction GenerateReconstructionForMerge()
+	internal static Reconstruction GenerateReconstructionForMerge()
 	{
 		var srcReconstruction = new Reconstruction();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
@@ -241,7 +241,7 @@ public class AlignmentTests
 		return srcReconstruction;
 	}
 
-	private static void RemoveRigFrames(Reconstruction reconstruction, uint rigId)
+	internal static void RemoveRigFrames(Reconstruction reconstruction, uint rigId)
 	{
 		List<uint> frameIds = [.. reconstruction.RegFrameIds];
 		foreach (uint frameId in frameIds)

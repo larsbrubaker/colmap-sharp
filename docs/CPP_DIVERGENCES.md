@@ -1133,10 +1133,9 @@ element order within the Schur ordering groups.
 starts depend on its hash order, so they cannot be reproduced; the solve converges to the
 same positions up to the gauge.
 
-**Evidence.** `GlobalPositioningTests`: `RefineSensorFromRigFalsePreservesRig` (1:1) passes,
-and the C#-only Nominal/MultiCameraRig alignment checks meet COLMAP's bounds (0.1 degree,
-0.5 projection-center error after a similarity alignment). The 1:1 Nominal and
-MultiCameraRig cases wait for `ReconstructionNear` (estimators/alignment).
+**Evidence.** `GlobalPositioningTests`: `GlobalPositioning_Nominal`,
+`GlobalPositioning_MultiCameraRig` and `RefineSensorFromRigFalsePreservesRig` (all 1:1) pass
+with COLMAP's `ReconstructionNear` bounds.
 
 ## 49. Alignment visits hash containers in a fixed order
 

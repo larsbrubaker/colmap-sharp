@@ -13,15 +13,13 @@
 // - TwoViewGeometryEstimation.Calibrated.cs: the calibrated and spherical paths;
 // - TwoViewGeometryEstimation.Focal.cs: the shared-focal and one-sided-focal paths;
 // - TwoViewGeometryEstimation.Pose.cs: relative pose decomposition
-//   (EstimateTwoViewGeometryPose) and MaybeDecomposeRelativePoses.
+//   (EstimateTwoViewGeometryPose) and MaybeDecomposeRelativePoses;
+// - TwoViewGeometryEstimation.Rig.cs: EstimateRigTwoViewGeometries.
 // Tests: ColmapSharp.Tests/Estimators/TwoViewGeometryEstimationTests.cs
-// (two_view_geometry_test.cc 1:1, see its header for the cases that wait).
+// (two_view_geometry_test.cc 1:1).
 //
 // Tier C (outcome) for the RANSAC-driven estimators; Tier B for the pose decomposition and
 // TwoViewGeometryFromKnownRelativePose (decompositions, no randomness).
-//
-// Not yet ported (its dependency is not): EstimateRigTwoViewGeometries (needs
-// estimators/generalized_pose).
 //
 // Translation notes:
 // - size_t inlier counts are ints here (RansacReport's Support.NumInliers); the size_t casts

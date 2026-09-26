@@ -4,13 +4,7 @@
 // GlobalPositioningTests: colmap/estimators/global_positioning_test.cc 1:1 for
 // Estimators/GlobalPositioning.cs. Test names are <Suite>_<Test>. Tier C.
 //
-// Ported: GlobalPositioning.RefineSensorFromRigFalsePreservesRig.
-// Waiting: GlobalPositioning.{Nominal, MultiCameraRig}. They assert through the
-// ReconstructionNear matcher, which needs AlignReconstructionsViaProjCenters and
-// ComputeImageAlignmentError (estimators/alignment, not ported yet; ReconstructionMatchers.cs).
-// Until then, the C#-only tests at the bottom run the same two setups and check the same
-// bounds (rotation 0.1 deg, projection center 0.5 after a similarity alignment) through a
-// least-squares Sim3 of the projection centers. They do not stand in for the ported cases.
+// Ported: GlobalPositioning.{Nominal, MultiCameraRig, RefineSensorFromRigFalsePreservesRig}.
 //
 // Translation notes: the SQLite test database is an InMemoryDatabase. COLMAP's gtest_main
 // reseeds the PRNG with 0 at every test start; Setup does the same, before any await.
@@ -107,44 +101,27 @@ public class GlobalPositioningTests
 		}
 	}
 
-	// C#-only: the GlobalPositioning.Nominal setup, checked through a least-squares Sim3 of
-	// the projection centers until ReconstructionNear is ported (file header).
 	[Test]
-	public async Task CSharpOnly_GlobalPositioning_NominalAlignsToGroundTruth() =>
-		await RunAndCheckAlignment(1, 1, 10);
+	public async Task GlobalPositioning_Nominal() => await RunAndExpectNearGroundTruth(1, 1, 10);
 
-	// C#-only: the GlobalPositioning.MultiCameraRig setup, checked the same way.
 	[Test]
-	public async Task CSharpOnly_GlobalPositioning_MultiCameraRigAlignsToGroundTruth() =>
-		await RunAndCheckAlignment(2, 3, 5);
+	public async Task GlobalPositioning_MultiCameraRig() => await RunAndExpectNearGroundTruth(2, 3, 5);
 
-	private static async Task RunAndCheckAlignment(int numRigs, int numCamerasPerRig, int numFramesPerRig)
+	// The shared body of Nominal and MultiCameraRig: they differ only in the dataset size.
+	private static async Task RunAndExpectNearGroundTruth(int numRigs, int numCamerasPerRig, int numFramesPerRig)
 	{
-		(Reconstruction gt, Reconstruction reconstruction, PoseGraph poseGraph) =
+		(Reconstruction gtReconstruction, Reconstruction reconstruction, PoseGraph poseGraph) =
 			Setup(numRigs, numCamerasPerRig, numFramesPerRig);
 
-		await Assert.That(GlobalPositioning.RunGlobalPositioning(TestOptions(), poseGraph, reconstruction)).IsTrue();
+		bool success = GlobalPositioning.RunGlobalPositioning(TestOptions(), poseGraph, reconstruction);
+		await Assert.That(success).IsTrue();
 
-		List<uint> imageIds = gt.RegImageIds();
-		var src = new Vector3d[imageIds.Count];
-		var tgt = new Vector3d[imageIds.Count];
-		for (int i = 0; i < imageIds.Count; ++i)
-		{
-			src[i] = reconstruction.Image(imageIds[i]).ProjectionCenter();
-			tgt[i] = gt.Image(imageIds[i]).ProjectionCenter();
-		}
-
-		var gtFromEstimate = new Sim3d();
-		await Assert.That(SimilarityTransform.EstimateSim3d(src, tgt, ref gtFromEstimate)).IsTrue();
-
-		double maxRotationErrorRad = MathUtils.DegToRad(0.1);
-		for (int i = 0; i < imageIds.Count; ++i)
-		{
-			Rigid3d gtCamFromWorld = gt.Image(imageIds[i]).CamFromWorld();
-			Rigid3d camFromWorld = reconstruction.Image(imageIds[i]).CamFromWorld();
-			Quaterniond alignedRotation = camFromWorld.Rotation * gtFromEstimate.Rotation.Inverse();
-			await Assert.That(alignedRotation.AngularDistance(gtCamFromWorld.Rotation)).IsLessThanOrEqualTo(maxRotationErrorRad);
-			await Assert.That((gtFromEstimate * src[i] - tgt[i]).Norm).IsLessThanOrEqualTo(0.5);
-		}
+		await Assert.That(ReconstructionMatchers.ExplainReconstructionNear(
+			gtReconstruction,
+			reconstruction,
+			maxRotationErrorDeg: 0.1,
+			maxProjCenterError: 0.5,
+			maxScaleError: null,
+			numObsTolerance: 0.0)).IsNull();
 	}
 }

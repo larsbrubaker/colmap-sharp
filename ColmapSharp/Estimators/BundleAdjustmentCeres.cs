@@ -5,9 +5,10 @@
 // summary half of bundle_adjustment_ceres.cc: CeresBundleAdjustmentOptions (COLMAP's solver
 // defaults, CreateLossFunction, CreateSolverOptions with the linear solver chosen by image
 // count and the single-thread cut-off for small problems), CeresBundleAdjustmentSummary,
-// CeresPosePriorBundleAdjustmentOptions, the abstract CeresBundleAdjuster and the factory.
+// CeresPosePriorBundleAdjustmentOptions, the abstract CeresBundleAdjuster and the factories.
 // The problem setup (residuals, parameterization, gauge fixing) is
-// BundleAdjustmentCeres.Default.cs. The solver is Solver/LeastSquaresSolver.cs.
+// BundleAdjustmentCeres.Default.cs; the pose prior adjuster is BundleAdjustmentCeres.PosePrior.cs.
+// The solver is Solver/LeastSquaresSolver.cs.
 // Tests: ColmapSharp.Tests/Estimators/BundleAdjustmentCeresTests.cs
 // (bundle_adjustment_ceres_test.cc) and BundleAdjustmentTests.cs.
 //
@@ -243,6 +244,15 @@ public static class CeresBundleAdjusters
 	public static CeresBundleAdjuster CreateDefaultCeresBundleAdjuster(
 		BundleAdjustmentOptions options, BundleAdjustmentConfig config, Reconstruction reconstruction) =>
 		new DefaultBundleAdjuster(options, config, reconstruction);
+
+	/// <summary>Port of colmap::CreatePosePriorCeresBundleAdjuster (BundleAdjustmentCeres.PosePrior.cs).</summary>
+	public static CeresBundleAdjuster CreatePosePriorCeresBundleAdjuster(
+		BundleAdjustmentOptions options,
+		PosePriorBundleAdjustmentOptions priorOptions,
+		BundleAdjustmentConfig config,
+		IEnumerable<Geometry.PosePrior> posePriors,
+		Reconstruction reconstruction) =>
+		new PosePriorBundleAdjuster(options, priorOptions, config, posePriors, reconstruction);
 
 	// SolveWithGpuFallback without the GPU retry (no GPU here): the solver options for this
 	// problem, COLMAP's CancellationCallback when check_if_stopped is set, and the solve.
