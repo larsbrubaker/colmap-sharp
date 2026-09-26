@@ -27,6 +27,7 @@ The modules that exist only because of an excluded dependency are listed below.
 | Upstream | License | Used by COLMAP for | Decision |
 |---|---|---|---|
 | Eigen | MPL-2.0 | All linear algebra | **Do not port.** Write our own linear algebra (`ColmapSharp.LinearAlgebra`) from textbook algorithms (Golub & Van Loan). Match Eigen's *documented* semantics (e.g. quaternion `w,x,y,z` layout, `AngleAxis` conventions), not its code. |
+| libc++ (LLVM) | Apache-2.0 WITH LLVM-exception | `std::uniform_*_distribution`, `normal_distribution` behind `math/random` | **Port the distribution algorithms** so seeded RANSAC matches the macOS pycolmap oracle. Add LLVM's notice when the first file lands. |
 | Ceres Solver | BSD-3 | Bundle adjustment, all nonlinear refinement | **Port the subset we use:** Levenberg-Marquardt trust region, Schur complement (dense and iterative), Jets for automatic differentiation, loss functions, manifolds. Add Ceres' notice when the first file lands. |
 | SuiteSparse / CHOLMOD | LGPL-2.1+ / GPL | `optim/sparse_cholesky`, LAD, rotation averaging | **Do not port.** Write a supernodal- or simplicial-LDLᵀ sparse Cholesky with AMD ordering from the published algorithms (Davis, *Direct Methods for Sparse Linear Systems*, as a description only; CSparse's code is LGPL). |
 | METIS | Apache-2.0 | Graph partitioning for hierarchical mapping | Allowed. Not needed until hierarchical mapping; a simpler partitioner may suffice. |

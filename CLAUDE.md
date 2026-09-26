@@ -72,10 +72,13 @@ function *and everything it calls* before porting it.
   it in `docs/CPP_DIVERGENCES.md` if the result can differ.
 - **PRNG.** COLMAP uses `std::mt19937` behind `colmap/math/random.h`. Port mt19937 exactly.
   `std::uniform_int_distribution` / `uniform_real_distribution` / `normal_distribution` are
-  implementation-defined (libc++ ≠ libstdc++). Port the one used by the pinned pycolmap wheel
-  for the platform the oracle fixtures come from, and record which in `Random.cs`.
+  implementation-defined; we match **libc++**, which the macOS pycolmap wheel links. So
+  PRNG-dependent fixtures must be generated on macOS (the Linux wheel uses libstdc++).
 - **No FMA.** Never introduce `Math.FusedMultiplyAdd` or `System.Numerics.Vector<T>` in math
-  paths; C++ is built without `-ffast-math` and contraction would change bits.
+  paths, so results are identical on every platform. Watch out: Apple clang defaults to
+  `-ffp-contract=on`, so the macOS arm64 pycolmap wheel *may* fuse `a*b + c` where we don't.
+  When a Tier A oracle diff lands exactly on a multiply-add, suspect contraction on the C++
+  side before chasing a port bug, and record the case in `docs/CPP_DIVERGENCES.md`.
 - **Numeric constants.** `std::numeric_limits<double>::epsilon()` is `2.220446049250313E-16`;
   C# `double.Epsilon` is the smallest subnormal and is **wrong**. `float` stays `float` —
   COLMAP stores descriptors, bitmaps, and depth maps in single precision.
@@ -86,14 +89,14 @@ function *and everything it calls* before porting it.
   `normalized()` on a zero vector returns zero. Match the documented behavior, don't port Eigen.
 - **Threading.** COLMAP's `ThreadPool` becomes `Parallel.For`/tasks only where each worker
   writes its own slot. Sequential and parallel runs must give the same result.
-- **Errors.** `THROW_CHECK*` → `ArgumentException`/`InvalidOperationException` with the
-  same message; `LOG(FATAL)` → exception. Never swallow.
+- **Errors.** `THROW_CHECK*` → `Util/Check.cs` (throws with COLMAP's "Check failed: …" message); `LOG(FATAL)` → exception. Never swallow.
 - **Cancellation and progress** go through `CancellationToken` and `IProgress<T>` — MatterCAD
   shows progress and lets the user cancel a long reconstruction.
 
 ## Layout and style
 
-- `ColmapSharp/` — the library, one folder per COLMAP module (`Math/`, `Geometry/`,
+- `ColmapSharp/` — the library, one folder per COLMAP module (`Mathematics/` — not `Math`,
+  which would shadow `System.Math` — `Geometry/`,
   `Sensor/`, `Scene/`, `Optim/`, `Estimators/`, `Feature/`, `Sfm/`, `Mvs/`, `Controllers/`,
   `Util/`), plus `LinearAlgebra/` and `Solver/` (the Eigen and Ceres replacements).
 - `ColmapSharp.Tests/` — TUnit, mirroring the same folders.
