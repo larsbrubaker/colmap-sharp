@@ -15,7 +15,7 @@
 namespace ColmapSharp.Feature.VLFeat;
 
 /// <summary>Port of the SIFT-relevant parts of VLFeat's mathop.h.</summary>
-public static class VlMathOp
+public static partial class VlMathOp
 {
 	/// <summary>VL_PI.</summary>
 	public const double Pi = 3.141592653589793;

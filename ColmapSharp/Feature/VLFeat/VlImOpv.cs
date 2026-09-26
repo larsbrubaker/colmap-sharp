@@ -3,7 +3,8 @@
 //
 // VlImOpv: vl_imconvcol_vf from thirdparty/VLFeat/imopv.c - the separable column
 // convolution SIFT's Gaussian smoothing runs twice per level (VlSiftFilter.cs, Smooth).
-// Only the float instantiation is ported; it is the only one COLMAP's SIFT calls.
+// Only the float instantiation is ported; it is the only one COLMAP calls. VlImOpv.Smooth.cs
+// has vl_imsmooth_f and the image gradients the covariant detector (VlCovDet*.cs) uses.
 //
 // Tier A (exact). This is the scalar (non-SSE2) path, which is what COLMAP compiles on arm64.
 // Each output column is one sequential float accumulation in VLFeat's order, so running the
@@ -12,7 +13,7 @@
 namespace ColmapSharp.Feature.VLFeat;
 
 /// <summary>Port of the float image operations of VLFeat's imopv.c that SIFT uses.</summary>
-public static class VlImOpv
+public static partial class VlImOpv
 {
 	/// <summary>VL_PAD_BY_ZERO.</summary>
 	public const int PadByZero = 0x0;

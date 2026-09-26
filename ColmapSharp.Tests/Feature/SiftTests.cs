@@ -5,9 +5,7 @@
 // Nominal) is SiftCpuExtraction_Nominal over the same parameter rows, with the same checks
 // (keypoint count, ValidateKeypoints, ValidateDescriptorNorms). Tests ColmapSharp/Feature/Sift.cs.
 //
-// Ported so far: the "Sift" row. Pending, not skipped: CovariantSift, CovariantAffineSift,
-// CovariantAffineSiftUpright, CovariantDSPSift and CovariantAffineDSPSift need COLMAP's
-// CovariantSiftCPUFeatureExtractor (VLFeat covdet), which is not ported yet; they land with it.
+// All six rows are ported; the five Covariant* rows run CovariantSift.cs (VLFeat covdet).
 // Skipped: ExtractSiftFeaturesGPU.Nominal (SiftGPU, excluded). The matcher tests of
 // sift_test.cc are in SiftMatcherTests.cs and SiftMatcherGuidedTests.cs.
 // The cancellation tests (C#-only) are in SiftCancellationTests.cs.
@@ -70,6 +68,11 @@ public class SiftTests
 
 	[Test]
 	[Arguments("Sift", false, false, false, false, 22)]
+	[Arguments("CovariantSift", false, false, true, false, 22)]
+	[Arguments("CovariantAffineSift", true, false, false, false, 22)]
+	[Arguments("CovariantAffineSiftUpright", true, false, false, true, 10)]
+	[Arguments("CovariantDSPSift", false, true, false, false, 22)]
+	[Arguments("CovariantAffineDSPSift", true, true, false, false, 22)]
 	public async Task SiftCpuExtraction_Nominal(
 		string name,
 		bool estimateAffineShape,

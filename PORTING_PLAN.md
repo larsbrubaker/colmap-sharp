@@ -90,10 +90,6 @@ scope). Performance: ~2.6× slower than native Ceres on a 100-image synthetic sc
 2.9 s) — the Schur eliminator speedups in Phase 7 close most of this.
 
 ### Phase 9 — Features
-`feature/sift` covariant extractor (`CovariantSiftCPUFeatureExtractor`: affine shape, DSP-SIFT
-/ domain-size pooling, force_covariant — needs VLFeat `covdet.c`, `vl_sift_calc_raw_descriptor`,
-`vl_imgradient_polar_f`; then the five pending `SiftCpuExtraction` rows CovariantSift,
-CovariantAffineSift, CovariantAffineSiftUpright, CovariantDSPSift, CovariantAffineDSPSift).
 Skipped (SiftGPU excluded): `sift_test.cc` ExtractSiftFeaturesGPU.Nominal,
 CreateSiftGPUMatcherOpenGL/CUDA.Nominal, MatchSiftFeaturesGPU.{Nominal,TypeMismatch},
 MatchSiftFeaturesCPUvsGPU.Nominal, MatchGuidedSiftFeaturesGPU.* (7),

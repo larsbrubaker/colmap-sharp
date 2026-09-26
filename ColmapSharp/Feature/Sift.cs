@@ -9,11 +9,9 @@
 // (the grey input image). Tests: ColmapSharp.Tests/Feature/SiftTests.cs (sift_test.cc) and
 // SiftOracleTests.cs (C#-only, pycolmap fixtures).
 //
-// Not here yet: CovariantSiftCPUFeatureExtractor (estimate_affine_shape, domain-size
-// pooling, force_covariant_extractor) needs VLFeat's covdet, which is not ported, so
-// CreateSiftFeatureExtractor throws NotSupportedException for those options. The matching
-// half of sift.cc is SiftMatcher.cs. SiftGPU is excluded (docs/LICENSE_AUDIT.md), so there
-// is no use_gpu branch.
+// CovariantSiftCPUFeatureExtractor (estimate_affine_shape, domain-size pooling,
+// force_covariant_extractor) is CovariantSift.cs. The matching half of sift.cc is
+// SiftMatcher.cs. SiftGPU is excluded (docs/LICENSE_AUDIT.md), so there is no use_gpu branch.
 //
 // Cancellation (not in COLMAP): Extract checks its token between scale levels (in the
 // filter) and between DoG levels of descriptor computation, so MatterCAD can stop a
@@ -136,17 +134,15 @@ public sealed class SiftExtractionOptions
 public static class SiftFeatureExtractors
 {
 	/// <summary>
-	/// Port of CreateSiftFeatureExtractor: the SIFT CPU extractor. The covariant extractor
-	/// (estimate_affine_shape, domain_size_pooling, force_covariant_extractor) is not ported
-	/// yet, and the GPU extractor is excluded.
+	/// Port of CreateSiftFeatureExtractor: the covariant CPU extractor for
+	/// estimate_affine_shape, domain_size_pooling or force_covariant_extractor, otherwise the
+	/// SIFT CPU extractor. The GPU extractor is excluded.
 	/// </summary>
 	public static FeatureExtractor CreateSiftFeatureExtractor(FeatureExtractionOptions options)
 	{
 		if (options.Sift.EstimateAffineShape || options.Sift.DomainSizePooling || options.Sift.ForceCovariantExtractor)
 		{
-			throw new NotSupportedException(
-				"The covariant SIFT extractor (affine shape estimation, domain-size pooling) is not available yet; "
-				+ "turn off EstimateAffineShape, DomainSizePooling and ForceCovariantExtractor.");
+			return new CovariantSiftCpuFeatureExtractor(options);
 		}
 
 		return new SiftCpuFeatureExtractor(options);

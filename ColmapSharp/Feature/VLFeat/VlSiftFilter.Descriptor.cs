@@ -2,15 +2,16 @@
 // Ported from VLFeat (BSD-2-Clause, see THIRD_PARTY_NOTICES.md) as vendored by COLMAP.
 //
 // VlSiftFilter.Descriptor: update_gradient, vl_sift_calc_keypoint_orientations,
-// normalize_histogram and vl_sift_calc_keypoint_descriptor from thirdparty/VLFeat/sift.c.
-// Part of VlSiftFilter (scale space in VlSiftFilter.cs, detection in VlSiftFilter.Detect.cs).
+// normalize_histogram, vl_sift_calc_keypoint_descriptor and vl_sift_calc_raw_descriptor from
+// thirdparty/VLFeat/sift.c. Part of VlSiftFilter (scale space in VlSiftFilter.cs, detection in
+// VlSiftFilter.Detect.cs). The raw descriptor is what COLMAP's covariant extractor
+// (Feature/CovariantSift.cs) computes on its warped patches.
 //
 // Tier A (exact). Gradients and descriptor bins are float, orientation histograms double;
 // every conversion between them is written out where the C converts implicitly (a float
 // local assigned a double expression rounds once, at the assignment).
 //
-// vl_sift_calc_raw_descriptor and vl_sift_keypoint_init are not ported yet: only COLMAP's
-// covariant extractor (VLFeat covdet) calls them, and that extractor is not ported.
+// vl_sift_keypoint_init is not ported: nothing in COLMAP calls it.
 
 namespace ColmapSharp.Feature.VLFeat;
 
@@ -259,6 +260,136 @@ public sealed partial class VlSiftFilter
 
 		// Set the descriptor to zero if it is lower than our norm_threshold.
 		if (NormThreshold != 0 && norm < NormThreshold)
+		{
+			d.Clear();
+		}
+		else
+		{
+			// Truncate at 0.2.
+			for (int bin = 0; bin < DescriptorLength; ++bin)
+			{
+				if ((double)d[bin] > 0.2)
+				{
+					d[bin] = (float)0.2;
+				}
+			}
+
+			// Normalize again.
+			NormalizeHistogram(d);
+		}
+	}
+
+	/// <summary>
+	/// Port of vl_sift_calc_raw_descriptor: the SIFT descriptor of the keypoint at
+	/// (<paramref name="x"/>, <paramref name="y"/>) with scale <paramref name="sigma"/> and
+	/// orientation <paramref name="angle0"/>, computed from a caller-supplied gradient image
+	/// (interleaved modulus and angle, as vl_imgradient_polar_f writes with a horizontal
+	/// stride of 2) of size <paramref name="width"/> x <paramref name="height"/>. Uses only
+	/// the filter's magnif, window size and norm threshold. Leaves <paramref name="descr"/>
+	/// untouched when the keypoint is outside the image, like VLFeat.
+	/// </summary>
+	public void CalcRawDescriptor(
+		ReadOnlySpan<float> grad, Span<float> descr, int width, int height, double x, double y, double sigma, double angle0)
+	{
+		double magnif = Magnif;
+		int w = width;
+		int h = height;
+		const int Xo = 2;
+		int yo = 2 * w;
+
+		int xi = (int)(x + 0.5);
+		int yi = (int)(y + 0.5);
+
+		double st0 = Math.Sin(angle0);
+		double ct0 = Math.Cos(angle0);
+		double sbp = (magnif * sigma) + VlMathOp.EpsilonD;
+		int bigW = (int)Math.Floor((Math.Sqrt(2.0) * sbp * (Nbp + 1) / 2.0) + 0.5);
+
+		const int Binto = 1;
+		const int Binyo = Nbo * Nbp;
+		const int Binxo = Nbo;
+
+		// Check bounds.
+		if (xi < 0 || xi >= w || yi < 0 || yi >= h - 1)
+		{
+			return;
+		}
+
+		Span<float> d = descr.Slice(0, DescriptorLength);
+		d.Clear();
+
+		// Center the scale space and the descriptor on the current keypoint. Note that dpt is
+		// pointing to the bin of center (SBP/2, SBP/2, 0).
+		int pt = (xi * Xo) + (yi * yo);
+		int dpt = ((Nbp / 2) * Binyo) + ((Nbp / 2) * Binxo);
+		float wsigma = (float)WindowSize;
+
+		// Process pixels in the intersection of the image rectangle and the keypoint bounding
+		// box (unlike the scale-space descriptor, the border pixels are included).
+		for (int dyi = Math.Max(-bigW, -yi); dyi <= Math.Min(+bigW, h - yi - 1); ++dyi)
+		{
+			for (int dxi = Math.Max(-bigW, -xi); dxi <= Math.Min(+bigW, w - xi - 1); ++dxi)
+			{
+				float mod = grad[pt + (dxi * Xo) + (dyi * yo) + 0];
+				float angle = grad[pt + (dxi * Xo) + (dyi * yo) + 1];
+				float theta = VlMathOp.Mod2PiF((float)(angle - angle0));
+
+				// Fractional displacement.
+				float dx = (float)(xi + dxi - x);
+				float dy = (float)(yi + dyi - y);
+
+				// Get the displacement normalized w.r.t. the keypoint orientation and extension.
+				float nx = (float)(((ct0 * dx) + (st0 * dy)) / sbp);
+				float ny = (float)(((-st0 * dx) + (ct0 * dy)) / sbp);
+				float nt = (float)((Nbo * theta) / (2 * VlMathOp.Pi));
+
+				// The Gaussian window has a standard deviation equal to NBP/2 in the normalized
+				// frame.
+				float win = (float)VlMathOp.FastExpN(((nx * nx) + (ny * ny)) / (2.0 * wsigma * wsigma));
+
+				// The sample will be distributed in 8 adjacent bins, from the "lower-left" one.
+				int binx = (int)VlMathOp.FloorF((float)(nx - 0.5));
+				int biny = (int)VlMathOp.FloorF((float)(ny - 0.5));
+				int bint = (int)VlMathOp.FloorF(nt);
+				float rbinx = (float)(nx - (binx + 0.5));
+				float rbiny = (float)(ny - (biny + 0.5));
+				float rbint = nt - bint;
+
+				for (int dbinx = 0; dbinx < 2; ++dbinx)
+				{
+					for (int dbiny = 0; dbiny < 2; ++dbiny)
+					{
+						for (int dbint = 0; dbint < 2; ++dbint)
+						{
+							if (binx + dbinx >= -(Nbp / 2) &&
+								binx + dbinx < (Nbp / 2) &&
+								biny + dbiny >= -(Nbp / 2) &&
+								biny + dbiny < (Nbp / 2))
+							{
+								float weight = win
+									* mod
+									* MathF.Abs(1 - dbinx - rbinx)
+									* MathF.Abs(1 - dbiny - rbiny)
+									* MathF.Abs(1 - dbint - rbint);
+
+								d[dpt + (((bint + dbint) % Nbo) * Binto) + ((biny + dbiny) * Binyo) + ((binx + dbinx) * Binxo)] += weight;
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Standard SIFT descriptors are normalized, truncated and normalized again.
+		float norm = NormalizeHistogram(d);
+
+		// Zero the descriptor if its norm is below norm_thresh times the number of samples (the
+		// Gaussian window of the descriptor is not normalized).
+		int numSamples =
+			(Math.Min(bigW, w - xi - 1) - Math.Max(-bigW, -xi) + 1) *
+			(Math.Min(bigW, h - yi - 1) - Math.Max(-bigW, -yi) + 1);
+
+		if (NormThreshold != 0 && norm < NormThreshold * numSamples)
 		{
 			d.Clear();
 		}

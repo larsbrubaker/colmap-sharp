@@ -143,8 +143,12 @@ POSSIBILITY OF SUCH DAMAGE.
 Source: https://www.vlfeat.org, as vendored by COLMAP in `src/thirdparty/VLFeat` (reference
 version pinned in `REFERENCE`)
 
-Ported in `ColmapSharp/Feature/VLFeat/`: the SIFT filter of `sift.c`/`sift.h` and the parts
-of `mathop.h` and `imopv.c` it uses.
+Ported in `ColmapSharp/Feature/VLFeat/`: the SIFT filter of `sift.c`/`sift.h` (including
+`vl_sift_calc_raw_descriptor`), the DoG covariant detector of `covdet.c`/`covdet.h` (detection,
+affine adaptation, orientations, patch extraction), the Gaussian scale space of
+`scalespace.c`/`scalespace.h`, and the parts of `mathop.h`/`mathop.c` (including `vl_svd2`,
+`vl_lapack_dlasv2` and `vl_gaussian_elimination`) and `imopv.c` (`vl_imconvcol_vf`,
+`vl_imsmooth_f`, `vl_imgradient_f`, `vl_imgradient_polar_f`) they use.
 
 ```
 Copyright (C) 2007-11, Andrea Vedaldi and Brian Fulkerson

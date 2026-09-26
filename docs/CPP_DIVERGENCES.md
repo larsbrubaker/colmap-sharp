@@ -962,6 +962,16 @@ wheel (`SiftOracleTests.CSharpOnly_MatchesPycolmapWithinFmaTolerance`, nine opti
 keypoint counts and order agree exactly, values within 1.03e-3, descriptor bytes within 1 on
 at most 0.05% of the bytes.
 
+The covariant extractor (`Feature/CovariantSift.cs`, VLFeat covdet) has the same split:
+`sift_harness.c`'s covdet mode, unfused, matches `VlCovDetTests` bit for bit on eight cases
+(every feature frame and score, every raw descriptor of every DSP scale), while against the
+wheel (`CovariantSiftOracleTests`) the frames agree within 4e-4. Fusing also reaches two
+discontinuities there: on the symmetric square two orientations of one feature score equally,
+so which comes first flips; and on the texture with domain-size pooling one keypoint (of 184)
+gets a descriptor up to 4 gray levels off, because the patch extractor picks its scale-space
+level with a floor of a log2 that lands on the other side of an integer for one pooled scale.
+`CSharpOnly_KnownDivergences` pins that case.
+
 ## 42. FeatureDescriptorIndex is an exact nearest-neighbor search, not faiss's IVF index
 
 **What differs.** COLMAP's `FeatureDescriptorIndex` (feature/index.cc) wraps faiss: an exact
@@ -1193,3 +1203,25 @@ COLMAP's order carries no meaning and varies run to run.
 
 **Evidence.** `IncrementalTriangulatorTests` (incremental_triangulator_test.cc 1:1) pass;
 their counts do not depend on the order on the noise-free synthetic scenes.
+
+## 57. The covariant SIFT extractor orders equal (octave, level) features stably
+
+**What differs.** COLMAP's `CovariantSiftCPUFeatureExtractor` (feature/sift.cc) sorts the
+covdet features by (octave, level), both descending, with `std::sort`, which leaves features
+with equal keys in an implementation-defined order (libc++'s introsort; it insertion-sorts,
+stably, only short ranges). The port (`Feature/CovariantSift.cs`) sorts with the covdet index
+as the tie-break, so equal keys keep detection order. The keypoints and descriptors are the
+same set, but their order within an (octave, level) group can differ once there are more
+features than libc++ insertion-sorts. It also changes one keypoint when `max_num_features`
+truncates: COLMAP pushes the first keypoint of the next group before it stops, and which
+keypoint is first there is the tie order.
+
+**Why.** Reproducing libc++'s `std::sort` exactly would tie the result to one standard
+library version (its thresholds and partitioning changed between LLVM releases); the stable
+order is deterministic, as for entry 40.
+
+**Evidence.** `CovariantSiftOracleTests`: on the texture fixtures (184 and 191 features)
+every keypoint pairs with a pycolmap keypoint within the FMA drift of entry 41, but not index
+by index. With `max_num_features = 20` both give 26 keypoints; the first 25 pair up and the
+26th differs (`CSharpOnly_KnownDivergences`). The five covariant rows of
+`SiftTests.SiftCpuExtraction_Nominal` (sift_test.cc 1:1) pass.

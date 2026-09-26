@@ -45,7 +45,8 @@ VLFEAT_CASES = [
 
 def build_harness(workdir):
     exe = workdir / "sift_harness"
-    sources = [str(VLFEAT / f) for f in ("generic.c", "host.c", "mathop.c", "imopv.c", "sift.c", "random.c")]
+    sources = [str(VLFEAT / f) for f in ("generic.c", "host.c", "mathop.c", "imopv.c", "sift.c", "random.c",
+                                                   "scalespace.c", "covdet.c", "stringop.c")]
     subprocess.run(["clang", "-O2", "-w", "-ffp-contract=off", "-DVL_DISABLE_SSE2", "-DVL_DISABLE_AVX",
                     "-DVL_DISABLE_OPENMP", "-I", str(VLFEAT), "-o", str(exe),
                     str(ROOT / "oracle" / "sift_harness.c"), *sources], check=True)
