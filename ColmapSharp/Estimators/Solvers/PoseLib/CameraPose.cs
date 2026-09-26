@@ -6,7 +6,8 @@
 // CameraPose: PoseLib/camera_pose.h (struct CameraPose) and the two quaternion helpers of
 // PoseLib/misc/quaternion.h it is built on (rotmat_to_quat, quat_to_rotmat). The pose type
 // every PoseLib solver returns (P3p.cs, P4pf.cs); Estimators/Solvers/PoseLibUtils.cs converts
-// it to and from COLMAP's Rigid3d.
+// it to and from COLMAP's Rigid3d. Also ImagePair (camera_pose.h), the pose-plus-cameras
+// output of the focal relative pose solvers (Relpose6ptSharedFocal.cs, Relpose6ptOnesidedFocal.cs).
 //
 // Only the members COLMAP's callers use are ported (construction from R and t, R(), Rt());
 // PoseLib's rotate/compose/center helpers are used only inside PoseLib's own refinement
@@ -69,3 +70,10 @@ public readonly struct CameraPose
 		return new Vector4d(qFlip.W, qFlip.X, qFlip.Y, qFlip.Z).Normalized();
 	}
 }
+
+/// <summary>
+/// Two cameras and their relative pose, the output of PoseLib's relative pose solvers with
+/// unknown focal lengths (Relpose6ptSharedFocal.cs, Relpose6ptOnesidedFocal.cs). Port of
+/// poselib::ImagePair (camera_pose.h).
+/// </summary>
+public readonly record struct ImagePair(CameraPose Pose, PoseLibCamera Camera1, PoseLibCamera Camera2);

@@ -652,6 +652,42 @@ on R0). The 1:1 `GeneralizedAbsolutePoseTests.ParameterizedGP3PEstimatorTests_No
 pass with COLMAP's tolerances.
 each satisfies the original system to 1e-8. Not compared against C++ PoseLib.
 
+## 30. The six-point focal relative pose solvers take their null space from unpivoted Householder QR
+
+**What differs.** PoseLib's `relpose_6pt_shared_focal` and `relpose_6pt_onesided_focal`
+(the minimal solvers of COLMAP's `RelativePoseSharedFocalEstimator` and
+`RelativePoseOneSidedFocalEstimator`) take the 3D null space of their six epipolar
+constraints from the last three columns of the full Q of
+`epipolar_constraints.fullPivHouseholderQr()` (a 9 x 6 matrix).
+`Estimators/Solvers/PoseLib/Relpose6ptSharedFocal.NullSpace3` (used by both) takes the same
+three columns from an unpivoted Householder QR (`LinearAlgebra/Householder.FactorInPlace` /
+`ApplyQ`, allocation-free). Both are orthonormal bases of the same space; only the basis
+inside it differs, and with it the 280 (shared) or 190 (one-sided) template coefficients,
+the action matrix and its eigenvalues, which parametrize F = N0 + x N1 + y N2 in basis
+coordinates. The one-sided solver also orders its nine solutions by the eigenvalue order of
+`LinearAlgebra/EigenSolver.cs` (Schur order), which may differ from Eigen's.
+
+**Why.** Eigen (MPL-2.0) is not ported, and full-pivoting Householder QR has no published
+convention precise enough to reproduce Eigen's Q column for column (entries 24 and 27 are
+the same choice for the 7-point and 5-point solvers). In exact arithmetic the solution set does
+not depend on the basis (apart from solutions whose F has no N0 component, which the affine
+parametrization cannot represent; a measure-zero configuration that moves with the basis).
+In floating point it can: the shared-focal solver brackets the real roots of an
+ill-conditioned degree-15 characteristic polynomial with Sturm sequences, and which
+spurious (non-physical) real roots survive that bracketing depends on the basis, so extra
+models can appear or vanish on either side. The output order is not part of the contract: COLMAP treats the models as
+a set. What can differ is numerical conditioning near the solvers' thresholds (the Sturm
+bracketing tolerance, the 1e-8 tests on imaginary parts and on q = 1/f^2), where a
+near-degenerate root can be kept on one side and dropped on the other.
+
+**Evidence.** `RelativePoseSharedFocalTests.RelativePoseSharedFocalEstimator_Nominal` and
+`RelativePoseOneSidedFocalTests` (`_Nominal`, `_FullSphereCalibratedRays`) pass 1:1 with
+COLMAP's tolerances and failure-rate bounds; with seeds 0 to 4 both failure-rate tests
+observed 0 failures in 100 trials (COLMAP's bound is 3). A differential run against the
+real PoseLib (the reviewer's harness, fed the same inputs to both sides): one-sided, 574 of
+574 models identical; shared focal, 521 of 552 models match to 1e-6, and the true focal is
+found in 295 of 300 problems on both sides, the differences being the spurious roots above.
+
 ## 31. SynthesizeDataset visits points, images and chained pairs in ascending id order
 
 **What differs.** `Synthetic.SynthesizeDataset` / `SynthesizeNoise` / `SynthesizeImages`

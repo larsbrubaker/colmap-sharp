@@ -4,15 +4,17 @@
 //
 // Sturm: PoseLib/misc/sturm.h - real-root isolation of a univariate polynomial by Sturm
 // sequences and bisection, finished with Ridders' method and Newton steps. Used by the
-// minimal solvers whose problem reduces to one polynomial: Re3q3.cs (degree 8, for P4Pf)
-// and Relpose5pt.cs (degree 10).
+// minimal solvers whose problem reduces to one polynomial: Re3q3.cs (degree 8, for P4Pf),
+// Relpose5pt.cs (degree 10) and Relpose6ptSharedFocal.cs (degree 15).
 //
 // Translation notes:
 // - PoseLib makes the degree N a template parameter so the buffers live on the stack; here N
 //   is an argument and the buffers are stackalloc'd, so there is still no heap allocation.
 // - signchanges<N> counts sign changes with a popcount over a bit mask for N < 32; that is
 //   the same count as the plain loop PoseLib uses for N >= 32, which is what is ported.
-// - charpoly_danilevsky_piv is not ported: none of the solvers COLMAP calls uses it.
+// - charpoly_danilevsky_piv (the characteristic polynomial by Danilevsky's method with
+//   pivoting) is ported for Relpose6ptSharedFocal.cs, which brackets the eigenvalues of its
+//   action matrix as polynomial roots. The matrix is a column-major span of n x n values.
 // - MAX_STURM_RECURSION_DEPTH_LIMIT keeps PoseLib's default, 300.
 
 namespace ColmapSharp.Estimators.Solvers.PoseLib;
@@ -298,6 +300,111 @@ public static class Sturm
 		else if (nRts == 1)
 		{
 			RiddersMethodNewton(n, fvec, a, b, roots, ref nRoots, tol);
+		}
+	}
+
+	/// <summary>
+	/// Writes the monic characteristic polynomial of the n x n column-major matrix
+	/// <paramref name="a"/> (destroyed) to <paramref name="p"/> (n + 1 coefficients, constant
+	/// first), by Danilevsky's reduction to Frobenius form with row/column pivoting.
+	/// Port of poselib::sturm::charpoly_danilevsky_piv.
+	/// </summary>
+	public static void CharpolyDanilevskyPiv(Span<double> a, int n, Span<double> p)
+	{
+		Span<double> v = stackalloc double[n];
+		Span<double> vinv = stackalloc double[n];
+		Span<double> aCol = stackalloc double[n];
+		Span<double> newRow = stackalloc double[n];
+		for (int i = n - 1; i > 0; i--)
+		{
+			int pivInd = i - 1;
+			double piv = Math.Abs(a[i + n * (i - 1)]);
+
+			// Find largest pivot
+			for (int j = 0; j < i - 1; j++)
+			{
+				if (Math.Abs(a[i + n * j]) > piv)
+				{
+					piv = Math.Abs(a[i + n * j]);
+					pivInd = j;
+				}
+			}
+
+			if (pivInd != i - 1)
+			{
+				// Perform permutation
+				for (int c = 0; c < n; c++)
+				{
+					(a[(i - 1) + n * c], a[pivInd + n * c]) = (a[pivInd + n * c], a[(i - 1) + n * c]);
+				}
+
+				for (int r = 0; r < n; r++)
+				{
+					(a[r + n * (i - 1)], a[r + n * pivInd]) = (a[r + n * pivInd], a[r + n * (i - 1)]);
+				}
+			}
+
+			piv = a[i + n * (i - 1)];
+
+			// A.row(i - 1) = v^T * A with v = A.row(i).
+			for (int c = 0; c < n; c++)
+			{
+				v[c] = a[i + n * c];
+			}
+
+			for (int c = 0; c < n; c++)
+			{
+				double sum = 0.0;
+				for (int k = 0; k < n; k++)
+				{
+					sum += v[k] * a[k + n * c];
+				}
+
+				newRow[c] = sum;
+			}
+
+			for (int c = 0; c < n; c++)
+			{
+				a[(i - 1) + n * c] = newRow[c];
+			}
+
+			for (int k = 0; k < n; k++)
+			{
+				vinv[k] = -1.0 * v[k];
+			}
+
+			vinv[i - 1] = 1;
+			for (int k = 0; k < n; k++)
+			{
+				vinv[k] /= piv;
+			}
+
+			vinv[i - 1] -= 1;
+			for (int r = 0; r < n; r++)
+			{
+				aCol[r] = a[r + n * (i - 1)];
+			}
+
+			for (int j = 0; j <= i; j++)
+			{
+				for (int c = 0; c < n; c++)
+				{
+					a[j + n * c] = a[j + n * c] + aCol[j] * vinv[c];
+				}
+			}
+
+			for (int c = 0; c < n; c++)
+			{
+				a[i + n * c] = 0.0;
+			}
+
+			a[i + n * (i - 1)] = 1;
+		}
+
+		p[n] = 1;
+		for (int i = 0; i < n; i++)
+		{
+			p[i] = -a[n * (n - i - 1)];
 		}
 	}
 }

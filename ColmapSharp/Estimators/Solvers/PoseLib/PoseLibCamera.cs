@@ -3,8 +3,8 @@
 // THIRD_PARTY_NOTICES.md), commit fa7280fee27f97aff31ae7f98bab7f583fac7d08.
 //
 // PoseLibCamera: the camera description of PoseLib/misc/camera_models.h and .cc (struct
-// Camera: model id, size, parameters; id_from_string, name_from_id, init_params, set_focal,
-// set_principal_point, and each model's name, id, num_params, focal_idx and
+// Camera: model id, size, parameters; id_from_string, name_from_id, init_params, focal,
+// set_focal, set_principal_point, and each model's name, id, num_params, focal_idx and
 // principal_point_idx). Estimators/Solvers/PoseLibUtils.cs converts COLMAP's Camera to and
 // from it.
 //
@@ -78,6 +78,31 @@ public sealed class PoseLibCamera
 
 	/// <summary>The model name, or "INVALID_MODEL" for an unknown id (model_name()).</summary>
 	public string ModelName => NameFromId(ModelId);
+
+	/// <summary>
+	/// The mean of the model's focal parameters: 1 for an empty (identity) camera, and also 1
+	/// for a model without focal parameters or an unknown id. Port of Camera::focal.
+	/// </summary>
+	public double Focal()
+	{
+		if (Params.Count == 0)
+		{
+			return 1.0; // empty camera assumed to be identity
+		}
+
+		double focal = 1.0;
+		ModelInfo? model = Find(ModelId);
+		if (model is not null && model.FocalIdx.Length > 0)
+		{
+			focal = 0.0;
+			foreach (int idx in model.FocalIdx)
+			{
+				focal += Params[idx] / model.FocalIdx.Length;
+			}
+		}
+
+		return focal;
+	}
 
 	/// <summary>Port of Camera::id_from_string.</summary>
 	public static int IdFromString(string modelName)

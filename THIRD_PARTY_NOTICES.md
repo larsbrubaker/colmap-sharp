@@ -174,8 +174,14 @@ uses from `misc/quaternion.h` and `misc/essential.cc`); `CameraPose` (`PoseLib/c
 three-quadratics solver of `misc/re3q3.cc`; the P3P solver of `solvers/p3p.cc` with
 `solvers/p3p_common.h` and `misc/univariate.cc`'s single-real-root cubic; the P4Pf
 solver of `solvers/p4pf.cc`; the generalized P3P solver of `solvers/gp3p.cc`
-(`Gp3p.cs`, with `re3q3_rotation`, `rotation_to_3q3` and `quat_multiply` in `Re3q3.cs`); and
-the five-point essential matrix solver of `solvers/relpose_5pt.cc` (`Relpose5pt.cs`).
+(`Gp3p.cs`, with `re3q3_rotation`, `rotation_to_3q3` and `quat_multiply` in `Re3q3.cs`);
+the five-point essential matrix solver of `solvers/relpose_5pt.cc` (`Relpose5pt.cs`); the
+shared-focal relative pose solver of `solvers/relpose_6pt_focal.cc`
+(`Relpose6ptSharedFocal*.cs`, with `charpoly_danilevsky_piv` of `misc/sturm.h` in
+`Sturm.cs`); the one-sided focal relative pose solver of
+`solvers/relpose_6pt_onesided_focal.cc` (`Relpose6ptOnesidedFocal*.cs`, full template);
+`motion_from_essential` and `check_cheirality` of `misc/essential.cc` (`Essential.cs`); and
+`ImagePair` of `camera_pose.h` and `Camera::focal` of `misc/camera_models.cc`.
 
 ```
 BSD 3-Clause License

@@ -59,12 +59,10 @@ Skipped `scene/database_test.cc` cases: `OpenFile`, `OpenCloseFile`, `OpenFileWi
 ### Phase 6 — Minimal solvers and estimators
 The four TinySolver callers (essential / fundamental refinement, relpose shared and one-sided
 focal) use `Optim/TinySolver.cs` with `TinyProductManifold<…, TinyEuclideanManifold1>`.
-Open: `relpose_shared_focal`, `relpose_one_sided_focal` (their Tiny focal Sampson functors
-are in `Estimators/CostFunctions/TinyRelativePoseSampsonError.cs`).
 Estimators implement `IEstimator<TX,TY,TModel>` (+ `ILocalEstimator` for LO-RANSAC) as
 `readonly struct`s — see `Optim/Estimator.cs` and `Estimators/Solvers/SimilarityTransform.cs`.
 `LoRansac.Estimate` hides (does not override) `Ransac.Estimate`: call it on the LoRansac type.
-Then the estimators: `two_view_geometry`, `pose`, `generalized_pose`, `triangulation`, `alignment`,
+Open estimators: `two_view_geometry` (partly ported, branch pending), `pose`, `generalized_pose`, `triangulation`, `alignment`,
 `fundamental_matrix_degensac`, `rotation_averaging`, `global_positioning`,
 `gravity_refinement`, `view_graph_calibration`.
 

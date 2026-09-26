@@ -7,7 +7,7 @@
 // Efficient Solution to the Five-Point Relative Pose Problem", PAMI 2004. The minimal case of
 // COLMAP's EssentialMatrixFivePointEstimator (Estimators/Solvers/EssentialMatrixEstimators.cs).
 // The CameraPose overload (which decomposes each E with misc/essential.cc's
-// motion_from_essential) is not ported: COLMAP does its own decomposition.
+// motion_from_essential, in Essential.cs) is not ported: COLMAP does its own decomposition.
 //
 // Steps: the 4D null space of the five epipolar constraints; the ten cubic constraints
 // (determinant plus the trace constraint) in its coefficients (compute_trace_constraints);
