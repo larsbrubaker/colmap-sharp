@@ -14,10 +14,11 @@
 //
 // Only the part of the API COLMAP calls is here (see the grep in the Phase 7 notes):
 // AddParameterBlock (with manifold), AddResidualBlock, Set/IsParameterBlockConstant,
-// SetParameterBlockVariable, SetManifold/GetManifold, HasParameterBlock, and the counts.
-// Not ported yet: bounds (SetParameterLowerBound, used by view-graph calibration) and
-// Problem::Evaluate (used by covariance estimation and view-graph calibration), which arrive
-// with their callers. RemoveResidualBlock/RemoveParameterBlock are unused by COLMAP.
+// SetParameterBlockVariable, SetManifold/GetManifold, HasParameterBlock, the counts, the
+// per-coordinate bounds (Set/GetParameterLowerBound/UpperBound: view-graph calibration and
+// the global positioner) and Problem::Evaluate (Problem.Evaluate.cs: covariance estimation
+// and view-graph calibration). RemoveResidualBlock/RemoveParameterBlock,
+// EvaluateResidualBlock and the evaluation callback are unused by COLMAP and not ported.
 // Ceres' ownership options have no C# meaning: cost, loss and manifold objects may be shared
 // between blocks and problems freely.
 
@@ -36,7 +37,7 @@ public sealed class ResidualBlockId
 }
 
 /// <summary>ceres::Problem: parameter blocks and the residual blocks over them.</summary>
-public sealed class Problem
+public sealed partial class Problem
 {
 	// Blocks on each array, sorted by offset, for lookup and the aliasing check.
 	private readonly Dictionary<double[], List<ParameterBlock>> blocksByArray = new(ReferenceEqualityComparer.Instance);
@@ -142,6 +143,25 @@ public sealed class Problem
 	public Manifold? GetManifold(ArraySegment<double> values) =>
 		FindOrThrow(values, "have its manifold queried").Manifold;
 
+	/// <summary>
+	/// Sets the lower bound of coordinate <paramref name="index"/> of the block
+	/// (-double.MaxValue, Ceres' -std::numeric_limits&lt;double&gt;::max(), means none).
+	/// </summary>
+	public void SetParameterLowerBound(ArraySegment<double> values, int index, double lowerBound) =>
+		FindOrThrow(values, "given a lower bound on one of its components").SetLowerBound(index, lowerBound);
+
+	/// <summary>Sets the upper bound of coordinate <paramref name="index"/> (double.MaxValue means none).</summary>
+	public void SetParameterUpperBound(ArraySegment<double> values, int index, double upperBound) =>
+		FindOrThrow(values, "given an upper bound on one of its components").SetUpperBound(index, upperBound);
+
+	/// <summary>The lower bound of coordinate <paramref name="index"/> (-double.MaxValue if none).</summary>
+	public double GetParameterLowerBound(ArraySegment<double> values, int index) =>
+		FindOrThrow(values, "queried for the lower bound of one of its components").LowerBoundForParameter(index);
+
+	/// <summary>The upper bound of coordinate <paramref name="index"/> (double.MaxValue if none).</summary>
+	public double GetParameterUpperBound(ArraySegment<double> values, int index) =>
+		FindOrThrow(values, "queried for the upper bound of one of its components").UpperBoundForParameter(index);
+
 	/// <summary>Ambient size of the block.</summary>
 	public int ParameterBlockSize(ArraySegment<double> values) => FindOrThrow(values, "have its size queried").Size;
 
@@ -232,6 +252,9 @@ public sealed class Problem
 
 		return lo;
 	}
+
+	/// <summary>The block starting at (array, offset), or null (Ceres' parameter_map lookup).</summary>
+	internal ParameterBlock? Find(double[] array, int offset) => Find(new ArraySegment<double>(array, offset, 0));
 
 	private ParameterBlock? Find(ArraySegment<double> values)
 	{

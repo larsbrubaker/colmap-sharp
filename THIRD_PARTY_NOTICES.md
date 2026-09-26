@@ -93,7 +93,18 @@ of `include/ceres/internal/numeric_diff.h` and
 `block_random_access_sparse_matrix_test.cc`, `block_random_access_diagonal_matrix_test.cc`,
 parts of `graph_algorithms_test.cc` and `reorder_program_test.cc`, and problems 2-4 of
 `linear_least_squares_problems.cc` ported in the tests, and the data of
-`examples/curve_fitting.cc` in `CeresExampleTests.cs`). `ColmapSharp/Optim/TinySolver.cs` ports COLMAP's
+`examples/curve_fitting.cc` in `CeresExampleTests.cs`); parameter bounds, `Problem::Evaluate`
+and `CRSMatrix`, the user `ParameterBlockOrdering` (`include/ceres/ordered_groups.h`,
+`include/ceres/problem.h`, `include/ceres/crs_matrix.h`, `ApplyOrdering` in
+`reorder_program.cc`) and the trust-region minimizer's projected Armijo line search with its
+polynomial helpers (`internal/ceres/line_search.cc`, `line_search.h`, `polynomial.cc`,
+`polynomial.h`, `function_sample.h`) in `ParameterBlock.cs`, `Problem.cs`,
+`Problem.Evaluate.cs`, `ParameterBlockOrdering.cs`, `SchurOrdering.cs`,
+`TrustRegionLineSearch.cs` and `CeresPolynomial.cs` (with `ordered_groups_test.cc`,
+`polynomial_test.cc`, the
+bounds and `ProblemEvaluateTest` cases of `problem_test.cc`, the bounds cases of
+`parameter_block_test.cc` and `evaluator_test_utils.cc` ported in the tests).
+`ColmapSharp/Optim/TinySolver.cs` ports COLMAP's
 `colmap/optim/tiny_solver.h`, which is COLMAP's modified copy of Ceres'
 `include/ceres/tiny_solver.h` and carries this notice.
 

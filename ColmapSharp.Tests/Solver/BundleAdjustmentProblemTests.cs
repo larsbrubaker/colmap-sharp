@@ -245,7 +245,7 @@ public class BundleAdjustmentProblemTests
 	public async Task Gradient_MatchesFiniteDifferencesOfTheCost()
 	{
 		Problem problem = BuildProblem(Perturbed(), new CauchyLoss(2.0));
-		Program reduced = problem.Program.CreateReducedProgram(out _, out _)!;
+		Program reduced = problem.Program.CreateReducedProgram([], out _, out _)!;
 		await Assert.That(problem.Program.SetParameterBlockStatePtrsToUserStatePtrs()).IsTrue();
 		var evaluator = new ProgramEvaluator(reduced, denseJacobian: false, numEliminateBlocks: 0, numThreads: 1);
 		double[] x = new double[evaluator.NumParameters];

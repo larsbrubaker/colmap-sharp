@@ -11,10 +11,11 @@
 //   the port does exactly that, so the problem, the evaluator and Plus are exercised too.
 //   Same 14 column subsets, DENSE_QR, radius 1e4 (max 1e20), tolerances 1e-26, and the
 //   optimum within 0.001.
-// - JacobiScalingTest: as in Ceres, through Problem and Solve.
+// - JacobiScalingTest, GradientToleranceConvergenceUpdatesStep: as in Ceres, through Problem
+//   and Solve (the latter runs the projected line search of a bounded problem; Ceres'
+//   ExpCostFunctor is autodiff, here its derivative -exp(x) is written out, the same value).
 // Not ported: PowellsSingularFunctionUsingDogleg (the dogleg strategy is not ported; COLMAP
-// always uses Levenberg-Marquardt) and GradientToleranceConvergenceUpdatesStep (needs
-// parameter bounds, which arrive with view-graph calibration).
+// always uses Levenberg-Marquardt).
 
 using ColmapSharp.Solver;
 
@@ -224,5 +225,36 @@ public class TrustRegionMinimizerTests
 		var options = new SolverOptions { LinearSolverType = LinearSolverType.DenseQr };
 		SolverSummary summary = LeastSquaresSolver.Solve(options, problem);
 		await Assert.That(summary.FinalCost).IsLessThanOrEqualTo(1e-10);
+	}
+
+	// residual = 10 - exp(x).
+	private sealed class ExpCostFunction() : CostFunction(1, 1)
+	{
+		public override bool Evaluate(
+			ReadOnlySpan<ArraySegment<double>> parameters, Span<double> residuals, ReadOnlySpan<ArraySegment<double>> jacobians)
+		{
+			double x = parameters[0][0];
+			residuals[0] = 10.0 - Math.Exp(x);
+			if (!jacobians.IsEmpty && jacobians[0].Array is not null)
+			{
+				jacobians[0].AsSpan()[0] = -Math.Exp(x);
+			}
+
+			return true;
+		}
+	}
+
+	[Test]
+	public async Task GradientToleranceConvergenceUpdatesStep()
+	{
+		double[] x = [5];
+		var problem = new Problem();
+		problem.AddResidualBlock(new ExpCostFunction(), null, x);
+		problem.SetParameterLowerBound(x, 0, 3.0);
+		var options = new SolverOptions();
+		SolverSummary summary = LeastSquaresSolver.Solve(options, problem);
+		await Assert.That(Math.Abs(3.0 - x[0])).IsLessThanOrEqualTo(1e-12);
+		double expectedFinalCost = 0.5 * Math.Pow(10.0 - Math.Exp(3.0), 2);
+		await Assert.That(Math.Abs(expectedFinalCost - summary.FinalCost)).IsLessThanOrEqualTo(1e-12);
 	}
 }

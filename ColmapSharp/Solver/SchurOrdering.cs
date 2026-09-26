@@ -2,11 +2,13 @@
 // Ported from Ceres Solver 2.2.0 internal/ceres/parameter_block_ordering.cc
 // (ComputeStableSchurOrdering, CreateHessianGraph), internal/ceres/graph_algorithms.h
 // (StableIndependentSetOrdering) and internal/ceres/reorder_program.cc
-// (ReorderProgramForSchurTypeLinearSolver, LexicographicallyOrderResidualBlocks)
+// (ReorderProgramForSchurTypeLinearSolver, ApplyOrdering, LexicographicallyOrderResidualBlocks)
 // (BSD-3-Clause, see THIRD_PARTY_NOTICES.md).
 //
-// The ordering the Schur solvers need, chosen automatically as Ceres does when the user
-// gives no linear_solver_ordering (COLMAP's bundle adjuster never does): the E blocks are a
+// The ordering the Schur solvers need. With a user ParameterBlockOrdering of several groups
+// (COLMAP's global positioner), the first group must be an independent set and is
+// eliminated; the program takes the groups' order (ApplyOrdering). Otherwise (no ordering, as
+// in COLMAP's bundle adjuster, or a single group) it is chosen automatically: the E blocks are a
 // large independent set of the Hessian graph (no two share a residual block), found greedily
 // in order of increasing degree, which in bundle adjustment picks the points. The reduced
 // program's parameter blocks become [E blocks, F blocks], and its residual blocks are
@@ -14,10 +16,8 @@
 // last. LeastSquaresSolver.cs calls this before building the evaluator, whose Jacobian
 // layout (BlockSparseMatrix.cs) then puts the E cells first.
 //
-// Not ported: a user-supplied ParameterBlockOrdering with several elimination groups (only
-// COLMAP's global positioner sets one), and the fill-reducing pre-ordering of the F blocks
-// for SPARSE_SCHUR, which the sparse Cholesky's own AMD replaces
-// (docs/CPP_DIVERGENCES.md entry 35).
+// Not ported: the fill-reducing pre-ordering of the F blocks for SPARSE_SCHUR, which the
+// sparse Cholesky's own AMD replaces (docs/CPP_DIVERGENCES.md entry 35).
 
 using ColmapSharp.Util;
 
@@ -27,10 +27,105 @@ namespace ColmapSharp.Solver;
 internal static class SchurOrdering
 {
 	/// <summary>
-	/// ReorderProgramForSchurTypeLinearSolver with a single elimination group: reorders
-	/// <paramref name="program"/> and returns the number of E blocks.
+	/// ReorderProgramForSchurTypeLinearSolver: reorders <paramref name="program"/> (the
+	/// reduced one) for <paramref name="ordering"/>, or automatically when it is null or has a
+	/// single group, and gives the number of E blocks. False with <paramref name="error"/> set
+	/// if the ordering does not cover the program or its first group is not independent.
 	/// </summary>
-	public static int ReorderProgramForSchurTypeLinearSolver(Program program)
+	public static bool ReorderProgramForSchurTypeLinearSolver(
+		Problem problem, ParameterBlockOrdering? ordering, Program program, out int sizeOfFirstEliminationGroup, out string error)
+	{
+		error = string.Empty;
+		sizeOfFirstEliminationGroup = 0;
+		if (ordering is not null && ordering.NumElements != program.ParameterBlocks.Count)
+		{
+			error = $"The program has {program.ParameterBlocks.Count} parameter blocks, but the parameter block ordering has {ordering.NumElements} parameter blocks.";
+			return false;
+		}
+
+		if (ordering is null || ordering.NumGroups == 1)
+		{
+			// Ceres is completely free to choose the parameter block ordering: the e_blocks are
+			// a maximal independent set.
+			sizeOfFirstEliminationGroup = ReorderProgramForSchurTypeLinearSolver(program);
+			return true;
+		}
+
+		// The user provided an ordering with more than one elimination group. Verify that the
+		// first elimination group is an independent set.
+		var firstEliminationGroup = new HashSet<ParameterBlock>(ReferenceEqualityComparer.Instance);
+		int firstGroupSize = 0;
+		foreach ((double[] array, int offset) in ordering.Groups().First().Elements)
+		{
+			firstGroupSize++;
+			if (problem.Find(array, offset) is ParameterBlock block)
+			{
+				firstEliminationGroup.Add(block);
+			}
+		}
+
+		if (!program.IsParameterBlockSetIndependent(firstEliminationGroup))
+		{
+			error = $"The first elimination group in the parameter block ordering of size {firstGroupSize} is not an independent set";
+			return false;
+		}
+
+		if (!ApplyOrdering(problem, ordering, program, out error))
+		{
+			return false;
+		}
+
+		program.SetParameterOffsetsAndIndex();
+		sizeOfFirstEliminationGroup = firstGroupSize;
+
+		// Schur type solvers also require that their residual blocks be lexicographically
+		// ordered.
+		LexicographicallyOrderResidualBlocks(sizeOfFirstEliminationGroup, program);
+		program.SetParameterOffsetsAndIndex();
+		return true;
+	}
+
+	/// <summary>
+	/// ApplyOrdering: the program's parameter blocks become the ordering's, group by group
+	/// (each in insertion order, ParameterBlockOrdering.cs). False with an error if the sizes
+	/// differ or an element is not a block of <paramref name="problem"/>.
+	/// </summary>
+	public static bool ApplyOrdering(Problem problem, ParameterBlockOrdering ordering, Program program, out string error)
+	{
+		error = string.Empty;
+		int numParameterBlocks = program.ParameterBlocks.Count;
+		if (ordering.NumElements != numParameterBlocks)
+		{
+			error = "User specified ordering does not have the same number of parameters as the problem. The problem"
+				+ $"has {numParameterBlocks} blocks while the ordering has {ordering.NumElements} blocks.";
+			return false;
+		}
+
+		var parameterBlocks = new List<ParameterBlock>(numParameterBlocks);
+		foreach ((int group, IEnumerable<(double[] Array, int Offset)> elements) in ordering.Groups())
+		{
+			foreach ((double[] array, int offset) in elements)
+			{
+				ParameterBlock? block = problem.Find(array, offset);
+				if (block is null)
+				{
+					error = "User specified ordering contains a pointer to a double that is not a parameter block in "
+						+ $"the problem. The invalid double is in group: {group}";
+					return false;
+				}
+
+				parameterBlocks.Add(block);
+			}
+		}
+
+		program.ParameterBlocks.Clear();
+		program.ParameterBlocks.AddRange(parameterBlocks);
+		return true;
+	}
+
+	// The automatic (single group) case: reorders the program and returns the number of E
+	// blocks.
+	private static int ReorderProgramForSchurTypeLinearSolver(Program program)
 	{
 		int sizeOfFirstEliminationGroup = ComputeStableSchurOrdering(program, out List<ParameterBlock> schurOrdering);
 		Check.Eq(schurOrdering.Count, program.ParameterBlocks.Count, "Congratulations, you found a Ceres bug! Please report this error to the developers.");

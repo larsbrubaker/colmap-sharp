@@ -10,7 +10,9 @@
 // cost array. Ceres instead sums cost and gradient per thread and then across threads, which
 // makes its last bits depend on the thread count and the scheduling. Here the cost is summed
 // over residual blocks in order and the gradient is J'r computed after the parallel pass, so
-// the result is the same for any thread count (docs/CPP_DIVERGENCES.md, entry 18).
+// the result is the same for any thread count (docs/CPP_DIVERGENCES.md, entry 18). A gradient
+// asked for without a Jacobian (the bounded line search, Problem.Evaluate) goes through a
+// Jacobian and residual vector the evaluator owns, allocated on first use and reused.
 
 using System.Runtime.ExceptionServices;
 
@@ -35,7 +37,12 @@ internal sealed class ProgramEvaluator
 	// The outputs of the parallel evaluation in progress (the evaluator is not reentrant).
 	private double[]? currentResiduals;
 	private SparseMatrix? currentJacobian;
+	private bool currentApplyLossFunction = true;
 	private int failed;
+
+	// Scratch for a gradient evaluated without the caller's Jacobian or residuals.
+	private SparseMatrix? gradientJacobian;
+	private double[]? gradientResiduals;
 
 	/// <summary>
 	/// Creates the evaluator. <paramref name="denseJacobian"/> selects DenseSparseMatrix
@@ -85,10 +92,10 @@ internal sealed class ProgramEvaluator
 	/// <summary>Number of residuals (Jacobian rows).</summary>
 	public int NumResiduals { get; }
 
-	/// <summary>Number of Evaluate calls without a Jacobian.</summary>
+	/// <summary>Number of Evaluate calls asking for neither a gradient nor a Jacobian.</summary>
 	public int NumResidualEvaluations { get; private set; }
 
-	/// <summary>Number of Evaluate calls with a Jacobian.</summary>
+	/// <summary>Number of Evaluate calls asking for a gradient or a Jacobian.</summary>
 	public int NumJacobianEvaluations { get; private set; }
 
 	/// <summary>A zero Jacobian of the evaluator's kind.</summary>
@@ -97,17 +104,32 @@ internal sealed class ProgramEvaluator
 
 	/// <summary>
 	/// Evaluates at <paramref name="state"/>. <paramref name="residuals"/>,
-	/// <paramref name="gradient"/> and <paramref name="jacobian"/> are optional; a gradient
-	/// needs the Jacobian and the residuals (the minimizer always asks for all three). Returns false if a residual
-	/// block fails or the cost is not finite.
+	/// <paramref name="gradient"/> and <paramref name="jacobian"/> are optional. Without
+	/// <paramref name="applyLossFunction"/> the cost and residuals are the plain squared ones
+	/// (Problem::EvaluateOptions::apply_loss_function). Returns false if a residual block
+	/// fails or the cost is not finite.
 	/// </summary>
-	public bool Evaluate(double[] state, out double cost, double[]? residuals, double[]? gradient, SparseMatrix? jacobian)
+	public bool Evaluate(
+		double[] state,
+		out double cost,
+		double[]? residuals,
+		double[]? gradient,
+		SparseMatrix? jacobian,
+		bool applyLossFunction = true)
 	{
 		cost = 0.0;
-		Check.That(
-			gradient is null || (jacobian is not null && residuals is not null),
-			"The gradient is computed as J'r, so it needs the Jacobian and the residuals.");
-		if (jacobian is null)
+
+		// program_evaluator.h times a call as "Evaluator::Jacobian" when a gradient or a
+		// Jacobian is asked for, "Evaluator::Residual" otherwise.
+		bool countAsJacobianEvaluation = gradient is not null || jacobian is not null;
+		if (gradient is not null && (jacobian is null || residuals is null))
+		{
+			// The gradient is J'r, so it needs both; borrow the evaluator's own.
+			jacobian ??= gradientJacobian ??= CreateJacobian();
+			residuals ??= gradientResiduals ??= new double[NumResiduals];
+		}
+
+		if (!countAsJacobianEvaluation)
 		{
 			NumResidualEvaluations++;
 		}
@@ -135,7 +157,7 @@ internal sealed class ProgramEvaluator
 			Scratch scratch = scratchPool[0];
 			for (int i = 0; i < numResidualBlocks && !aborted; i++)
 			{
-				aborted = !EvaluateResidualBlock(i, scratch, residuals, jacobian);
+				aborted = !EvaluateResidualBlock(i, scratch, residuals, jacobian, applyLossFunction);
 			}
 		}
 		else
@@ -145,6 +167,7 @@ internal sealed class ProgramEvaluator
 			// evaluation allocates nothing of its own.
 			currentResiduals = residuals;
 			currentJacobian = jacobian;
+			currentApplyLossFunction = applyLossFunction;
 			failed = 0;
 			Array.Clear(chunkExceptions);
 			Parallel.For(0, scratchPool.Length, parallelOptions, chunkBody);
@@ -184,7 +207,7 @@ internal sealed class ProgramEvaluator
 		return double.IsFinite(cost);
 	}
 
-	private bool EvaluateResidualBlock(int i, Scratch scratch, double[]? residuals, SparseMatrix? jacobian)
+	private bool EvaluateResidualBlock(int i, Scratch scratch, double[]? residuals, SparseMatrix? jacobian, bool applyLossFunction)
 	{
 		ResidualBlock residualBlock = program.ResidualBlocks[i];
 		int numResiduals = residualBlock.NumResiduals;
@@ -203,7 +226,7 @@ internal sealed class ProgramEvaluator
 		}
 
 		if (!residualBlock.Evaluate(
-				true, out double blockCost, blockResiduals, blockJacobians, scratch.EvaluateScratch, scratch.ParameterViews, scratch.EvalJacobians))
+				applyLossFunction, out double blockCost, blockResiduals, blockJacobians, scratch.EvaluateScratch, scratch.ParameterViews, scratch.EvalJacobians))
 		{
 			return false;
 		}
@@ -229,7 +252,7 @@ internal sealed class ProgramEvaluator
 		{
 			for (int i = start; i < end && Volatile.Read(ref failed) == 0; i++)
 			{
-				if (!EvaluateResidualBlock(i, scratchPool[t], currentResiduals, currentJacobian))
+				if (!EvaluateResidualBlock(i, scratchPool[t], currentResiduals, currentJacobian, currentApplyLossFunction))
 				{
 					Volatile.Write(ref failed, 1);
 				}

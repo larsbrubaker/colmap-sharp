@@ -12,9 +12,11 @@
 // restored) and fill in the summary.
 //
 // The parameter blocks keep Problem's insertion order except for the Schur solvers, which
-// put the eliminated blocks first (SchurOrdering.cs); Ceres also reorders for SuiteSparse's
-// own fill-reducing ordering, which the simplicial Cholesky here does itself
-// (docs/CPP_DIVERGENCES.md entry 22).
+// put the eliminated blocks first (SchurOrdering.cs), chosen automatically or taken from
+// the user's SolverOptions.LinearSolverOrdering; Ceres also reorders for SuiteSparse's own
+// fill-reducing ordering, which the simplicial Cholesky here does itself
+// (docs/CPP_DIVERGENCES.md entry 22). A problem whose variable blocks have bounds must start
+// feasible and runs the projected line search (TrustRegionMinimizer.cs).
 
 namespace ColmapSharp.Solver;
 
@@ -48,6 +50,7 @@ public static class LeastSquaresSolver
 		summary.NumResiduals = program.NumResiduals;
 		summary.LinearSolverTypeUsed = options.LinearSolverType;
 		summary.NumThreadsUsed = options.NumThreads;
+		summary.NumLineSearchSteps = 0;
 
 		try
 		{
@@ -57,7 +60,7 @@ public static class LeastSquaresSolver
 				return summary;
 			}
 
-			Preprocessed? pp = Preprocess(options, program, summary, out error);
+			Preprocessed? pp = Preprocess(options, problem, summary, out error);
 			if (pp is null)
 			{
 				summary.Message = error;
@@ -104,14 +107,18 @@ public static class LeastSquaresSolver
 	}
 
 	// TrustRegionPreprocessor::Preprocess.
-	private static Preprocessed? Preprocess(SolverOptions options, Program program, SolverSummary summary, out string error)
+	private static Preprocessed? Preprocess(SolverOptions options, Problem problem, SolverSummary summary, out string error)
 	{
-		if (!program.ParameterBlocksAreFinite(out error))
+		Program program = problem.Program;
+
+		// IsProgramValid.
+		if (!program.ParameterBlocksAreFinite(out error) || !program.IsFeasible(out error))
 		{
 			return null;
 		}
 
-		Program? reduced = program.CreateReducedProgram(out double fixedCost, out error);
+		var removedParameterBlocks = new List<ParameterBlock>();
+		Program? reduced = program.CreateReducedProgram(removedParameterBlocks, out double fixedCost, out error);
 		if (reduced is null)
 		{
 			return null;
@@ -124,10 +131,61 @@ public static class LeastSquaresSolver
 			return pp;
 		}
 
-		// SetupLinearSolver: the Schur solvers eliminate an independent set of blocks, which
-		// reorders the program (ReorderProgramForSchurTypeLinearSolver).
+		// SetupLinearSolver. A user ordering loses the blocks the reduction removed (on a
+		// copy: Ceres edits the caller's ordering). If that empties the first elimination
+		// group, a Schur solver has nothing to eliminate and Ceres switches solvers
+		// (docs/CPP_DIVERGENCES.md entry 37).
 		LinearSolverType type = options.LinearSolverType;
-		int numEliminateBlocks = LinearSolver.IsSchurType(type) ? SchurOrdering.ReorderProgramForSchurTypeLinearSolver(reduced) : 0;
+		ParameterBlockOrdering? ordering = null;
+		if (options.LinearSolverOrdering is not null)
+		{
+			ordering = options.LinearSolverOrdering.Clone();
+
+			// Ceres CHECKs (and aborts) on an empty ordering in MinNonZeroGroup; here the solve
+			// fails with the reason instead.
+			if (ordering.NumGroups == 0)
+			{
+				error = "Solver::Options::linear_solver_ordering is empty (Check failed: NumGroups() != 0). Leave it unset to let the solver choose, or add every parameter block to a group.";
+				return null;
+			}
+
+			int minGroupId = ordering.MinNonZeroGroup();
+			ordering.Remove(removedParameterBlocks.ConvertAll(b => b.UserState));
+			if (LinearSolver.IsSchurType(type) && ordering.NumGroups == 0)
+			{
+				error = "Solver::Options::linear_solver_ordering holds only parameter blocks that are constant or unused (Check failed: NumGroups() != 0), so the Schur solver has no ordering for the variable blocks.";
+				return null;
+			}
+
+			if (LinearSolver.IsSchurType(type) && minGroupId != ordering.MinNonZeroGroup())
+			{
+				if (!LinearSolverForZeroEBlocks(type, out type, out error))
+				{
+					return null;
+				}
+
+				summary.LinearSolverTypeUsed = type;
+			}
+		}
+
+		// ReorderProgram: the Schur solvers eliminate the first group of the ordering, or an
+		// independent set they choose, which reorders the program.
+		int numEliminateBlocks = 0;
+		if (LinearSolver.IsSchurType(type))
+		{
+			if (!SchurOrdering.ReorderProgramForSchurTypeLinearSolver(problem, ordering, reduced, out numEliminateBlocks, out error))
+			{
+				return null;
+			}
+		}
+		else if (type == LinearSolverType.SparseNormalCholesky && ordering is not null && ordering.NumElements != reduced.ParameterBlocks.Count)
+		{
+			// ReorderProgramForSparseCholesky's check; the fill-reducing ordering itself is
+			// the simplicial Cholesky's own (docs/CPP_DIVERGENCES.md entry 22).
+			error = $"The program has {reduced.ParameterBlocks.Count} parameter blocks, but the parameter block ordering has {ordering.NumElements} parameter blocks.";
+			return null;
+		}
+
 		pp.LinearSolver = LinearSolver.Create(new LinearSolverOptions(
 			type,
 			options.PreconditionerType,
@@ -163,11 +221,33 @@ public static class LeastSquaresSolver
 		program.ParameterBlocksToStateVector(reducedParameters);
 		double[] originalReducedParameters = (double[])reducedParameters.Clone();
 
-		var minimizer = new TrustRegionMinimizer(options, pp.Evaluator!, pp.Jacobian!, pp.Strategy!, summary, cancellationToken);
+		var minimizer = new TrustRegionMinimizer(
+			options, pp.Evaluator!, pp.Jacobian!, pp.Strategy!, summary, program.IsBoundsConstrained(), cancellationToken);
 		minimizer.Minimize(reducedParameters);
 
 		program.StateVectorToParameterBlocks(summary.IsSolutionUsable ? reducedParameters : originalReducedParameters);
 		program.CopyParameterBlockStateToUserState();
+	}
+
+	// LinearSolver::LinearSolverForZeroEBlocks: the solver to use when a user ordering leaves
+	// the Schur solver nothing to eliminate. ITERATIVE_SCHUR would become CGNR, which is not
+	// ported, so that case fails with a message rather than running something else.
+	private static bool LinearSolverForZeroEBlocks(LinearSolverType given, out LinearSolverType type, out string error)
+	{
+		error = string.Empty;
+		type = given switch
+		{
+			LinearSolverType.SparseSchur => LinearSolverType.SparseNormalCholesky,
+			LinearSolverType.DenseSchur => LinearSolverType.DenseQr,
+			_ => given,
+		};
+		if (given == LinearSolverType.IterativeSchur)
+		{
+			error = "No E blocks: Ceres switches ITERATIVE_SCHUR to CGNR, which is not ported. Use SPARSE_SCHUR or give the first elimination group a variable block.";
+			return false;
+		}
+
+		return true;
 	}
 
 	// SetSummaryFinalCost: the minimizer may take nonmonotonic steps, so the final cost is

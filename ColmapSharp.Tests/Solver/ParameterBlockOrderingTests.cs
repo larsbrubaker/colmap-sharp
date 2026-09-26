@@ -1,18 +1,20 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 // Ported from Ceres Solver 2.2.0 internal/ceres/parameter_block_ordering_test.cc,
 // internal/ceres/graph_algorithms_test.cc (StableIndependentSet.BreakTies) and
-// internal/ceres/reorder_program_test.cc (ReorderResidualBlockNormalFunction)
+// internal/ceres/reorder_program_test.cc (ReorderResidualBlockNormalFunction,
+// ApplyOrderingOrderingTooSmall, ApplyOrderingNormal)
 // (BSD-3-Clause, see THIRD_PARTY_NOTICES.md).
 //
 // SchurOrderingTests, StableIndependentSetTests and ReorderProgramTests (Ceres' tests, not
 // COLMAP's): ColmapSharp/Solver/SchurOrdering.cs, same problems and expectations.
+// - ApplyOrderingOrderingTooSmall applies the ordering to a copy of the problem's program,
+//   as Ceres does; ApplyOrderingNormal to the problem's own.
 // - SchurOrderingTest.OneFixed ends by checking that ComputeSchurOrdering puts the constant
 //   block last. Only the stable variant (ComputeStableSchurOrdering, the one Ceres' Schur
 //   solvers use) is ported, so the check runs on it; it appends constant blocks the same way.
 // Not ported: graph_algorithms_test's IndependentSetOrdering, Degree2MaximumSpanningForest and
 //   VertexTotalOrdering cases (those algorithms are not ported: unstable ordering, and the
-//   visibility-clustering preconditioners); reorder_program_test's ApplyOrdering* cases (a
-//   user ParameterBlockOrdering with several groups is not ported), the
+//   visibility-clustering preconditioners); reorder_program_test's
 //   ReorderProgramForSparseCholeskyUsingSuiteSparse cases (SuiteSparse is not ported) and
 //   ReorderResidualBlocksbyPartition (the SUBSET preconditioner and CGNR are not ported).
 
@@ -210,5 +212,52 @@ public class ReorderProgramTests
 		{
 			await Assert.That(ReferenceEquals(residualBlocks[i], expectedResidualBlocks[i])).IsTrue();
 		}
+	}
+
+	[Test]
+	public async Task ApplyOrderingOrderingTooSmall()
+	{
+		var problem = new Problem();
+		double[] x = new double[1];
+		double[] y = new double[1];
+		double[] z = new double[1];
+
+		problem.AddParameterBlock(x);
+		problem.AddParameterBlock(y);
+		problem.AddParameterBlock(z);
+
+		var linearSolverOrdering = new ParameterBlockOrdering();
+		linearSolverOrdering.AddElementToGroup(x, 0);
+		linearSolverOrdering.AddElementToGroup(y, 1);
+
+		var program = new Program(problem.Program);
+		await Assert.That(SchurOrdering.ApplyOrdering(problem, linearSolverOrdering, program, out _)).IsFalse();
+	}
+
+	[Test]
+	public async Task ApplyOrderingNormal()
+	{
+		var problem = new Problem();
+		double[] x = new double[1];
+		double[] y = new double[1];
+		double[] z = new double[1];
+
+		problem.AddParameterBlock(x);
+		problem.AddParameterBlock(y);
+		problem.AddParameterBlock(z);
+
+		var linearSolverOrdering = new ParameterBlockOrdering();
+		linearSolverOrdering.AddElementToGroup(x, 0);
+		linearSolverOrdering.AddElementToGroup(y, 2);
+		linearSolverOrdering.AddElementToGroup(z, 1);
+
+		Program program = problem.Program;
+		await Assert.That(SchurOrdering.ApplyOrdering(problem, linearSolverOrdering, program, out _)).IsTrue();
+		List<ParameterBlock> parameterBlocks = program.ParameterBlocks;
+
+		await Assert.That(parameterBlocks.Count).IsEqualTo(3);
+		await Assert.That(ReferenceEquals(parameterBlocks[0].UserState.Array, x)).IsTrue();
+		await Assert.That(ReferenceEquals(parameterBlocks[1].UserState.Array, z)).IsTrue();
+		await Assert.That(ReferenceEquals(parameterBlocks[2].UserState.Array, y)).IsTrue();
 	}
 }

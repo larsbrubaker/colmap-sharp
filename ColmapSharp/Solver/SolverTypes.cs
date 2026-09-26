@@ -8,7 +8,10 @@
 // IsSolutionUsable), per-iteration summaries and the iteration callback COLMAP's
 // CancellationCallback implements. Defaults are Ceres 2.2's. Options that only select
 // Ceres features not ported (line search minimizer, dogleg, inner iterations, logging to
-// stdout, the GPU and library switches) are absent rather than accepted and ignored.
+// stdout, the GPU and library switches) are absent rather than accepted and ignored. The
+// line search options are the ones the trust-region minimizer's projected line search reads
+// on a bounds-constrained problem (TrustRegionLineSearch.cs); LinearSolverOrdering is the
+// user's elimination ordering (ParameterBlockOrdering.cs).
 // FullReport (a long table COLMAP only logs when print_summary is on) is not ported yet.
 
 using System.Globalization;
@@ -33,6 +36,19 @@ public enum TerminationType
 
 	/// <summary>A callback aborted the solve; the parameters are left as they were.</summary>
 	UserFailure,
+}
+
+/// <summary>ceres::LineSearchInterpolationType: how a line search picks its next trial step.</summary>
+public enum LineSearchInterpolationType
+{
+	/// <summary>Halve the step.</summary>
+	Bisection,
+
+	/// <summary>Fit a quadratic to values (and the initial derivative).</summary>
+	Quadratic,
+
+	/// <summary>Fit a cubic to values and derivatives.</summary>
+	Cubic,
 }
 
 /// <summary>ceres::CallbackReturnType.</summary>
@@ -176,6 +192,39 @@ public sealed class SolverOptions
 	/// <summary>Called after every iteration, in order, until one does not continue.</summary>
 	public List<IIterationCallback> Callbacks { get; } = [];
 
+	/// <summary>
+	/// The elimination ordering for the linear solver, or null to let the solver choose (the
+	/// Schur solvers then find an independent set). With several groups, a Schur solver
+	/// eliminates the lowest group, which must be an independent set. Unlike Ceres, Solve
+	/// leaves this object as it was (Ceres removes the blocks it drops as constant;
+	/// docs/CPP_DIVERGENCES.md entry 37).
+	/// </summary>
+	public ParameterBlockOrdering? LinearSolverOrdering { get; set; }
+
+	/// <summary>How the bounded line search picks trial steps.</summary>
+	public LineSearchInterpolationType LineSearchInterpolationType { get; set; } = LineSearchInterpolationType.Cubic;
+
+	/// <summary>The line search fails once step size times the step's max-norm falls below this.</summary>
+	public double MinLineSearchStepSize { get; set; } = 1e-9;
+
+	/// <summary>The Armijo condition's sufficient decrease factor.</summary>
+	public double LineSearchSufficientFunctionDecrease { get; set; } = 1e-4;
+
+	/// <summary>A new trial step is at least this fraction of the previous one.</summary>
+	public double MaxLineSearchStepContraction { get; set; } = 1e-3;
+
+	/// <summary>A new trial step is at most this fraction of the previous one.</summary>
+	public double MinLineSearchStepContraction { get; set; } = 0.6;
+
+	/// <summary>Trial steps per line search; 0 turns the bounded line search off.</summary>
+	public int MaxNumLineSearchStepSizeIterations { get; set; } = 20;
+
+	/// <summary>The Wolfe curvature factor (validated only; the Wolfe search is not ported).</summary>
+	public double LineSearchSufficientCurvatureDecrease { get; set; } = 0.9;
+
+	/// <summary>The Wolfe expansion limit (validated only; the Wolfe search is not ported).</summary>
+	public double MaxLineSearchStepExpansion { get; set; } = 10.0;
+
 	/// <summary>Solver::Options::IsValid: null if valid, else Ceres' error message.</summary>
 	public string? Validate()
 	{
@@ -200,8 +249,53 @@ public sealed class SolverOptions
 			?? Ge(MinLinearSolverIterations, 0, "min_linear_solver_iterations")
 			?? Ge(MaxLinearSolverIterations, 0, "max_linear_solver_iterations")
 			?? LeOption(MinLinearSolverIterations, MaxLinearSolverIterations, "min_linear_solver_iterations", "max_linear_solver_iterations")
-			?? (UseNonmonotonicSteps ? Gt(MaxConsecutiveNonmonotonicSteps, 0, "max_consecutive_nonmonotonic_steps") : null);
+			?? (UseNonmonotonicSteps ? Gt(MaxConsecutiveNonmonotonicSteps, 0, "max_consecutive_nonmonotonic_steps") : null)
+			?? LineSearchOptionsError();
 	}
+
+	// LineSearchOptionsAreValid for the trust-region minimizer (max_lbfgs_rank and the
+	// direction type belong to the line search minimizer, which is not ported). The
+	// constraint texts are Ceres' source literals.
+	private string? LineSearchOptionsError()
+	{
+		return Op(MinLineSearchStepSize > 0.0, "min_line_search_step_size", MinLineSearchStepSize, "> 0.0")
+			?? Op(MaxLineSearchStepContraction > 0.0, "max_line_search_step_contraction", MaxLineSearchStepContraction, "> 0.0")
+			?? Op(MaxLineSearchStepContraction < 1.0, "max_line_search_step_contraction", MaxLineSearchStepContraction, "< 1.0")
+			?? OpOption(
+				MaxLineSearchStepContraction < MinLineSearchStepContraction,
+				"max_line_search_step_contraction",
+				MaxLineSearchStepContraction,
+				"min_line_search_step_contraction",
+				MinLineSearchStepContraction,
+				"<")
+			?? Op(MinLineSearchStepContraction <= 1.0, "min_line_search_step_contraction", MinLineSearchStepContraction, "<= 1.0")
+			?? Op(
+				MaxNumLineSearchStepSizeIterations >= 0,
+				"max_num_line_search_step_size_iterations",
+				MaxNumLineSearchStepSizeIterations,
+				">= (options.minimizer_type == ceres::TRUST_REGION ? 0 : 1)")
+			?? Op(LineSearchSufficientFunctionDecrease > 0.0, "line_search_sufficient_function_decrease", LineSearchSufficientFunctionDecrease, "> 0.0")
+			?? OpOption(
+				LineSearchSufficientFunctionDecrease < LineSearchSufficientCurvatureDecrease,
+				"line_search_sufficient_function_decrease",
+				LineSearchSufficientFunctionDecrease,
+				"line_search_sufficient_curvature_decrease",
+				LineSearchSufficientCurvatureDecrease,
+				"<")
+			?? Op(LineSearchSufficientCurvatureDecrease < 1.0, "line_search_sufficient_curvature_decrease", LineSearchSufficientCurvatureDecrease, "< 1.0")
+			?? Op(MaxLineSearchStepExpansion > 1.0, "max_line_search_step_expansion", MaxLineSearchStepExpansion, "> 1.0");
+	}
+
+	// OPTION_OP with the constraint's source text.
+	private static string? Op(bool ok, string name, double value, string constraint) =>
+		ok ? null : Violation(name, value, $"{name} {constraint}");
+
+	// OPTION_OP_OPTION.
+	private static string? OpOption(bool ok, string xName, double x, string yName, double y, string op) =>
+		ok
+			? null
+			: $"Invalid configuration. Solver::Options::{xName} = {Format(x)}. Solver::Options::{yName} = {Format(y)}. "
+				+ $"Violated constraint: Solver::Options::{xName}{op} Solver::Options::{yName}.";
 
 	private static string? Ge(double value, double bound, string name) =>
 		value >= bound ? null : Violation(name, value, $"{name} >= {Format(bound)}");
@@ -284,6 +378,12 @@ public sealed class SolverSummary
 	/// <summary>Jacobian evaluations.</summary>
 	public int NumJacobianEvaluations { get; internal set; } = -1;
 
+	/// <summary>Whether some variable block has a bound (the projected line search ran).</summary>
+	public bool IsConstrained { get; internal set; }
+
+	/// <summary>Trial steps of the bounded line search (its backtracking iterations).</summary>
+	public int NumLineSearchSteps { get; internal set; } = -1;
+
 	/// <summary>Linear solves.</summary>
 	public int NumLinearSolves { get; internal set; } = -1;
 
@@ -322,8 +422,8 @@ public sealed class SolverSummary
 		_ => "UNKNOWN",
 	};
 
-	/// <summary>printf's "%e": six fraction digits and an exponent of at least two digits.</summary>
-	internal static string FormatE(double value)
+	/// <summary>printf's "%.Ne" (default "%e"): N fraction digits and an exponent of at least two digits.</summary>
+	internal static string FormatE(double value, int precision = 6)
 	{
 		if (double.IsNaN(value))
 		{
@@ -337,7 +437,7 @@ public sealed class SolverSummary
 
 		// "E6" rounds the exact binary value correctly (unlike a custom format, which rounds
 		// a 15-digit intermediate); only the exponent's width differs from printf.
-		string s = value.ToString("E6", CultureInfo.InvariantCulture);
+		string s = value.ToString("E" + precision.ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
 		int e = s.IndexOf('E', StringComparison.Ordinal);
 		int exponent = int.Parse(s.AsSpan(e + 1), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
 		return string.Concat(

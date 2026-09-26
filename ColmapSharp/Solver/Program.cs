@@ -6,7 +6,9 @@
 // full one; LeastSquaresSolver.cs builds the reduced one the minimizer works on (constant
 // blocks and residual blocks that only touch them removed, their cost folded into
 // fixed_cost) and lays out the state vector (ambient sizes) and the delta vector (tangent
-// sizes) in block order. ProgramEvaluator.cs evaluates it.
+// sizes) in block order. ProgramEvaluator.cs evaluates it. The bounds checks
+// (IsBoundsConstrained, IsFeasible) and IsParameterBlockSetIndependent serve the
+// preprocessing in LeastSquaresSolver.cs and SchurOrdering.cs.
 
 using System.Globalization;
 
@@ -20,7 +22,8 @@ internal sealed class Program
 	{
 	}
 
-	private Program(Program other)
+	/// <summary>A copy of <paramref name="other"/>'s block lists (Ceres' copy constructor).</summary>
+	internal Program(Program other)
 	{
 		ParameterBlocks = [.. other.ParameterBlocks];
 		ResidualBlocks = [.. other.ResidualBlocks];
@@ -119,10 +122,10 @@ internal sealed class Program
 	/// to <paramref name="fixedCost"/>. Returns null with <paramref name="error"/> set if such a
 	/// residual block fails to evaluate.
 	/// </summary>
-	public Program? CreateReducedProgram(out double fixedCost, out string error)
+	public Program? CreateReducedProgram(List<ParameterBlock> removedParameterBlocks, out double fixedCost, out string error)
 	{
 		var reduced = new Program(this);
-		if (!reduced.RemoveFixedBlocks(out fixedCost, out error))
+		if (!reduced.RemoveFixedBlocks(removedParameterBlocks, out fixedCost, out error))
 		{
 			return null;
 		}
@@ -131,9 +134,10 @@ internal sealed class Program
 		return reduced;
 	}
 
-	private bool RemoveFixedBlocks(out double fixedCost, out string error)
+	private bool RemoveFixedBlocks(List<ParameterBlock> removedParameterBlocks, out double fixedCost, out string error)
 	{
 		error = string.Empty;
+		removedParameterBlocks.Clear();
 		fixedCost = 0.0;
 		var scratch = new double[MaxScratchDoublesNeededForEvaluate()];
 		int maxBlocks = MaxParametersPerResidualBlock();
@@ -193,6 +197,10 @@ internal sealed class Program
 			if (parameterBlock.Index != -1)
 			{
 				ParameterBlocks[numActiveParameterBlocks++] = parameterBlock;
+			}
+			else
+			{
+				removedParameterBlocks.Add(parameterBlock);
 			}
 		}
 
@@ -330,6 +338,111 @@ internal sealed class Program
 			state.AsSpan(block.StateOffset, block.Size),
 			delta.AsSpan(block.DeltaOffset, block.TangentSize),
 			statePlusDelta.AsSpan(block.StateOffset, block.Size));
+
+	/// <summary>Program::IsBoundsConstrained: some variable block has a finite bound.</summary>
+	public bool IsBoundsConstrained()
+	{
+		foreach (ParameterBlock block in ParameterBlocks)
+		{
+			if (block.IsConstant)
+			{
+				continue;
+			}
+
+			for (int j = 0; j < block.Size; j++)
+			{
+				if (block.LowerBoundForParameter(j) > -double.MaxValue || block.UpperBoundForParameter(j) < double.MaxValue)
+				{
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// Program::IsFeasible: constant blocks must start inside their bounds (Ceres cannot move
+	/// them), and variable blocks must have a non-empty box.
+	/// </summary>
+	public bool IsFeasible(out string error)
+	{
+		error = string.Empty;
+		foreach (ParameterBlock block in ParameterBlocks)
+		{
+			ReadOnlySpan<double> parameters = block.UserState.AsSpan();
+			for (int j = 0; j < block.Size; j++)
+			{
+				double lowerBound = block.LowerBoundForParameter(j);
+				double upperBound = block.UpperBoundForParameter(j);
+				if (block.IsConstant && (parameters[j] < lowerBound || parameters[j] > upperBound))
+				{
+					error = string.Format(
+						CultureInfo.InvariantCulture,
+						"ParameterBlock with size {0} has at least one infeasible value.\nFirst infeasible value is at index: {1}.\nLower bound: {2}, value: {3}, upper bound: {4}\nParameter block values: {5}",
+						block.Size,
+						j,
+						SolverSummary.FormatE(lowerBound),
+						SolverSummary.FormatE(parameters[j]),
+						SolverSummary.FormatE(upperBound),
+						FormatValues(parameters));
+					return false;
+				}
+
+				if (!block.IsConstant && lowerBound >= upperBound)
+				{
+					error = string.Format(
+						CultureInfo.InvariantCulture,
+						"ParameterBlock with size {0} has at least one infeasible bound.\nFirst infeasible bound is at index: {1}.\nLower bound: {2}, upper bound: {3}\nParameter block values: {4}",
+						block.Size,
+						j,
+						SolverSummary.FormatE(lowerBound),
+						SolverSummary.FormatE(upperBound),
+						FormatValues(parameters));
+					return false;
+				}
+			}
+		}
+
+		return true;
+	}
+
+	/// <summary>
+	/// Program::IsParameterBlockSetIndependent: no residual block touches two blocks of
+	/// <paramref name="independentSet"/>.
+	/// </summary>
+	public bool IsParameterBlockSetIndependent(IReadOnlySet<ParameterBlock> independentSet)
+	{
+		foreach (ResidualBlock residualBlock in ResidualBlocks)
+		{
+			int count = 0;
+			foreach (ParameterBlock parameterBlock in residualBlock.ParameterBlocks)
+			{
+				count += independentSet.Contains(parameterBlock) ? 1 : 0;
+			}
+
+			if (count > 1)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	// AppendArrayToString: each value as "%12g ", uninitialized ones as "Uninitialized ".
+	private static string FormatValues(ReadOnlySpan<double> values)
+	{
+		var text = new System.Text.StringBuilder();
+		foreach (double value in values)
+		{
+			text.Append(value == ArrayValidity.ImpossibleValue
+				? "Uninitialized "
+				: Util.CppStreamFormat.FormatDouble(value).PadLeft(12) + " ");
+		}
+
+		return text.ToString();
+	}
 
 	/// <summary>Program::ParameterBlocksAreFinite: every parameter value is finite.</summary>
 	public bool ParameterBlocksAreFinite(out string error)

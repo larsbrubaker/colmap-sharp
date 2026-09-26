@@ -70,14 +70,10 @@ needs `generalized_pose`), `pose`, `generalized_pose`, `triangulation`, `alignme
 ### Phase 7 — Nonlinear least-squares solver (Ceres replacement)
 Done: Jet/autodiff, losses, manifolds, Problem, LM trust region, DENSE_QR,
 DENSE_NORMAL_CHOLESKY, SPARSE_NORMAL_CHOLESKY, DENSE_SCHUR, SPARSE_SCHUR, ITERATIVE_SCHUR
-(Jacobi/SchurJacobi), automatic Schur ordering (`Solver/`). Open: parameter bounds
-(`SetParameterLowerBound/UpperBound` + Ceres' projected line search; view-graph calibration
-and GlobalPositioner need them) with Ceres' GradientToleranceConvergenceUpdatesStep test;
-`Problem.Evaluate` (covariance, view-graph calibration); user `ParameterBlockOrdering` with
-several groups (`ApplyOrdering` + reorder_program_test ApplyOrderingOrderingTooSmall /
-ApplyOrderingNormal; GlobalPositioner needs it). Not ported on purpose: `Summary.FullReport`
+(Jacobi/SchurJacobi), automatic and user (multi-group) Schur ordering, parameter bounds with
+Ceres' projected line search, `Problem.Evaluate` (`Solver/`). Not ported on purpose: `Summary.FullReport`
 (log-only), Dogleg, inner iterations, SuiteSparse/LAPACK/Accelerate/NESDIS/SPSE/SUBSET/CGNR
-variants and their Ceres tests, static-size Schur specializations
+variants and their Ceres tests, Ceres' line search minimizer and its tests, static-size Schur specializations
 (SchurEliminatorForOneFBlock), unstable independent-set ordering, visibility-clustering
 preconditioners, Ceres' bit-packed cell-key tests.
 Performance (before BA at scale), keeping results bit-identical and thread-count independent:

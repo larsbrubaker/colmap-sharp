@@ -816,6 +816,52 @@ observations (`EverySolver_ReachesTheSameOptimum`, cost to 1e-9 relative, parame
 1e-6), and bit-identical results for 1 and 4 threads (`ThreadCount_DoesNotChangeTheResult`).
 Not compared against C++ Ceres.
 
+## 36. A user ParameterBlockOrdering keeps each group in insertion order
+
+**What differs.** Ceres' `ParameterBlockOrdering` (`OrderedGroups<double*>`) stores each
+group as a `std::set<double*>`, so `ApplyOrdering` lays out the blocks of one group in
+increasing heap-address order. `Solver/ParameterBlockOrdering.cs` keeps each group in the
+order its blocks were added (`AddElementToGroup`; moving a block to another group appends it
+there). The program's parameter block order within a group, and so the Schur eliminator's
+chunk order and the reduced camera system's column order, can differ from a given Ceres run.
+
+**Why.** C# has no stable addresses, and in C++ the address order is itself an accident of
+the allocator (COLMAP's global positioner adds points, frame centers and rig cameras that
+live in separate hash-map nodes), so no run-to-run order exists to match. Insertion order is
+deterministic and is the order the caller controls. Groups themselves are still visited in
+increasing id order, and every Ceres check (independent first group, element count, unknown
+blocks) is the same.
+
+**Evidence.** `OrderedGroupsTests` (Ceres' `ordered_groups_test.cc`) and
+`ReorderProgramTests.ApplyOrderingNormal` pass unchanged; neither depends on the order
+inside a group. The effect on results is rounding-level (the order of additions into the
+reduced system), within the Tier C outcome bar; `ProblemTests.UserOrdering_SchurSolverMatchesDenseQr`
+checks the solutions against DENSE_QR.
+
+## 37. Solve does not edit the caller's ordering, and ITERATIVE_SCHUR never falls back to CGNR
+
+**What differs.** 1. Ceres' preprocessor removes the blocks it drops as constant from
+`Solver::Options::linear_solver_ordering` itself (a `shared_ptr`, so the caller's object is
+edited). `LeastSquaresSolver.Solve` edits a copy; `SolverOptions.LinearSolverOrdering` is
+unchanged afterwards. 2. When that removal empties the first elimination group, Ceres swaps
+SPARSE_SCHUR for SPARSE_NORMAL_CHOLESKY and DENSE_SCHUR for DENSE_QR (both done here, and
+reported in `SolverSummary.LinearSolverTypeUsed`) and ITERATIVE_SCHUR for CGNR; CGNR is not
+ported, so that last case ends the solve with FAILURE and a message saying so. 3. An empty
+user ordering, or (for a Schur solver) one that holds only blocks the reduction removed,
+trips a CHECK in Ceres' `MinNonZeroGroup` and aborts the process; here the solve ends with
+FAILURE and a message naming the problem.
+
+**Why.** 1. The in-place edit is a side effect on an input the caller may reuse (COLMAP
+rebuilds its ordering before every solve, so it never sees it). 2. CGNR is excluded from the
+port (PORTING_PLAN.md Phase 7); no COLMAP caller combines ITERATIVE_SCHUR with a user ordering. 3. A
+library inside MatterCAD must not abort the host; the CHECK's condition is kept, only its
+consequence differs.
+
+**Evidence.** `ProblemTests.UserOrdering_ConstantFirstGroup_SwitchesSolver`: every block of the
+first group constant, SPARSE_SCHUR solves as SPARSE_NORMAL_CHOLESKY and the ordering still
+holds all six blocks. `ProblemTests.UserOrdering_Empty_Fails` and
+`UserOrdering_OnlyConstantBlocks_Fails` cover case 3.
+
 ## 40. ExtractTopScaleFeatures keeps equal-scale keypoints in input order
 
 **What differs.** COLMAP's `ExtractTopScaleFeatures` (feature/utils.cc) selects the largest

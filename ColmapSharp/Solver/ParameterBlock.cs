@@ -7,9 +7,11 @@
 // During a solve its State moves to a slice of the minimizer's own state vector (x or the
 // candidate point), so the user's array is only written when the solve ends, as in Ceres.
 // Problem.cs owns the blocks; Program.cs orders them and assigns their state and tangent
-// offsets; ResidualBlock.cs reads State and PlusJacobian. Bounds (SetParameterLowerBound)
-// are not ported yet: they make a problem "constrained", which switches the trust-region
-// minimizer to a projected line search that nothing in this step needs.
+// offsets; ResidualBlock.cs reads State and PlusJacobian. Per-coordinate bounds
+// (Problem.SetParameterLowerBound/UpperBound) are stored lazily, as in Ceres: a block with
+// none allocates nothing, and Plus projects onto the box after the manifold's Plus. A
+// variable block with a finite bound makes the program "constrained", which switches the
+// trust-region minimizer to its projected line search (TrustRegionLineSearch.cs).
 
 namespace ColmapSharp.Solver;
 
@@ -18,6 +20,8 @@ internal sealed class ParameterBlock
 {
 	private Manifold? manifold;
 	private double[]? plusJacobian;
+	private double[]? upperBounds;
+	private double[]? lowerBounds;
 
 	/// <summary>Creates a block over <paramref name="userState"/>, at position <paramref name="index"/>.</summary>
 	public ParameterBlock(ArraySegment<double> userState, int index)
@@ -121,21 +125,96 @@ internal sealed class ParameterBlock
 		State.AsSpan().CopyTo(destination.AsSpan(0, Size));
 	}
 
-	/// <summary>x_plus_delta = Plus(x, delta), through the manifold if there is one.</summary>
+	/// <summary>
+	/// x_plus_delta = Plus(x, delta), through the manifold if there is one, then projected
+	/// onto the box of the bounds.
+	/// </summary>
 	public bool Plus(ReadOnlySpan<double> x, ReadOnlySpan<double> delta, Span<double> xPlusDelta)
 	{
 		if (manifold is not null)
 		{
-			return manifold.Plus(x, delta, xPlusDelta);
+			if (!manifold.Plus(x, delta, xPlusDelta))
+			{
+				return false;
+			}
+		}
+		else
+		{
+			for (int i = 0; i < Size; i++)
+			{
+				xPlusDelta[i] = x[i] + delta[i];
+			}
 		}
 
-		for (int i = 0; i < Size; i++)
+		// Project onto the box constraints (std::max / std::min: a NaN coordinate stays NaN
+		// against a bound on the left, as in Ceres, so the evaluation fails rather than the
+		// bound hiding it).
+		if (lowerBounds is not null)
 		{
-			xPlusDelta[i] = x[i] + delta[i];
+			for (int i = 0; i < Size; i++)
+			{
+				xPlusDelta[i] = CppMax(xPlusDelta[i], lowerBounds[i]);
+			}
+		}
+
+		if (upperBounds is not null)
+		{
+			for (int i = 0; i < Size; i++)
+			{
+				xPlusDelta[i] = CppMin(xPlusDelta[i], upperBounds[i]);
+			}
 		}
 
 		return true;
 	}
+
+	/// <summary>Ceres' SetUpperBound: an infinite (max) bound on an unbounded block allocates nothing.</summary>
+	public void SetUpperBound(int index, double upperBound)
+	{
+		Util.Check.Lt(index, Size);
+		if (upperBound >= double.MaxValue && upperBounds is null)
+		{
+			return;
+		}
+
+		if (upperBounds is null)
+		{
+			upperBounds = new double[Size];
+			Array.Fill(upperBounds, double.MaxValue);
+		}
+
+		upperBounds[index] = upperBound;
+	}
+
+	/// <summary>Ceres' SetLowerBound: an infinite (-max) bound on an unbounded block allocates nothing.</summary>
+	public void SetLowerBound(int index, double lowerBound)
+	{
+		Util.Check.Lt(index, Size);
+		if (lowerBound <= -double.MaxValue && lowerBounds is null)
+		{
+			return;
+		}
+
+		if (lowerBounds is null)
+		{
+			lowerBounds = new double[Size];
+			Array.Fill(lowerBounds, -double.MaxValue);
+		}
+
+		lowerBounds[index] = lowerBound;
+	}
+
+	/// <summary>The upper bound of coordinate <paramref name="index"/> (double.MaxValue if none).</summary>
+	public double UpperBoundForParameter(int index) => upperBounds is null ? double.MaxValue : upperBounds[index];
+
+	/// <summary>The lower bound of coordinate <paramref name="index"/> (-double.MaxValue if none).</summary>
+	public double LowerBoundForParameter(int index) => lowerBounds is null ? -double.MaxValue : lowerBounds[index];
+
+	// std::max(a, b) is (a < b) ? b : a; std::min(a, b) is (b < a) ? b : a. Math.Max/Min
+	// treat NaN and signed zeros differently.
+	private static double CppMax(double a, double b) => a < b ? b : a;
+
+	private static double CppMin(double a, double b) => b < a ? b : a;
 
 	private bool UpdatePlusJacobian()
 	{

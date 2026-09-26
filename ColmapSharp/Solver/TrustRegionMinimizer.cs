@@ -6,9 +6,11 @@
 // (TrustRegionStrategy.cs): evaluate, compute a step in the Jacobi-scaled space, evaluate
 // the candidate, accept or reject by step quality, and stop on the function, gradient or
 // parameter tolerance, the iteration or time limit, the minimum radius, too many invalid
-// steps, a callback, or cancellation. Not ported, because nothing COLMAP builds enables
-// them: inner iterations (use_inner_iterations), the dogleg strategy, and the projected line
-// search of bound-constrained problems (bounds are not ported yet, Problem.cs).
+// steps, a callback, or cancellation. On a bounds-constrained problem the start point is first
+// projected onto the bounds, and every valid step is shortened by a projected Armijo line
+// search (TrustRegionLineSearch.cs) before the candidate is evaluated; Plus does the
+// projection (ParameterBlock.cs). Not ported, because nothing COLMAP builds enables them:
+// inner iterations (use_inner_iterations) and the dogleg strategy.
 // LeastSquaresSolver.cs sets it up and writes the result back.
 
 using System.Diagnostics;
@@ -16,7 +18,7 @@ using System.Globalization;
 
 namespace ColmapSharp.Solver;
 
-/// <summary>ceres::internal::TrustRegionMinimizer (Levenberg-Marquardt, unconstrained).</summary>
+/// <summary>ceres::internal::TrustRegionMinimizer (Levenberg-Marquardt).</summary>
 internal sealed class TrustRegionMinimizer
 {
 	private readonly SolverOptions options;
@@ -28,6 +30,9 @@ internal sealed class TrustRegionMinimizer
 	private readonly Stopwatch clock = Stopwatch.StartNew();
 	private readonly int numResiduals;
 	private readonly int numEffectiveParameters;
+	private readonly bool isConstrained;
+	private LineSearchFunction? lineSearchFunction;
+	private ArmijoLineSearch? lineSearch;
 
 	private double[] x = [];
 	private double[] candidateX = [];
@@ -56,8 +61,10 @@ internal sealed class TrustRegionMinimizer
 		SparseMatrix jacobian,
 		LevenbergMarquardtStrategy strategy,
 		SolverSummary summary,
+		bool isConstrained,
 		CancellationToken cancellationToken)
 	{
+		this.isConstrained = isConstrained;
 		this.options = options;
 		this.evaluator = evaluator;
 		this.jacobian = jacobian;
@@ -107,6 +114,13 @@ internal sealed class TrustRegionMinimizer
 				continue;
 			}
 
+			if (isConstrained && options.MaxNumLineSearchStepSizeIterations > 0)
+			{
+				// Use a projected line search to enforce the bounds constraints and improve
+				// the quality of the step.
+				DoLineSearch();
+			}
+
 			ComputeCandidatePointAndEvaluateCost();
 
 			if (atLeastOneSuccessfulStep && ParameterToleranceReached())
@@ -152,7 +166,13 @@ internal sealed class TrustRegionMinimizer
 		summary.TerminationType = TerminationType.NoConvergence;
 		summary.NumSuccessfulSteps = 0;
 		summary.NumUnsuccessfulSteps = 0;
+		summary.IsConstrained = isConstrained;
 		numConsecutiveInvalidSteps = 0;
+		if (isConstrained)
+		{
+			lineSearchFunction = new LineSearchFunction(evaluator);
+			lineSearch = new ArmijoLineSearch(options, lineSearchFunction);
+		}
 
 		x = (double[])parameters.Clone();
 		candidateX = new double[parameters.Length];
@@ -174,6 +194,20 @@ internal sealed class TrustRegionMinimizer
 	private bool IterationZero()
 	{
 		iterationSummary = new IterationSummary { Iteration = 0, Eta = options.Eta };
+		if (isConstrained)
+		{
+			// Project the starting point onto the bounds: x = Plus(x, 0).
+			Array.Clear(delta);
+			if (!evaluator.Plus(x, delta, candidateX))
+			{
+				summary.Message = "Unable to project initial point onto the feasible set.";
+				summary.TerminationType = TerminationType.Failure;
+				return false;
+			}
+
+			candidateX.AsSpan().CopyTo(x);
+		}
+
 		if (!EvaluateGradientAndJacobian())
 		{
 			summary.Message = "Initial residual and Jacobian evaluation failed.";
@@ -371,6 +405,31 @@ internal sealed class TrustRegionMinimizer
 		}
 
 		return true;
+	}
+
+	// DoLineSearch: an Armijo search along delta from x, starting at the full step, scales
+	// delta by the step length it finds (and leaves it alone if it fails). Ceres notes this
+	// "does not do anything illegal but is incorrect and not terribly effective"
+	// (ceres-solver issue 187); it is ported as is.
+	private void DoLineSearch()
+	{
+		lineSearchFunction!.Init(x, delta);
+		double directionalDerivative = 0.0;
+		for (int i = 0; i < numEffectiveParameters; i++)
+		{
+			directionalDerivative += gradient[i] * delta[i];
+		}
+
+		LineSearchSummary lineSearchSummary = lineSearch!.Search(1.0, xCost, directionalDerivative);
+		summary.NumLineSearchSteps += lineSearchSummary.NumIterations;
+		if (lineSearchSummary.Success)
+		{
+			double stepLength = lineSearchSummary.OptimalPoint.X;
+			for (int i = 0; i < numEffectiveParameters; i++)
+			{
+				delta[i] *= stepLength;
+			}
+		}
 	}
 
 	private bool HandleInvalidStep()
