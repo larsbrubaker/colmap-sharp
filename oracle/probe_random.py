@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # probe_random.py: which C++ standard library's <random> distributions does the pinned
-# pycolmap wheel run? The answer decides how ColmapSharp.Math's Random port implements
+# pycolmap wheel run? The answer decides how ColmapSharp.Mathematics' Random port implements
 # std::uniform_int_distribution / uniform_real_distribution / normal_distribution (their
 # algorithms are implementation-defined: libc++ and libstdc++ give different numbers from
 # the same mt19937 stream). See PORTING_PLAN.md, Phase 1, and CLAUDE.md's PRNG rule.

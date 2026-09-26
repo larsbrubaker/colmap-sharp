@@ -4,8 +4,9 @@
 // MathUtils: the scalar helpers of colmap/math/math.h and colmap/math/math.cc -
 // sign, clamp, degree/radian conversion, percentile/median/MAD, mean/variance/stddev,
 // NextCombination, sigmoid scaling, NChooseK and TruncateCast. It is the first file of
-// the Math module; random.h, polynomial.h, union_find.h and the graph helpers land next to
-// it as their own files. Tests: ColmapSharp.Tests/Math/MathTests.cs (math_test.cc 1:1).
+// the Mathematics module (COLMAP's math/, renamed so the namespace does not shadow
+// System.Math); random.h, polynomial.h, union_find.h and the graph helpers land next to it
+// as their own files. Tests: ColmapSharp.Tests/Mathematics/MathTests.cs (math_test.cc 1:1).
 //
 // Tier A (exact): everything here is scalar and deterministic, so results are
 // bit-identical to COLMAP for the same input.
@@ -17,12 +18,13 @@
 // - Percentile/Median reorder the span in place like COLMAP's std::nth_element does. The
 //   exact order left behind differs from libc++'s (it is unspecified there too); the
 //   returned value does not, because it depends only on the order statistics.
-// - Math functions are called as double.Floor/System.Math.X, never bare Math.X: inside
-//   any ColmapSharp.* namespace, "Math" resolves to this ColmapSharp.Math namespace.
+// - THROW_CHECK* go through ColmapSharp.Util.Check, which reproduces COLMAP's messages.
 
 using System.Numerics;
 
-namespace ColmapSharp.Math;
+using ColmapSharp.Util;
+
+namespace ColmapSharp.Mathematics;
 
 /// <summary>
 /// Port of the free functions in colmap/math/math.h and math.cc.
@@ -89,25 +91,14 @@ public static class MathUtils
 	public static double Percentile<T>(Span<T> elems, double p)
 		where T : INumber<T>
 	{
-		if (elems.IsEmpty)
-		{
-			throw new ArgumentException("Check failed: !elems.empty() ");
-		}
-
-		if (!(p >= 0))
-		{
-			throw new ArgumentException($"Check failed: p >= 0 ({p} vs. 0) ");
-		}
-
-		if (!(p <= 100))
-		{
-			throw new ArgumentException($"Check failed: p <= 100 ({p} vs. 100) ");
-		}
+		Check.That(!elems.IsEmpty);
+		Check.Ge(p, 0);
+		Check.Le(p, 100);
 
 		double idxDouble = p / 100.0 * (elems.Length - 1);
-		double leftIdxDouble = double.Floor(idxDouble);
+		double leftIdxDouble = Math.Floor(idxDouble);
 		int leftIdx = (int)leftIdxDouble;
-		double rightIdxDouble = double.Ceiling(idxDouble);
+		double rightIdxDouble = Math.Ceiling(idxDouble);
 		int rightIdx = (int)rightIdxDouble;
 		NthElement(elems, rightIdx);
 		double right = double.CreateChecked(elems[rightIdx]);
@@ -153,7 +144,7 @@ public static class MathUtils
 		var absDeviations = new double[elems.Length];
 		for (int i = 0; i < elems.Length; i++)
 		{
-			absDeviations[i] = double.Abs(double.CreateChecked(elems[i]) - median);
+			absDeviations[i] = Math.Abs(double.CreateChecked(elems[i]) - median);
 		}
 
 		return (median, Median<double>(absDeviations));
@@ -164,10 +155,7 @@ public static class MathUtils
 	public static double Mean<T>(ReadOnlySpan<T> elems)
 		where T : INumber<T>
 	{
-		if (elems.IsEmpty)
-		{
-			throw new ArgumentException("Check failed: !elems.empty() ");
-		}
+		Check.That(!elems.IsEmpty);
 
 		double sum = 0;
 		foreach (T el in elems)
@@ -198,7 +186,7 @@ public static class MathUtils
 	public static double StdDev<T>(ReadOnlySpan<T> elems)
 		where T : INumber<T>
 	{
-		return double.Sqrt(Variance(elems));
+		return Math.Sqrt(Variance(elems));
 	}
 
 	/// <summary>

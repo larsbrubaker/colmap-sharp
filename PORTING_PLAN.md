@@ -32,9 +32,10 @@ Each phase ends with its ported tests green. Test names follow COLMAP's.
   `AngleAxis`; dynamic `VectorXd`/`MatrixXd`; decompositions: Householder QR, Jacobi and
   Golub–Kahan SVD, symmetric eigen, LU with partial pivoting, LLᵀ/LDLᵀ. Written from
   textbook algorithms — **Eigen is MPL-2.0 and must not be transcribed.**
-- `Math/`: `random` (mt19937 + distributions, exact), `polynomial` (companion-matrix and
-  Durand–Kerner roots), `union_find`, `connected_components`, `spanning_tree`, `graph_cut`
-  (max-flow; COLMAP's own BSD code), `matrix.h` helpers.
+- `Mathematics/` (COLMAP's `math/`): `random` (mt19937 + distributions, exact),
+  `polynomial` (companion-matrix and Durand–Kerner roots), `union_find`,
+  `connected_components`, `spanning_tree`, `graph_cut` (max-flow; COLMAP's own BSD code),
+  `matrix.h` helpers.
 - **Random targets libc++.** `oracle/probe_random.py` shows the pycolmap 4.2.0 wheel
   (`cp314-macosx_14_0_arm64`) links `/usr/lib/libc++.1.dylib` and imports 333 `std::__1`
   symbols and no `__cxx11`/`GLIBCXX` ones. pycolmap binds only `set_random_seed`, and

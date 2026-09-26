@@ -2,24 +2,24 @@
 // Ported from COLMAP (BSD-3-Clause, see THIRD_PARTY_NOTICES.md).
 //
 // MathTests: colmap/math/math_test.cc ported 1:1, one method per gtest TEST(Suite, Name)
-// named Suite_Name, same expected values and tolerances. Tests ColmapSharp/Math/MathUtils.cs.
+// named Suite_Name, same expected values and tolerances. Tests ColmapSharp/Mathematics/MathUtils.cs.
 // Each test runs its checks under Assert.Multiple so a failure reports every mismatch,
 // like gtest's EXPECT_* rather than stopping at the first.
 //
 // Tier A (exact): EXPECT_EQ stays IsEqualTo on doubles, never a tolerance.
 
-using ColmapSharp.Math;
+using ColmapSharp.Mathematics;
 
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
-namespace ColmapSharp.Tests.Math;
+namespace ColmapSharp.Tests.Mathematics;
 
 public class MathTests
 {
 	// M_PI in math.h is 3.14159265358979323846..., which rounds to the same double.
-	private const double MPi = System.Math.PI;
+	private const double MPi = Math.PI;
 
 	[Test]
 	public async Task SignOfNumber_Nominal()
@@ -57,8 +57,8 @@ public class MathTests
 			await Assert.That(MathUtils.DegToRad(0.0f)).IsEqualTo(0.0f);
 			await Assert.That(MathUtils.DegToRad(0.0)).IsEqualTo(0.0);
 			// float - double promotes to double, as in the C++.
-			await Assert.That(double.Abs(MathUtils.DegToRad(180.0f) - MPi)).IsLessThan((double)1e-6f);
-			await Assert.That(double.Abs(MathUtils.DegToRad(180.0) - MPi)).IsLessThan(1e-6);
+			await Assert.That(Math.Abs(MathUtils.DegToRad(180.0f) - MPi)).IsLessThan((double)1e-6f);
+			await Assert.That(Math.Abs(MathUtils.DegToRad(180.0) - MPi)).IsLessThan(1e-6);
 		}
 	}
 
@@ -69,8 +69,8 @@ public class MathTests
 		{
 			await Assert.That(MathUtils.RadToDeg(0.0f)).IsEqualTo(0.0f);
 			await Assert.That(MathUtils.RadToDeg(0.0)).IsEqualTo(0.0);
-			await Assert.That(double.Abs(MathUtils.RadToDeg(MPi) - 180.0f)).IsLessThan((double)1e-6f);
-			await Assert.That(double.Abs(MathUtils.RadToDeg(MPi) - 180.0)).IsLessThan(1e-6);
+			await Assert.That(Math.Abs(MathUtils.RadToDeg(MPi) - 180.0f)).IsLessThan((double)1e-6f);
+			await Assert.That(Math.Abs(MathUtils.RadToDeg(MPi) - 180.0)).IsLessThan(1e-6);
 		}
 	}
 
@@ -82,7 +82,7 @@ public class MathTests
 			for (int i = 0; i < 360; ++i)
 			{
 				double angle = i;
-				await Assert.That(double.Abs(angle - MathUtils.RadToDeg(MathUtils.DegToRad(angle)))).IsLessThanOrEqualTo(1e-6);
+				await Assert.That(Math.Abs(angle - MathUtils.RadToDeg(MathUtils.DegToRad(angle)))).IsLessThanOrEqualTo(1e-6);
 			}
 		}
 	}
@@ -193,12 +193,12 @@ public class MathTests
 	{
 		using (Assert.Multiple())
 		{
-			await Assert.That(double.Abs(MathUtils.Variance<int>([1, 2, 3, 4]) - 1.66666666)).IsLessThanOrEqualTo(1e-6);
-			await Assert.That(double.Abs(MathUtils.Variance<int>([1, 2, 3, 100]) - 2401.66666666)).IsLessThanOrEqualTo(1e-6);
-			await Assert.That(double.Abs(MathUtils.Variance<int>([1, 2, 3, 4, 100]) - 1902.5)).IsLessThanOrEqualTo(1e-6);
-			await Assert.That(double.Abs(MathUtils.Variance<int>([-100, 1, 2, 3, 4]) - 2102.5)).IsLessThanOrEqualTo(1e-6);
-			await Assert.That(double.Abs(MathUtils.Variance<int>([-1, -2, -3, -4]) - 1.66666666)).IsLessThanOrEqualTo(1e-6);
-			await Assert.That(double.Abs(MathUtils.Variance<int>([-1, -2, 3, 4]) - 8.66666666)).IsLessThanOrEqualTo(1e-6);
+			await Assert.That(Math.Abs(MathUtils.Variance<int>([1, 2, 3, 4]) - 1.66666666)).IsLessThanOrEqualTo(1e-6);
+			await Assert.That(Math.Abs(MathUtils.Variance<int>([1, 2, 3, 100]) - 2401.66666666)).IsLessThanOrEqualTo(1e-6);
+			await Assert.That(Math.Abs(MathUtils.Variance<int>([1, 2, 3, 4, 100]) - 1902.5)).IsLessThanOrEqualTo(1e-6);
+			await Assert.That(Math.Abs(MathUtils.Variance<int>([-100, 1, 2, 3, 4]) - 2102.5)).IsLessThanOrEqualTo(1e-6);
+			await Assert.That(Math.Abs(MathUtils.Variance<int>([-1, -2, -3, -4]) - 1.66666666)).IsLessThanOrEqualTo(1e-6);
+			await Assert.That(Math.Abs(MathUtils.Variance<int>([-1, -2, 3, 4]) - 8.66666666)).IsLessThanOrEqualTo(1e-6);
 		}
 	}
 
@@ -207,9 +207,9 @@ public class MathTests
 	{
 		using (Assert.Multiple())
 		{
-			await Assert.That(double.Abs(double.Sqrt(MathUtils.Variance<int>([1, 2, 3, 4])) - MathUtils.StdDev<int>([1, 2, 3, 4])))
+			await Assert.That(Math.Abs(Math.Sqrt(MathUtils.Variance<int>([1, 2, 3, 4])) - MathUtils.StdDev<int>([1, 2, 3, 4])))
 				.IsLessThanOrEqualTo(1e-6);
-			await Assert.That(double.Abs(double.Sqrt(MathUtils.Variance<int>([1, 2, 3, 100])) - MathUtils.StdDev<int>([1, 2, 3, 100])))
+			await Assert.That(Math.Abs(Math.Sqrt(MathUtils.Variance<int>([1, 2, 3, 100])) - MathUtils.StdDev<int>([1, 2, 3, 100])))
 				.IsLessThanOrEqualTo(1e-6);
 		}
 	}
@@ -253,8 +253,8 @@ public class MathTests
 		using (Assert.Multiple())
 		{
 			await Assert.That(MathUtils.Sigmoid(0.0)).IsEqualTo(0.5);
-			await Assert.That(double.Abs(MathUtils.Sigmoid(100.0) - 1.0)).IsLessThanOrEqualTo(1e-10);
-			await Assert.That(double.Abs(MathUtils.Sigmoid(-100.0) - 0)).IsLessThanOrEqualTo(1e-10);
+			await Assert.That(Math.Abs(MathUtils.Sigmoid(100.0) - 1.0)).IsLessThanOrEqualTo(1e-10);
+			await Assert.That(Math.Abs(MathUtils.Sigmoid(-100.0) - 0)).IsLessThanOrEqualTo(1e-10);
 		}
 	}
 
@@ -263,9 +263,9 @@ public class MathTests
 	{
 		using (Assert.Multiple())
 		{
-			await Assert.That(double.Abs(MathUtils.ScaleSigmoid(0.5) - 0.5)).IsLessThanOrEqualTo(1e-10);
-			await Assert.That(double.Abs(MathUtils.ScaleSigmoid(1.0) - 1.0)).IsLessThanOrEqualTo(1e-10);
-			await Assert.That(double.Abs(MathUtils.ScaleSigmoid(-1.0) - 0)).IsLessThanOrEqualTo(1e-4);
+			await Assert.That(Math.Abs(MathUtils.ScaleSigmoid(0.5) - 0.5)).IsLessThanOrEqualTo(1e-10);
+			await Assert.That(Math.Abs(MathUtils.ScaleSigmoid(1.0) - 1.0)).IsLessThanOrEqualTo(1e-10);
+			await Assert.That(Math.Abs(MathUtils.ScaleSigmoid(-1.0) - 0)).IsLessThanOrEqualTo(1e-4);
 		}
 	}
 
