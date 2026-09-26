@@ -286,3 +286,47 @@ order already (they come from vectors, not hash iteration).
 the pairs in this order (COLMAP's `PoseGraph::Load`, and through it the global mapper) will
 see them in load order; a pycolmap fixture for such a pipeline is then compared at Tier C,
 not Tier A.
+
+## 16. PROSAC's out-of-range sample index fails a Check instead of reading past the data
+
+**What differs.** COLMAP's `ProgressiveSampler` (ported faithfully in
+`Optim/ProgressiveSampler.cs`) makes index `n` the mandatory element of a progressive sample,
+and `n` can equal `total_num_samples`: on the first sample when `num_samples ==
+total_num_samples`, and in general on the sample where the growth schedule reaches the last
+element. COLMAP's `Sampler::SampleXY` then reads `X[total_num_samples]`, past the end of the
+`std::vector` (undefined behavior: garbage or a crash). `SampleX`/`SampleXY` in
+`Optim/Sampler.cs` check every sampled index against the data length and throw COLMAP's
+"Check failed" `ArgumentException` instead.
+
+**Why.** Undefined behavior has no C# equivalent to match, and silently clamping or shifting
+the index would change the sampler's Tier A sequence that `progressive_sampler_test.cc` pins.
+COLMAP 4.2.0 instantiates `ProgressiveSampler` nowhere outside its own test, so no pipeline
+reaches this path; failing loudly keeps any future user from getting a model estimated from
+out-of-bounds memory.
+
+**Evidence.** `ProgressiveSamplerTests` (1:1) still pass unchanged. The C#-only
+`RansacTests.CSharpOnly_ProgressiveSamplerIndexPastEndFailsCheck` runs RANSAC with PROSAC on
+exactly `kMinNumSamples` pairs and expects the Check failure.
+
+## 17. RANSAC and LO-RANSAC always run their trial loop serially
+
+**What differs.** With `RANSACOptions::num_threads > 1` (or -1), COLMAP built with OpenMP
+runs the trial loop on several threads, each with its own sampler seeded
+`random_seed + thread index`, sharing an atomic trial counter and a mutex-guarded best model.
+`Optim/Ransac.cs` and `Optim/LoRansac.cs` validate `num_threads` exactly as COLMAP does
+(`Check()`, and "Parallel RANSAC only supports RandomSampler" for any other sampler with more
+than one effective thread) and then run the loop once on the calling thread, which is what
+COLMAP itself does when built without OpenMP ("the block runs once serially").
+
+**Why.** COLMAP's parallel result depends on thread scheduling (which thread claims which
+trial index, and which thread's model reaches the shared best first), so it is not
+reproducible even against itself; CLAUDE.md requires sequential and parallel runs to give the
+same result. The serial loop with the thread-0 seed is COLMAP's own `num_threads == 1`
+behavior and its non-OpenMP build's behavior for every `num_threads`. A deterministic parallel
+scheme (for example, fixed per-trial seeds) would be a different algorithm from both COLMAP
+builds and is left for when profiling shows RANSAC is a bottleneck.
+
+**Evidence.** `RansacTests.RANSAC_ParallelSimilarityTransform` and
+`LoRansacTests.LORANSAC_ParallelSimilarityTransform` (1:1, `num_threads = 4`) pass with
+COLMAP's expectations. The C#-only `RansacTests.CSharpOnly_ParallelRequiresRandomSampler`
+pins the kept validation.

@@ -58,12 +58,13 @@ RangeExpression` — COLMAP's `span`/`filter_view` are replaced by `System.Span<
 there is no ColmapSharp code under test.
 
 ### Phase 5 — Optimization primitives
-`optim/`: `ransac`, `loransac` (generic over `ISampler<TSelf>` / `ISupportMeasurer<TSupport>`;
-decide PROSAC's out-of-range index when k == N, cast `num_inliers - i` to ulong as C++ does;
-constrain samplers to `class` or drop the struct claim in Sampler.cs), `tiny_solver`.
+`optim/tiny_solver` (+ `estimators/cost_functions/tiny_manifold.h`, needed by its test).
 
 ### Phase 6 — Minimal solvers and estimators
-`estimators/solvers/*` (P3P, EPnP, 5-pt/7-pt/8-pt, homography, affine, similarity,
+Estimators implement `IEstimator<TX,TY,TModel>` (+ `ILocalEstimator` for LO-RANSAC) as
+`readonly struct`s — see `Optim/Estimator.cs` and `Estimators/Solvers/SimilarityTransform.cs`.
+`LoRansac.Estimate` hides (does not override) `Ransac.Estimate`: call it on the LoRansac type.
+`estimators/solvers/*` (P3P, EPnP, 5-pt/7-pt/8-pt, homography, affine,
 generalized pose, focal solvers; the PoseLib parts are BSD-3, add its notice),
 `two_view_geometry`, `pose`, `generalized_pose`, `triangulation`, `alignment`,
 `fundamental_matrix_degensac`, `rotation_averaging`, `global_positioning`,

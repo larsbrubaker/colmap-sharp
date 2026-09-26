@@ -13,15 +13,20 @@
 //   carries the instance members and is usable as an ordinary type. ISampler<TSelf> adds
 //   what RANSAC needs from the *type*: `Sampler thread_sampler(kMinNumSamples)` becomes
 //   TSelf.Create(n), and the `is_randomized_sampler<Sampler>` trait becomes
-//   TSelf.IsRandomized. RANSAC is generic over `TSampler : ISampler<TSampler>`, so every
-//   call is a constrained call on the concrete sampler (no boxing, no virtual dispatch the
-//   JIT cannot see through for struct samplers).
+//   TSelf.IsRandomized. RANSAC is generic over `TSampler : class, ISampler<TSampler>`
+//   (Ransac.cs): every sampler is a sealed class, because a sampler carries per-run state
+//   (the PROSAC schedule, RandomSampler's running permutation) that a struct copy would
+//   silently fork.
 // - size_t sample indices become int, since they index C# lists and arrays.
 //   MaxNumSamples stays ulong: the randomized samplers report size_t's maximum and
 //   CombinationSampler reports NChooseK, which is 64-bit.
 // - SampleX/SampleXY's `thread_local std::vector<size_t>` scratch becomes a [ThreadStatic]
 //   List<int>, so the hot RANSAC loop does not allocate. X/Y are read-only spans and the
 //   outputs are spans, so arrays and lists (via CollectionsMarshal.AsSpan) both work.
+// - Each sampled index is checked against the data length. In COLMAP an index past the end
+//   reads past the std::vector (undefined behavior); ProgressiveSampler produces one when
+//   its progressive growth reaches the last element (see ProgressiveSampler.cs). Here that
+//   fails loudly with a Check instead (docs/CPP_DIVERGENCES.md, entry 16).
 
 using ColmapSharp.Util;
 
@@ -83,6 +88,7 @@ public static class SamplerExtensions
 		sampler.Sample(sampledIdxs);
 		for (int i = 0; i < xRand.Length; ++i)
 		{
+			Check.Lt(sampledIdxs[i], x.Length);
 			xRand[i] = x[sampledIdxs[i]];
 		}
 	}
@@ -109,6 +115,7 @@ public static class SamplerExtensions
 		sampler.Sample(sampledIdxs);
 		for (int i = 0; i < xRand.Length; ++i)
 		{
+			Check.Lt(sampledIdxs[i], x.Length);
 			xRand[i] = x[sampledIdxs[i]];
 			yRand[i] = y[sampledIdxs[i]];
 		}

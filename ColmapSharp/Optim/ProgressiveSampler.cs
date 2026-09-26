@@ -18,8 +18,9 @@
 //   from [0, n - 2] and the mandatory element is index n, so index n - 1 is skipped and
 //   index n can equal total_num_samples (for example num_samples == total_num_samples
 //   yields index total_num_samples on the first call). Keeping this is what Tier A means;
-//   RANSAC will read past the end of the data in that case exactly as COLMAP would, so the
-//   RANSAC port has to decide how to surface it.
+//   the same happens with fewer samples once n has grown to total_num_samples. COLMAP's
+//   RANSAC then reads past the end of the data (undefined behavior); SampleX/SampleXY
+//   (Sampler.cs) throw a Check failure instead (docs/CPP_DIVERGENCES.md, entry 16).
 
 using ColmapSharp.Mathematics;
 using ColmapSharp.Util;
