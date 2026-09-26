@@ -7,8 +7,8 @@ decisions are in `docs/LICENSE_AUDIT.md`.
 **Reference:** COLMAP 4.2.0 (`REFERENCE`); oracle `pycolmap==4.2.0`.
 **Size:** ~100k lines of C++ in scope (tests, UI and CLI excluded), 142 `*_test.cc` files,
 ~1,640 gtest cases.
-**Goal for MatterCAD:** photos → camera poses + sparse cloud → dense depth → mesh, all
-cancellable with progress.
+**Goal for MatterCAD:** photos → camera poses + sparse cloud → dense depth → textured mesh,
+all cancellable with progress.
 
 ## Out of scope (do not re-litigate)
 
@@ -114,9 +114,11 @@ End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. 
 `patch_match_cuda.cu` (parallel over pixels/rows, deterministic), `fusion`,
 `poisson_meshing` (PoissonRecon MIT port, add notice), `delaunay_meshing` (tetrahedralization
 via MIConvexHull (MIT) or MatterCAD's own; graph-cut surface extraction is COLMAP's own code),
-`mesh_simplification`, `texture_mapping` (non-CGAL parts).
+`mesh_simplification`, `texture_mapping` (in scope: MatterCAD shows the textured model so
+the user can relate it to their photos; CGAL's AABB tree for occlusion is replaced by a
+managed BVH written here).
 
-### Phase 13 — Global and hierarchical mapping (after MatterCAD integration if not needed)
+### Phase 13 — Global and hierarchical mapping
 `sfm/global_mapper`, `controllers/global_pipeline`, `hierarchical_pipeline`,
 `rotation_averaging` controller.
 
@@ -124,6 +126,3 @@ via MIConvexHull (MIT) or MatterCAD's own; graph-cut surface extraction is COLMA
 Reference `ColmapSharp` from MatterCAD, host-side image decoding into the library's pixel
 buffer, a "photos → mesh" design operation with progress and cancel.
 
-## Open questions
-- Does MatterCAD need texture mapping, or only geometry? (It decides whether Phase 12's
-  texture work is in scope.)
