@@ -7,9 +7,9 @@
 // Tier C (outcome): the merged reconstruction against the ground truth after alignment via
 // projection centers, with COLMAP's bounds.
 //
-// Translation notes: the SQLite database file is InMemoryDatabase. COLMAP's gtest_main seeds
-// the PRNG with 0 before every test; the PRNG is per thread, so each test seeds it and runs
-// the pipeline before its first await. ExpectEqualReconstructions collects its failures as
+// Translation notes: the SQLite database file is InMemoryDatabase. PrngTestIsolation seeds
+// the PRNG with 0 before every test, as COLMAP's gtest_main does; the PRNG is per thread, so
+// each test runs the pipeline before its first await. ExpectEqualReconstructions collects its failures as
 // messages, asserted once; ASSERT_* preconditions throw through Require.
 
 using ColmapSharp.Controllers;
@@ -108,7 +108,6 @@ public class HierarchicalPipelineTests
 	[Test]
 	public async Task HierarchicalPipeline_WithoutNoise()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var gt = new Reconstruction();
 		Synthetic.SynthesizeDataset(
@@ -136,7 +135,6 @@ public class HierarchicalPipelineTests
 	[Test]
 	public async Task HierarchicalPipeline_WithoutNoiseAndNonTrivialFrames()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var gt = new Reconstruction();
 		Synthetic.SynthesizeDataset(
@@ -169,7 +167,6 @@ public class HierarchicalPipelineTests
 	[Test]
 	public async Task HierarchicalPipeline_WithoutNoiseAndPanoramicNonTrivialFrames()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var gt = new Reconstruction();
 		Synthetic.SynthesizeDataset(
@@ -202,7 +199,6 @@ public class HierarchicalPipelineTests
 	[Test]
 	public async Task HierarchicalPipeline_MultiReconstruction()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var gt1 = new Reconstruction();
 		var gt2 = new Reconstruction();
@@ -246,7 +242,6 @@ public class HierarchicalPipelineTests
 	[Test]
 	public async Task CSharpOnly_CancellationStopsBeforeMerging()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		Synthetic.SynthesizeDataset(
 			new SyntheticDatasetOptions { NumRigs = 2, NumCamerasPerRig = 1, NumFramesPerRig = 20, NumPoints3D = 100 },
@@ -284,7 +279,6 @@ public class HierarchicalPipelineTests
 	[Test]
 	public async Task CSharpOnly_ResultIgnoresClusterSchedule()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		Synthetic.SynthesizeDataset(
 			new SyntheticDatasetOptions { NumRigs = 2, NumCamerasPerRig = 1, NumFramesPerRig = 20, NumPoints3D = 100 },
@@ -312,7 +306,6 @@ public class HierarchicalPipelineTests
 	[Test]
 	public async Task CSharpOnly_ClusterProgressCountsIncrease()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		Synthetic.SynthesizeDataset(
 			new SyntheticDatasetOptions { NumRigs = 2, NumCamerasPerRig = 1, NumFramesPerRig = 20, NumPoints3D = 100 },

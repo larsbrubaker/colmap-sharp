@@ -5,12 +5,12 @@
 // one method per gtest TEST(Suite, Name) named Suite_Name. Tests
 // ColmapSharp/Scene/ReconstructionClustering.cs.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test; each test seeds before it
-// synthesizes. PartitionFramesIntoClusters draws one uniform number per cross-cluster
-// observation while walking points and clusters in hash-map order; here points are walked in
-// ascending id (Reconstruction.Points3D) and clusters in ascending id, so which observations
-// survive differs from COLMAP's run, but only the statistics the tests rely on (a keep ratio
-// of 0.0, 0.05 or 0.1 leaves the clusters weakly connected) are the same.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does.
+// PartitionFramesIntoClusters draws one uniform number per cross-cluster observation while
+// walking points and clusters in hash-map order; here points are walked in ascending id
+// (Reconstruction.Points3D) and clusters in ascending id, so which observations survive
+// differs from COLMAP's run, but only the statistics the tests rely on (a keep ratio of 0.0,
+// 0.05 or 0.1 leaves the clusters weakly connected) are the same.
 
 using ColmapSharp.Mathematics;
 using ColmapSharp.Scene;
@@ -120,7 +120,6 @@ public class ReconstructionClusteringTests
 
 	private static Reconstruction Synthesize(int numCamerasPerRig, int numFramesPerRig, int numPoints3D)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{

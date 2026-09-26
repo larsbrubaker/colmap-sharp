@@ -40,7 +40,6 @@ public class RelativePoseOneSidedFocalTests
 	[Test]
 	public async Task RelativePoseOneSidedFocalEstimator_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Camera camera2 = TestCamera2();
 		var estimator = new RelativePoseOneSidedFocalEstimator();
 		var log = new ExpectationLog();
@@ -69,7 +68,6 @@ public class RelativePoseOneSidedFocalTests
 	[Test]
 	public async Task RelativePoseOneSidedFocalEstimator_Residuals()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Camera camera2 = TestCamera2();
 		Rigid3d cam2FromCam1 = TestCam2FromCam1();
 		var points1 = new List<Vector2d>();
@@ -140,7 +138,6 @@ public class RelativePoseOneSidedFocalTests
 	[Test]
 	public async Task RelativePoseOneSidedFocalEstimator_RefineFromInitialModel()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Camera camera2 = TestCamera2();
 		var log = new ExpectationLog();
 		for (int k = 0; k < 50; ++k)
@@ -176,7 +173,6 @@ public class RelativePoseOneSidedFocalTests
 	[Test]
 	public async Task RelativePoseOneSidedFocalEstimator_FullSphereCalibratedRays()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Camera camera2 = TestCamera2(CameraModelId.Equirectangular);
 		// Without the cheirality filter the configurations are harsher than any pinhole pair,
 		// and the minimal solve occasionally loses the true root. Never exceeded 2% over 199

@@ -5,8 +5,8 @@
 // per gtest TEST(Suite, Name) named Suite_Name, same checks and tolerances. Tests
 // ColmapSharp/Geometry/EssentialMatrix.cs. Tier B where the SVD is involved
 // (decomposition, pose recovery, epipoles); the pycolmap comparisons are in
-// GeometryTwoViewOracleTests (C#-only).
-// Each test seeds the PRNG with 0, as COLMAP's gtest_main does.
+// GeometryTwoViewOracleTests (C#-only). PrngTestIsolation seeds the PRNG with 0 before
+// every test, as COLMAP's gtest_main does.
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
@@ -63,7 +63,6 @@ public class EssentialMatrixTests
 	[Test]
 	public async Task DecomposeEssentialMatrix_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var cam2FromCam1 = new Rigid3d(RandomEigen.RandomEigenQuaterniond(), new Vector3d(0.5, 1, 1).Normalized());
 		Matrix3d rotMat = cam2FromCam1.Rotation.ToRotationMatrix();
 		Matrix3d e = EssentialMatrix.EssentialMatrixFromPose(cam2FromCam1);
@@ -180,7 +179,6 @@ public class EssentialMatrixTests
 	[Test]
 	public async Task FundamentalFromEssentialMatrix_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Matrix3d e = RandomEssentialMatrix();
 		Matrix3d f = EssentialMatrix.FundamentalFromEssentialMatrix(K2, e, K1);
 		var x = new Vector3d(3, 2, 1);
@@ -194,7 +192,6 @@ public class EssentialMatrixTests
 	[Test]
 	public async Task EssentialFromFundamentalMatrix_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Matrix3d e = RandomEssentialMatrix();
 		Matrix3d f = EssentialMatrix.FundamentalFromEssentialMatrix(K2, e, K1);
 		await Assert.That(EigenMatrixNear(EssentialMatrix.EssentialFromFundamentalMatrix(K2, f, K1), e, 1e-6)).IsTrue();

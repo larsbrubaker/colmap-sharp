@@ -6,8 +6,9 @@
 //
 // Ported: GlobalPositioning.{Nominal, MultiCameraRig, RefineSensorFromRigFalsePreservesRig}.
 //
-// Translation notes: the SQLite test database is an InMemoryDatabase. COLMAP's gtest_main
-// reseeds the PRNG with 0 at every test start; Setup does the same, before any await.
+// Translation notes: the SQLite test database is an InMemoryDatabase. PrngTestIsolation
+// seeds the PRNG with 0 before every test, as COLMAP's gtest_main does; Setup draws
+// before any await.
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Estimators.Solvers;
@@ -33,8 +34,6 @@ public class GlobalPositioningTests
 	private static (Reconstruction Gt, Reconstruction Reconstruction, PoseGraph PoseGraph) Setup(
 		int numRigs, int numCamerasPerRig, int numFramesPerRig)
 	{
-		RandomUtils.SetPRNGSeed(0);
-
 		var database = new InMemoryDatabase();
 		var gtReconstruction = new Reconstruction();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions

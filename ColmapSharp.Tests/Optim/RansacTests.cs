@@ -8,10 +8,10 @@
 // success, inlier set, and the model within COLMAP's 1e-6). The test data helpers are
 // shared with LoRansacTests.cs, as the two C++ files carry identical copies.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so each test starts with
-// RandomUtils.SetPRNGSeed(0) and runs RANSAC before its first await (the PRNG is per thread
-// and an await may resume elsewhere). ParallelSimilarityTransform sets num_threads = 4,
-// which this port validates and then runs serially (Ransac.cs header).
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test runs RANSAC before its first await (the PRNG is per thread and an await may
+// resume elsewhere). ParallelSimilarityTransform sets num_threads = 4, which this port
+// validates and then runs serially (Ransac.cs header).
 
 using ColmapSharp.Estimators.Solvers;
 using ColmapSharp.Geometry;
@@ -144,7 +144,6 @@ public class RansacTests
 	[Test]
 	public async Task RANSAC_SimilarityTransform()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var data = SimilarityTransformTestData.Generate();
 
 		var options = new RansacOptions();
@@ -159,7 +158,6 @@ public class RansacTests
 	[Test]
 	public async Task RANSAC_ParallelSimilarityTransform()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var data = SimilarityTransformTestData.Generate();
 
 		var options = new RansacOptions();
@@ -175,7 +173,6 @@ public class RansacTests
 	[Test]
 	public async Task RANSAC_ReproducibilityWithRandomSeed()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var data = SimilarityTransformTestData.Generate();
 
 		var options1 = new RansacOptions();
@@ -219,7 +216,6 @@ public class RansacTests
 	[Test]
 	public async Task CSharpOnly_ProgressiveSamplerIndexPastEndFailsCheck()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var data = SimilarityTransformTestData.Generate(numSamples: 3, numOutliers: 0);
 
 		var options = new RansacOptions();
@@ -238,7 +234,6 @@ public class RansacTests
 	[Test]
 	public async Task CSharpOnly_ParallelRequiresRandomSampler()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var data = SimilarityTransformTestData.Generate(numSamples: 10, numOutliers: 0);
 
 		var options = new RansacOptions();

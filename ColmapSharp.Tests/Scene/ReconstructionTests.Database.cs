@@ -25,7 +25,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_TranscribeImageIdsToDatabase()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		string[] imageNames = ["test_image1.jpg", "test_image2.jpg", "test_image3.jpg"];
 
 		using var database = new InMemoryDatabase();
@@ -115,7 +114,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task CSharpOnly_LoadFromDatabaseCache()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using InMemoryDatabase database = DatabaseCacheTests.CreateTestDatabase();
 		DatabaseCache cache = DatabaseCache.Create(database, new DatabaseCache.Options());
 

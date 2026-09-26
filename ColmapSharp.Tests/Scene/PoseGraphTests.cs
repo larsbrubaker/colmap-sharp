@@ -4,9 +4,10 @@
 // PoseGraphTests: colmap/scene/pose_graph_test.cc ported 1:1, one method per gtest case
 // named Suite_Name, testing ColmapSharp/Scene/PoseGraph.cs. Load runs against
 // InMemoryDatabase (the database is not an SQLite file here). std::out_of_range is
-// KeyNotFoundException and std::runtime_error InvalidOperationException. COLMAP's
-// gtest_main seeds the PRNG with 0 before every test; tests that draw seed and draw before
-// their first await (the PRNG is thread-local). CSharpOnly_* cases are labeled as such.
+// KeyNotFoundException and std::runtime_error InvalidOperationException. PrngTestIsolation
+// seeds the PRNG with 0 before every test, as COLMAP's gtest_main does; tests that draw do
+// so before their first await (the PRNG is thread-local). CSharpOnly_* cases are labeled
+// as such.
 
 using ColmapSharp.Feature;
 using ColmapSharp.Geometry;
@@ -33,7 +34,6 @@ public class PoseGraphTests
 
 	private static Reconstruction SingleFrameRigs(int numRigs)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var syntheticOptions = new SyntheticDatasetOptions
 		{
 			NumRigs = numRigs,
@@ -224,7 +224,6 @@ public class PoseGraphTests
 	[Test]
 	public async Task PoseGraph_Load()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 
 		Camera camera = Camera.CreateFromModelId(InvalidCameraId, CameraModelId.SimplePinhole, 1, 1, 1);

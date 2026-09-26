@@ -36,8 +36,6 @@ public class EssentialMatrixSolverTests
 	[Arguments(1000)]
 	public async Task EssentialMatrixFivePointEstimatorTests_Nominal(int kNumRays)
 	{
-		RandomUtils.SetPRNGSeed(0);
-
 		// The minimal case has no redundancy, so it conditions its sample to stay well-posed
 		// and accepts the solver's numerical accuracy with a looser tolerance.
 		bool isMinimal = kNumRays == EssentialMatrixFivePointEstimator.MinNumSamples;
@@ -66,7 +64,6 @@ public class EssentialMatrixSolverTests
 	[Arguments(1024)]
 	public async Task EssentialMatrixEightPointEstimatorTests_Nominal(int kNumRays)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var log = new ExpectationLog();
 		for (int k = 0; k < 1; ++k)
 		{
@@ -90,7 +87,6 @@ public class EssentialMatrixSolverTests
 	[Test]
 	public async Task EssentialMatrixTangentSampsonEstimator_RefineRecoversPose()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Camera camera = Camera.CreateFromModelId(1, CameraModelId.Equirectangular, focalLength: 0.0, 1000, 500);
 		var log = new ExpectationLog();
 		for (int k = 0; k < 30; ++k)
@@ -135,7 +131,6 @@ public class EssentialMatrixSolverTests
 	[Test]
 	public async Task EssentialMatrixTangentSampsonEstimator_LORANSACWithOutliers()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Camera camera = Camera.CreateFromModelId(1, CameraModelId.Equirectangular, focalLength: 0.0, 1000, 500);
 		var log = new ExpectationLog();
 		for (int k = 0; k < 10; ++k)

@@ -9,9 +9,10 @@
 // count as [Arguments]. Same checks and tolerances. Tests
 // ColmapSharp/Estimators/Solvers/HomographyMatrixEstimator.cs (Tier B).
 //
-// Each test seeds the PRNG with 0, as COLMAP's gtest_main does, and draws everything before
-// its first await (the PRNG is per thread). The loops record EXPECT_* failures in an
-// ExpectationLog and the test asserts it is empty; ASSERT_* in a loop ends the loop.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test draws everything before its first await (the PRNG is per thread). The loops
+// record EXPECT_* failures in an ExpectationLog and the test asserts it is empty; ASSERT_*
+// in a loop ends the loop.
 
 using ColmapSharp.Estimators.Solvers;
 using ColmapSharp.LinearAlgebra;
@@ -52,7 +53,6 @@ public class HomographyMatrixSolverTests
 	[Arguments(1024)]
 	public async Task HomographyMatrixTests_Nominal(int kNumPoints)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var log = new ExpectationLog();
 		for (int x = 0; x < 10; ++x)
 		{
@@ -85,7 +85,6 @@ public class HomographyMatrixSolverTests
 	[Arguments(1024)]
 	public async Task HomographyMatrixTests_NumericalStability(int kNumPoints)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const double kCoordinateScale = 1e6;
 		var log = new ExpectationLog();
 		for (int x = 1; x < 10; ++x)
@@ -116,7 +115,6 @@ public class HomographyMatrixSolverTests
 	[Arguments(1024)]
 	public async Task HomographyMatrixTests_NoiseStability(int kNumPoints)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const double kNoise = 1e-3;
 		var log = new ExpectationLog();
 		for (int x = 1; x < 10; ++x)
@@ -148,7 +146,6 @@ public class HomographyMatrixSolverTests
 	[Arguments(1024)]
 	public async Task HomographyMatrixTests_Degenerate(int kNumPoints)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const double kNoise = 1e-3;
 		var modelCounts = new List<int>();
 		for (int x = 0; x < 10; ++x)
@@ -185,7 +182,6 @@ public class HomographyMatrixSolverTests
 	[Arguments(1024)]
 	public async Task HomographyMatrixRayTests_Nominal(int kNumPoints)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Camera camera1 = Camera.CreateFromModelId(1, CameraModelId.SimplePinhole, 1000, 1920, 1080);
 		Camera camera2 = Camera.CreateFromModelId(2, CameraModelId.SimplePinhole, 1200, 1920, 1080);
 
@@ -237,7 +233,6 @@ public class HomographyMatrixSolverTests
 	[Arguments(1024)]
 	public async Task HomographyMatrixRayTests_PixelEquivalence(int kNumPoints)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Camera camera1 = Camera.CreateFromModelId(1, CameraModelId.SimplePinhole, 1000, 1920, 1080);
 		Camera camera2 = Camera.CreateFromModelId(2, CameraModelId.Pinhole, 1200, 1920, 1080);
 
@@ -307,7 +302,6 @@ public class HomographyMatrixSolverTests
 	[Arguments(1024)]
 	public async Task HomographyMatrixRayTests_Spherical(int kNumPoints)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Camera camera = Camera.CreateFromModelId(1, CameraModelId.Equirectangular, focalLength: 0, 2048, 1024);
 		bool isSpherical = camera.IsSpherical;
 
@@ -376,7 +370,6 @@ public class HomographyMatrixSolverTests
 	[Test]
 	public async Task HomographyMatrixRay_SphericalSign()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Camera camera = Camera.CreateFromModelId(1, CameraModelId.Equirectangular, focalLength: 0, 2048, 1024);
 		Matrix3d h = new AngleAxisd(0.4, new Vector3d(0.2, 1, 0.3).Normalized()).ToRotationMatrix();
 

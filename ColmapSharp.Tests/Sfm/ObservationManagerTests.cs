@@ -8,10 +8,10 @@
 //
 // Tier A (exact): integer counts and the filters' scalar thresholds, as in C++.
 //
-// Translation notes: FlatHashSet{...} arguments are HashSet<ulong>/HashSet<uint>. COLMAP's
-// gtest_main seeds the PRNG with 0 before every test; the PRNG is per thread, so tests that
-// draw call RandomUtils.SetPRNGSeed(0) and draw every RandomEigenVectord<3>() they need
-// before their first await, in the C++ draw order. The drawn values only need to be
+// Translation notes: FlatHashSet{...} arguments are HashSet<ulong>/HashSet<uint>.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does;
+// the PRNG is per thread, so tests that draw make every RandomEigenVectord<3>() draw they
+// need before their first await, in the C++ draw order. The drawn values only need to be
 // "random" (any of them has a nonzero reprojection error), so drawing them up front changes
 // nothing the test checks.
 
@@ -78,7 +78,6 @@ public partial class ObservationManagerTests
 	[Test]
 	public async Task ObservationManager_FilterPoints3D()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d random1 = RandomEigen.RandomEigenVector3d();
 		Vector3d random2 = RandomEigen.RandomEigenVector3d();
 
@@ -174,7 +173,6 @@ public partial class ObservationManagerTests
 	[Test]
 	public async Task ObservationManager_FilterPoints3DInImages()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d random1 = RandomEigen.RandomEigenVector3d();
 
 		Reconstruction reconstruction = GenerateReconstruction(2);
@@ -215,7 +213,6 @@ public partial class ObservationManagerTests
 	[Test]
 	public async Task ObservationManager_FilterAllPoints()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d random1 = RandomEigen.RandomEigenVector3d();
 		Vector3d random2 = RandomEigen.RandomEigenVector3d();
 
@@ -250,7 +247,6 @@ public partial class ObservationManagerTests
 	[Test]
 	public async Task ObservationManager_FilterPoints3DWithShortTracks()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d random1 = RandomEigen.RandomEigenVector3d();
 		Vector3d random2 = RandomEigen.RandomEigenVector3d();
 		Vector3d random3 = RandomEigen.RandomEigenVector3d();

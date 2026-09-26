@@ -31,7 +31,6 @@ public partial class BundleAdjustmentCeresTests
 	[Test]
 	public async Task DefaultBundleAdjuster_FixGaugeWithThreePoints()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = BundleAdjustmentTests.Synthesize(2, 1, 1, 100);
 
 		var config = new BundleAdjustmentConfig();
@@ -57,7 +56,6 @@ public partial class BundleAdjustmentCeresTests
 	[Test]
 	public async Task DefaultBundleAdjuster_FixGaugeWithTwoCamsFromWorld()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = BundleAdjustmentTests.Synthesize(2, 2, 1, 100);
 
 		var options = new BundleAdjustmentOptions();
@@ -91,7 +89,6 @@ public partial class BundleAdjustmentCeresTests
 	[Test]
 	public async Task DefaultBundleAdjuster_FixGaugeWithTwoCamsFromWorldFixSensorFromRig()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = BundleAdjustmentTests.Synthesize(2, 2, 1, 100);
 
 		var options = new BundleAdjustmentOptions();
@@ -126,7 +123,6 @@ public partial class BundleAdjustmentCeresTests
 	[Test]
 	public async Task DefaultBundleAdjuster_FixGaugeWithTwoCamsFromWorldNoReferenceSensor()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = BundleAdjustmentTests.Synthesize(2, 2, 1, 100);
 
 		// Delete observations from the two reference images.
@@ -185,7 +181,6 @@ public partial class BundleAdjustmentCeresTests
 	[Test]
 	public async Task DefaultBundleAdjuster_FixGaugeWithTwoCamsFromWorldFallback()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = BundleAdjustmentTests.Synthesize(1, 2, 1, 100);
 
 		var options = new BundleAdjustmentOptions();

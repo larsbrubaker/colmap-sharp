@@ -4,8 +4,8 @@
 // FeatureMatchingUtilsTests: colmap/controllers/feature_matching_utils_test.cc ported 1:1, one
 // method per gtest case named Suite_Name. Tests ColmapSharp/Controllers/FeatureMatchingUtils.cs.
 // Database::Open of a test-dir file becomes an InMemoryDatabase; `use_gpu = false` has no
-// counterpart. COLMAP's gtest_main seeds the PRNG with 0 before every test, so CreateTestData
-// seeds before synthesizing. The C#-only test at the end is labeled as such.
+// counterpart. PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main
+// does. The C#-only test at the end is labeled as such.
 
 using ColmapSharp.Controllers;
 using ColmapSharp.Estimators;
@@ -30,7 +30,6 @@ public class FeatureMatchingUtilsTests
 
 	private static TestData CreateTestData(int numImages)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var options = new SyntheticDatasetOptions
 		{
@@ -303,6 +302,8 @@ public class FeatureMatchingUtilsTests
 	// two-view geometries cleared, so verification (RANSAC) has real choices to make.
 	private static TestData CreateNoisyMatchedData()
 	{
+		// Reseeded on every call, not only at test start: a test that compares two runs
+		// needs both built from the same dataset.
 		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();

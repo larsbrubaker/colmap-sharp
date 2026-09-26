@@ -26,8 +26,7 @@ public partial class UndistortersTests
 	{
 		string outputPath = Path.Combine(CreateTestDir(), "output");
 		// pycolmap synthesized the scene in a fresh process, whose PRNG starts from the
-		// default seed; this thread's PRNG may have been used by earlier tests.
-		RandomUtils.SetPRNGSeed(0);
+		// default seed 0, the seed PrngTestIsolation starts every test with.
 		(Reconstruction reconstruction, InMemoryImageSource images) = CreateSyntheticReconstructionWithBitmaps();
 		new ColmapUndistorter(
 			new ColmapUndistorter.Options(), new UndistortCameraOptions(), reconstruction, images, outputPath,
@@ -64,8 +63,7 @@ public partial class UndistortersTests
 	{
 		string outputPath = Path.Combine(CreateTestDir(), "pmvs_output");
 		// pycolmap synthesized the scene in a fresh process, whose PRNG starts from the
-		// default seed; this thread's PRNG may have been used by earlier tests.
-		RandomUtils.SetPRNGSeed(0);
+		// default seed 0, the seed PrngTestIsolation starts every test with.
 		(Reconstruction reconstruction, InMemoryImageSource images) = CreateSyntheticReconstructionWithBitmaps();
 		new PmvsUndistorter(
 			new PmvsUndistorter.Options(), new UndistortCameraOptions(), reconstruction, images, outputPath,

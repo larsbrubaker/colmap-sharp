@@ -9,8 +9,8 @@
 //
 // gtest's EXPECT_* keep going after a failure; so does this port: every failed expectation
 // goes to an ExpectationLog and each test asserts the log is empty at the end.
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so each RANSAC test starts
-// with RandomUtils.SetPRNGSeed(0) and runs synchronously up to its final assertion.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each RANSAC test runs synchronously up to its final assertion.
 
 using ColmapSharp.Estimators.Solvers;
 using ColmapSharp.Geometry;
@@ -111,7 +111,6 @@ public class AbsolutePoseTests
 	[Test]
 	public async Task AbsolutePose_P3P()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var log = new ExpectationLog();
 		ImgFromCamFunc imgFromCamFunc = PinholeImgFromCam();
 		CheckPnpRansac(log, new P3PEstimator(imgFromCamFunc), imgFromCamFunc, maxError: 1e-3, poseTol: 1e-5);
@@ -181,7 +180,6 @@ public class AbsolutePoseTests
 	[Test]
 	public async Task AbsolutePose_P4PFSharedFocalLength()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var log = new ExpectationLog();
 		CheckP4pf(log, shareFocalLength: true);
 		await Assert.That(log.Failures).IsEmpty();
@@ -190,7 +188,6 @@ public class AbsolutePoseTests
 	[Test]
 	public async Task AbsolutePose_P4PFSeparateFocalLengths()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var log = new ExpectationLog();
 		CheckP4pf(log, shareFocalLength: false);
 		await Assert.That(log.Failures).IsEmpty();
@@ -199,7 +196,6 @@ public class AbsolutePoseTests
 	[Test]
 	public async Task AbsolutePose_EPNP()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var log = new ExpectationLog();
 		ImgFromCamFunc imgFromCamFunc = PinholeImgFromCam();
 		CheckPnpRansac(log, new EPNPEstimator(imgFromCamFunc), imgFromCamFunc, maxError: 1e-5, poseTol: 1e-3);

@@ -25,7 +25,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeNoise_Point2DNoise()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions();
@@ -51,7 +50,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeNoise_Point3DNoise()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions();
@@ -68,7 +66,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeNoise_RigFromWorldNoise()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions();
@@ -100,7 +97,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeNoise_PriorPositionNoise()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions
@@ -130,7 +126,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeNoise_PriorGravityNoise()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions { PriorGravity = true };
@@ -153,7 +148,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeImages_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{

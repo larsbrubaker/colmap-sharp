@@ -7,9 +7,9 @@
 // construction/assignment is Frame.Clone(); `frame.SetRigPtr(&rig)` passes the reference;
 // operator<< is ToString(); UnorderedElementsAre compares as sets.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so each test that draws
-// starts with RandomUtils.SetPRNGSeed(0) and draws everything before its first await (the
-// PRNG is per thread and an await may resume elsewhere).
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test that draws does so before its first await (the PRNG is per thread and an
+// await may resume elsewhere).
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
@@ -87,7 +87,6 @@ public class FrameTests
 	[Test]
 	public async Task Frame_SetUp()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var frame = new Frame();
 		var rig = new Rig { RigId = 1 };
 
@@ -127,7 +126,6 @@ public class FrameTests
 	[Test]
 	public async Task Frame_SetResetRigPtr()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Rigid3d sensor2FromRig = TestRigid3d();
 		var frame = new Frame();
 		var rig = new Rig();
@@ -161,7 +159,6 @@ public class FrameTests
 	[Test]
 	public async Task Frame_AddDataId()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var rig = new Rig { RigId = 1 };
 		var sensorId1 = new SensorId(SensorType.Imu, 0);
 		var sensorId2 = new SensorId(SensorType.Camera, 0);
@@ -231,7 +228,6 @@ public class FrameTests
 	[Test]
 	public async Task Frame_SetCamFromWorld()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var frame = new Frame();
 		var rig = new Rig { RigId = 1 };
 		frame.SetRigId(1);

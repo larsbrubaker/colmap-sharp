@@ -7,10 +7,10 @@
 // are Tier B (a 3x3 SVD) and the robust ones Tier C (LO-RANSAC); COLMAP's tolerances are the
 // bars.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so each test starts with
-// RandomUtils.SetPRNGSeed(0) and draws everything before its first await (the PRNG is per
-// thread and an await may resume elsewhere). The robust tests leave random_seed at -1, so
-// RANSAC keeps drawing from that same thread PRNG, as in COLMAP.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test draws everything before its first await (the PRNG is per thread and an
+// await may resume elsewhere). The robust tests leave random_seed at -1, so RANSAC keeps
+// drawing from that same thread PRNG, as in COLMAP.
 
 using ColmapSharp.Estimators.Solvers;
 using ColmapSharp.Geometry;
@@ -56,7 +56,6 @@ public class SimilarityTransformTests
 
 	private static async Task TestEstimateRigid3dWithNumCoords(int numCoords)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Quaterniond rotation = RandomEigen.RandomEigenQuaterniond();
 		Vector3d translation = RandomEigen.RandomEigenVector3d();
 		var gtTgtFromSrc = new Rigid3d(rotation, translation);
@@ -97,7 +96,6 @@ public class SimilarityTransformTests
 	[Test]
 	public async Task Rigid3d_EstimateRobust()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const int NumInliers = 1000;
 		const int NumOutliers = 400;
 
@@ -127,7 +125,6 @@ public class SimilarityTransformTests
 
 	private static async Task TestEstimateSim3dWithNumCoords(int numCoords)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		double scale = RandomUtils.RandomUniformReal(0.1, 10.0);
 		Quaterniond rotation = RandomEigen.RandomEigenQuaterniond();
 		Vector3d translation = RandomEigen.RandomEigenVector3d();
@@ -170,7 +167,6 @@ public class SimilarityTransformTests
 	[Test]
 	public async Task Sim3d_EstimateRobust()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const int NumInliers = 1000;
 		const int NumOutliers = 400;
 

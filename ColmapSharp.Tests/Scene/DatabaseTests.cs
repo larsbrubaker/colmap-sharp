@@ -10,8 +10,8 @@
 // OpenCloseFile, OpenFileWithNonASCIIPath. OpenInMemory / OpenCloseInMemory construct an
 // InMemoryDatabase.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so tests drawing random
-// poses/matrices start with RandomUtils.SetPRNGSeed(0) and draw before their first await.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and tests drawing random poses/matrices draw before their first await.
 // FeatureDescriptorsData::Random is FeatureTypesTests.RandomBytes (the values don't matter).
 // EXPECT_ANY_THROW is ThrowsException().
 
@@ -110,7 +110,6 @@ public partial class DatabaseTests
 	[Test]
 	public async Task ParameterizedDatabaseTests_Rig()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		long numRigs0 = database.NumRigs();
 		var rig = new Rig();
@@ -296,7 +295,6 @@ public partial class DatabaseTests
 	[Test]
 	public async Task ParameterizedDatabaseTests_PosePrior()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var camera = new Camera();
 		camera.CameraId = database.WriteCamera(camera);

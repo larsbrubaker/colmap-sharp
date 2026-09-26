@@ -4,8 +4,8 @@
 // FeatureMatcherCacheTests: colmap/controllers/matcher_cache_test.cc ported 1:1, one method
 // per gtest case named Suite_Name. Tests ColmapSharp/Controllers/FeatureMatcherCache.cs.
 // Database::Open of a test-dir file becomes an InMemoryDatabase (SQLite files are out of
-// scope). COLMAP's gtest_main seeds the PRNG with 0 before every test, so each test seeds
-// before synthesizing its dataset (and before its first await). Tier A (exact).
+// scope). PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main
+// does, and each test synthesizes its dataset before its first await. Tier A (exact).
 
 using ColmapSharp.Feature;
 using ColmapSharp.Geometry;
@@ -25,7 +25,6 @@ public class FeatureMatcherCacheTests
 {
 	private static InMemoryDatabase CreateTestData(int numImages, bool withPriors = false, int numCamerasPerRig = 1)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var options = new SyntheticDatasetOptions
 		{

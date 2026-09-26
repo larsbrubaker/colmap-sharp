@@ -2,11 +2,11 @@
 // Ported from COLMAP (BSD-3-Clause, see THIRD_PARTY_NOTICES.md).
 //
 // RandomEigenTests: colmap/math/random_eigen_test.cc ported 1:1, one method per gtest
-// TEST(Suite, Name) named Suite_Name. Tests ColmapSharp/Mathematics/RandomEigen.cs.
-// The template shapes map to RandomEigen's per-type methods: RandomEigenVectord<4> is
+// TEST(Suite, Name) named Suite_Name. Tests ColmapSharp/Mathematics/RandomEigen.cs. The
+// template shapes map to RandomEigen's per-type methods: RandomEigenVectord<4> is
 // RandomEigenVector4d, RandomEigenVectorf<2> is RandomEigenVectorf(2),
-// RandomEigenMatrixd<3, 4> is RandomEigenMatrix3x4d.
-// Each test seeds the PRNG with 0, as COLMAP's gtest_main does.
+// RandomEigenMatrixd<3, 4> is RandomEigenMatrix3x4d. PrngTestIsolation seeds the PRNG
+// with 0 before every test, as COLMAP's gtest_main does.
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Mathematics;
@@ -24,7 +24,6 @@ public class RandomEigenTests
 	[Test]
 	public async Task RandomEigenVectord_Range()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		bool allInRange = true;
 		for (int i = 0; i < 1000; ++i)
 		{
@@ -48,7 +47,6 @@ public class RandomEigenTests
 	[Test]
 	public async Task RandomEigenVectorf_Range()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		bool allInRange = true;
 		for (int i = 0; i < 1000; ++i)
 		{
@@ -62,7 +60,6 @@ public class RandomEigenTests
 	[Test]
 	public async Task RandomEigenVectorXd_Dynamic()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		VectorXd vector = RandomEigen.RandomEigenVectorXd(7);
 		using (Assert.Multiple())
 		{
@@ -74,7 +71,6 @@ public class RandomEigenTests
 	[Test]
 	public async Task RandomEigenMatrixd_Range()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Matrix3x4d matrix = RandomEigen.RandomEigenMatrix3x4d();
 		var values = new double[12];
 		matrix.CopyToColumnMajor(values);
@@ -84,7 +80,6 @@ public class RandomEigenTests
 	[Test]
 	public async Task RandomEigenMatrixXf_Dynamic()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		float[,] matrix = RandomEigen.RandomEigenMatrixXf(3, 5);
 		using (Assert.Multiple())
 		{
@@ -97,7 +92,6 @@ public class RandomEigenTests
 	[Test]
 	public async Task RandomEigenQuaterniond_Unit()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		double maxError = 0;
 		for (int i = 0; i < 1000; ++i)
 		{

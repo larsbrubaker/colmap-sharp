@@ -6,10 +6,10 @@
 // Tests ColmapSharp/Estimators/CostFunctions/QuaternionUtils.cs (Tier A formulas; the checks
 // are COLMAP's tolerances against Eigen products and finite differences).
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so each test starts with
-// RandomUtils.SetPRNGSeed(0) and draws all its random inputs before its first await (the
-// PRNG is per thread and an await may resume elsewhere); the checks then run in the same
-// order as the C++ loop.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test draws all its random inputs before its first await (the PRNG is per
+// thread and an await may resume elsewhere); the checks then run in the same order as the
+// C++ loop.
 
 using ColmapSharp.Estimators.CostFunctions;
 using ColmapSharp.LinearAlgebra;
@@ -34,7 +34,6 @@ public class QuaternionUtilsTests
 
 	private static (Quaterniond[] Q, Quaterniond[] P) DrawQuaternionPairs()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var q = new Quaterniond[NumTrials];
 		var p = new Quaterniond[NumTrials];
 		for (int i = 0; i < NumTrials; ++i)
@@ -108,7 +107,6 @@ public class QuaternionUtilsTests
 	public async Task QuaternionRotatePointWithJac_Nominal()
 	{
 		const double Eps = 1e-7;
-		RandomUtils.SetPRNGSeed(0);
 		var qs = new Quaterniond[NumTrials];
 		var pts = new Vector3d[NumTrials];
 		for (int i = 0; i < NumTrials; ++i)
@@ -150,7 +148,6 @@ public class QuaternionUtilsTests
 	[Test]
 	public async Task EigenQuaternionAngleAxis_Roundtrip()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var qs = new Quaterniond[NumTrials];
 		for (int i = 0; i < NumTrials; ++i)
 		{

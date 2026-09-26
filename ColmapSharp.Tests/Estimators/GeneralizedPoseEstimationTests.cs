@@ -6,10 +6,11 @@
 // tolerances. Tests ColmapSharp/Estimators/GeneralizedPoseEstimation.cs. Tier C: RANSAC and
 // the refinement are judged by outcome at COLMAP's tolerances.
 //
-// Each test seeds the PRNG with 0, as COLMAP's gtest_main does, and draws everything before
-// its first await (the PRNG is per thread). std::shuffle is libc++'s (LibcxxRandom.Shuffle).
-// The C++ fixtures group observations in FlatHashMaps; here Dictionary insertion order is
-// used, which only reorders the correspondences.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test draws everything before its first await (the PRNG is per thread).
+// std::shuffle is libc++'s (LibcxxRandom.Shuffle). The C++ fixtures group observations in
+// FlatHashMaps; here Dictionary insertion order is used, which only reorders the
+// correspondences.
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Estimators.Solvers;
@@ -99,7 +100,6 @@ public class GeneralizedPoseEstimationTests
 	[Test]
 	public async Task EstimateGeneralizedAbsolutePose_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		GeneralizedAbsolutePoseProblem problem = BuildGeneralizedAbsolutePoseProblem();
 		int numPoints = problem.Points2D.Count;
 
@@ -150,7 +150,6 @@ public class GeneralizedPoseEstimationTests
 	[Test]
 	public async Task RefineGeneralizedAbsolutePose_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		GeneralizedAbsolutePoseProblem problem = BuildGeneralizedAbsolutePoseProblem();
 		bool[] gtInlierMask = Enumerable.Repeat(true, problem.Points2D.Count).ToArray();
 
@@ -178,7 +177,6 @@ public class GeneralizedPoseEstimationTests
 	[Test]
 	public async Task RefineGeneralizedAbsolutePose_PositionPrior()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		GeneralizedAbsolutePoseProblem problem = BuildGeneralizedAbsolutePoseProblem();
 		// Isolate the position-prior-only refinement path without reprojection terms.
 		bool[] inlierMask = new bool[problem.Points2D.Count];
@@ -212,7 +210,6 @@ public class GeneralizedPoseEstimationTests
 	[Test]
 	public async Task RefineGeneralizedAbsolutePose_PositionPriorCovariance()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		GeneralizedAbsolutePoseProblem problem = BuildGeneralizedAbsolutePoseProblem();
 		bool[] inlierMask = Enumerable.Repeat(true, problem.Points2D.Count).ToArray();
 
@@ -366,7 +363,6 @@ public class GeneralizedPoseEstimationTests
 	[Test]
 	public async Task EstimateGeneralizedRelativePose_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var log = new ExpectationLog();
 		foreach (int numCamerasPerRig1 in new[] { 1, 2, 3 })
 		{
@@ -529,7 +525,6 @@ public class GeneralizedPoseEstimationTests
 	[Test]
 	public async Task EstimateStructureLessAbsolutePose_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		StructureLessAbsolutePoseProblem problem = BuildStructureLessAbsolutePoseProblem(numWorldCams: 5);
 
 		var options = new StructureLessAbsolutePoseEstimationOptions();
@@ -555,7 +550,6 @@ public class GeneralizedPoseEstimationTests
 	[Test]
 	public async Task EstimateStructureLessAbsolutePose_WithOutliers()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		StructureLessAbsolutePoseProblem problem = BuildStructureLessAbsolutePoseProblem(numWorldCams: 10);
 
 		// Add outliers by perturbing some query observations.
@@ -591,7 +585,6 @@ public class GeneralizedPoseEstimationTests
 	[Test]
 	public async Task EstimateStructureLessAbsolutePose_PanoramicWorldCameras()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		StructureLessAbsolutePoseProblem problem = BuildStructureLessAbsolutePoseProblem(numWorldCams: 1);
 
 		var options = new StructureLessAbsolutePoseEstimationOptions();

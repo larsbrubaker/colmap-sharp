@@ -66,7 +66,6 @@ public partial class TwoViewGeometryEstimationTests
 	[Test]
 	public async Task EstimateRigTwoViewGeometries_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{
 			NumRigs = 2,

@@ -5,8 +5,9 @@
 // gtest case named Suite_Name. Tests ColmapSharp/Scene/ReconstructionPruning.cs.
 //
 // All four cases are ported; CSharpOnly_SameTilePointIsRedundant is an extra C#-only check.
-// COLMAP's gtest_main seeds the PRNG with 0 before every test; tests seed and synthesize
-// before their first await. testing::UnorderedElementsAre(...) is IsEquivalentTo.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does;
+// tests synthesize before their first await. testing::UnorderedElementsAre(...) is
+// IsEquivalentTo.
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Mathematics;
@@ -31,7 +32,6 @@ public class ReconstructionPruningTests
 	[Test]
 	public async Task FindRedundantPoints3D_VaryingCoverageGain()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{
@@ -64,7 +64,6 @@ public class ReconstructionPruningTests
 	[Test]
 	public async Task FindRedundantPoints3D_VaryingTrackLength()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{
@@ -98,7 +97,6 @@ public class ReconstructionPruningTests
 	[Test]
 	public async Task FindRedundantPoints3D_VaryingSpatialDistribution()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{

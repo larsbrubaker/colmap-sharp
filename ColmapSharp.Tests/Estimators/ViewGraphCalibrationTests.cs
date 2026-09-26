@@ -9,9 +9,9 @@
 // Tier C (a nonlinear solve and RANSAC): COLMAP's own tolerances.
 //
 // Translation notes: SQLite in-memory databases are InMemoryDatabase, which, like SQLite's
-// rowid order, returns the two-view geometries in pair-id order. COLMAP's gtest_main reseeds
-// the PRNG with 0 at every test start; each test does the same with RandomUtils.SetPRNGSeed(0)
-// and makes every draw before its first await (the PRNG is per thread).
+// rowid order, returns the two-view geometries in pair-id order. PrngTestIsolation seeds the
+// PRNG with 0 before every test, as COLMAP's gtest_main does, and each test makes every draw
+// before its first await (the PRNG is per thread).
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Geometry;
@@ -45,8 +45,6 @@ public class ViewGraphCalibrationTests
 	[Test]
 	public async Task CalibrateViewGraph_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
-
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		Synthetic.SynthesizeDataset(PinholeOptions(false), reconstruction, database);
@@ -101,8 +99,6 @@ public class ViewGraphCalibrationTests
 	[Test]
 	public async Task CalibrateViewGraph_PriorFocalLength()
 	{
-		RandomUtils.SetPRNGSeed(0);
-
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		Synthetic.SynthesizeDataset(PinholeOptions(true), reconstruction, database);
@@ -128,8 +124,6 @@ public class ViewGraphCalibrationTests
 	[Test]
 	public async Task CalibrateViewGraph_ConfigTagging()
 	{
-		RandomUtils.SetPRNGSeed(0);
-
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		Synthetic.SynthesizeDataset(PinholeOptions(false), reconstruction, database);
@@ -175,8 +169,6 @@ public class ViewGraphCalibrationTests
 	[Test]
 	public async Task CalibrateViewGraph_RelativePoseReestimation()
 	{
-		RandomUtils.SetPRNGSeed(0);
-
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		Synthetic.SynthesizeDataset(PinholeOptions(false), reconstruction, database);
@@ -240,8 +232,6 @@ public class ViewGraphCalibrationTests
 	[Test]
 	public async Task CalibrateViewGraph_SphericalCamerasAreIgnored()
 	{
-		RandomUtils.SetPRNGSeed(0);
-
 		var database = new InMemoryDatabase();
 
 		// Spherical (omnidirectional) cameras have no focal length and produce CALIBRATED
@@ -292,8 +282,6 @@ public class ViewGraphCalibrationTests
 	[Test]
 	public async Task CalibrateViewGraph_FisheyeCamerasAreIgnored()
 	{
-		RandomUtils.SetPRNGSeed(0);
-
 		var database = new InMemoryDatabase();
 
 		// A fisheye camera projects angularly, so its focal length cannot be recovered from a

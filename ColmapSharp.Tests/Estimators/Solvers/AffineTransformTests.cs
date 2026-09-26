@@ -6,10 +6,10 @@
 // ColmapSharp/Estimators/Solvers/AffineTransform.cs. The estimates are Tier B (LU or SVD)
 // and the robust one Tier C (LO-RANSAC); COLMAP's tolerances are the bars.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so each test starts with
-// RandomUtils.SetPRNGSeed(0) and draws everything before its first await (the PRNG is per
-// thread). The robust test leaves random_seed at -1, so RANSAC keeps drawing from that same
-// thread PRNG, as in COLMAP.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test draws everything before its first await (the PRNG is per thread). The
+// robust test leaves random_seed at -1, so RANSAC keeps drawing from that same thread PRNG,
+// as in COLMAP.
 
 using ColmapSharp.Estimators.Solvers;
 using ColmapSharp.LinearAlgebra;
@@ -52,7 +52,6 @@ public class AffineTransformTests
 
 	private static async Task TestEstimateAffine2dWithNumCoords(int numCoords)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Matrix2x3d gtTgtFromSrc = RandomEigen.RandomEigenMatrix2x3d();
 		var (src, tgt) = GenerateData(numCoords, 0, gtTgtFromSrc);
 
@@ -90,7 +89,6 @@ public class AffineTransformTests
 	[Test]
 	public async Task Affine2d_EstimateRobust()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const int NumInliers = 1000;
 		const int NumOutliers = 400;
 

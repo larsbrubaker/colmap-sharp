@@ -28,7 +28,6 @@ public partial class ObservationManagerTests
 	[Test]
 	public async Task ObservationManager_FilterFrames()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d random1 = RandomEigen.RandomEigenVector3d();
 
 		Reconstruction reconstruction = GenerateReconstruction(4);

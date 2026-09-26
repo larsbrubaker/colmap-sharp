@@ -6,12 +6,12 @@
 // comparison against pycolmap is SyntheticOracleTests.cs.
 //
 // Translation notes: Database::Open(kInMemorySqliteDatabasePath) is an InMemoryDatabase.
-// COLMAP's gtest_main seeds the PRNG with 0 before every test; the PRNG is thread-local and
-// awaits may resume on another thread, so every test seeds and synthesizes before its first
-// await. CreateTestDir() is a fresh temp directory. One deviation, forced by excluded image
-// I/O: SynthesizeImages.Nominal's images go to a sink instead of files
-// (docs/CPP_DIVERGENCES.md entry 32), so the test reads the width and height of the bitmaps
-// the sink received rather than decoding PNG files.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does;
+// the PRNG is thread-local and awaits may resume on another thread, so every test
+// synthesizes before its first await. CreateTestDir() is a fresh temp directory. One
+// deviation, forced by excluded image I/O: SynthesizeImages.Nominal's images go to a sink
+// instead of files (docs/CPP_DIVERGENCES.md entry 32), so the test reads the width and
+// height of the bitmaps the sink received rather than decoding PNG files.
 
 using ColmapSharp.Feature;
 using ColmapSharp.Geometry;
@@ -35,7 +35,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeDataset_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions { NumRigs = 2, NumCamerasPerRig = 3, NumFramesPerRig = 3 };
@@ -157,7 +156,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeDataset_MultipleTimes()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions { NumRigs = 2, NumCamerasPerRig = 3, NumFramesPerRig = 3 };
@@ -185,7 +183,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeDataset_WithPriors()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions
@@ -216,7 +213,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeDataset_MultiReconstruction()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction1 = new Reconstruction();
 		var reconstruction2 = new Reconstruction();
@@ -242,7 +238,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeDataset_ExhaustiveMatches()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions { MatchConfig = SyntheticMatchConfig.Exhaustive };
@@ -258,7 +253,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeDataset_ChainedMatches()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions { MatchConfig = SyntheticMatchConfig.Chained };
@@ -285,7 +279,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeDataset_SparseMatchesZeroSparsity()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions { MatchConfig = SyntheticMatchConfig.Sparse, MatchSparsity = 0.0 };
@@ -299,7 +292,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeDataset_SparseMatchesFullSparsity()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions { MatchConfig = SyntheticMatchConfig.Sparse, MatchSparsity = 1.0 };
@@ -311,7 +303,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeDataset_SparseMatchesPartialSparsity()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions
@@ -348,7 +339,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeDataset_NoDatabase()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var options = new SyntheticDatasetOptions();
 		var reconstruction = new Reconstruction();
 		Synthetic.SynthesizeDataset(options, reconstruction);
@@ -358,7 +348,6 @@ public partial class SyntheticTests
 	[Test]
 	public async Task SynthesizeDataset_TrackLength()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions
 		{

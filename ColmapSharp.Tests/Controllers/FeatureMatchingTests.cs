@@ -4,8 +4,8 @@
 // FeatureMatchingTests: colmap/controllers/feature_matching_test.cc ported 1:1, one method
 // per gtest case named Suite_Name. Tests ColmapSharp/Controllers/FeatureMatching.cs (and
 // FeatureMatching.FeaturePairs.cs). Database files become InMemoryDatabases; the match-list
-// files are written to a temporary directory; `use_gpu = false` has no counterpart. COLMAP's
-// gtest_main seeds the PRNG with 0 before every test, so each test seeds before synthesizing.
+// files are written to a temporary directory; `use_gpu = false` has no counterpart.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does.
 // Skipped: CreateVocabTreeFeatureMatcher.Nominal (vocabulary-tree retrieval is out of scope).
 // Tier C (outcome).
 
@@ -27,7 +27,6 @@ public class FeatureMatchingTests
 {
 	private static InMemoryDatabase CreateTestDatabase(int numImages)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var options = new SyntheticDatasetOptions
 		{
@@ -323,7 +322,6 @@ public class FeatureMatchingTests
 	[Test]
 	public async Task CreateGeometricVerifier_RigVerificationWithNonTrivialFrames()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{
@@ -353,7 +351,6 @@ public class FeatureMatchingTests
 	[Test]
 	public async Task CreateGeometricVerifier_RigVerificationWithTrivialFrames()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{
@@ -383,7 +380,6 @@ public class FeatureMatchingTests
 	[Test]
 	public async Task CreateGeometricVerifier_Guided()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{

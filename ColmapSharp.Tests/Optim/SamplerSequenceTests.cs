@@ -30,7 +30,6 @@ public class SamplerSequenceTests
 			new[] { 4, 9, 8 }, new[] { 9, 7, 1 }, new[] { 4, 8, 3 }, new[] { 2, 7, 1 },
 		};
 
-		RandomUtils.SetPRNGSeed(0);
 		var sampler = new RandomSampler(3);
 		sampler.Initialize(10);
 		List<int[]> actual = Draw(sampler, expected.Length);
@@ -47,7 +46,6 @@ public class SamplerSequenceTests
 			new[] { 0, 2, 4 }, new[] { 1, 2, 4 }, new[] { 2, 0, 4 }, new[] { 1, 0, 4 },
 		};
 
-		RandomUtils.SetPRNGSeed(0);
 		var sampler = new ProgressiveSampler(3);
 		sampler.Initialize(20);
 		List<int[]> actual = Draw(sampler, expected.Length);
@@ -65,7 +63,6 @@ public class SamplerSequenceTests
 		var xRand = new int[3];
 		var yRand = new string[3];
 
-		RandomUtils.SetPRNGSeed(0);
 		var sampler = new RandomSampler(3);
 		sampler.Initialize(10);
 		sampler.SampleXY<RandomSampler, int, string>(x, y, xRand, yRand);

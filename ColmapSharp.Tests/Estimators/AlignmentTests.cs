@@ -7,10 +7,10 @@
 // noise-free synthetic data, so COLMAP's 1e-6 bars apply to the recovered Sim3d); the error
 // summary is Tier B.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so each test starts with
-// RandomUtils.SetPRNGSeed(0) and does everything that draws from the PRNG (synthesis, the
-// random Sim3d, RANSAC with random_seed = -1) before its first await, since the PRNG is per
-// thread and an await may resume elsewhere.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test does everything that draws from the PRNG (synthesis, the random Sim3d,
+// RANSAC with random_seed = -1) before its first await, since the PRNG is per thread and an
+// await may resume elsewhere.
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Geometry;
@@ -77,7 +77,6 @@ public class AlignmentTests
 	[Test]
 	public async Task Alignment_AlignReconstructionToLocations()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var (srcReconstruction, tgtReconstruction, gtTgtFromSrc) = GenerateAlignedPair();
 
 		var tgtImageNames = new List<string>();
@@ -132,7 +131,6 @@ public class AlignmentTests
 	[Test]
 	public async Task Alignment_AlignReconstructionToPosePriors()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var (srcReconstruction, tgtReconstruction, gtTgtFromSrc) = GenerateAlignedPair();
 
 		List<PosePrior> tgtPosePriors = PosePriorsAtProjectionCenters(tgtReconstruction, 1e-2);
@@ -154,7 +152,6 @@ public class AlignmentTests
 	[Test]
 	public async Task Alignment_AlignReconstructionToPosePriorsWithAutomaticMaxError()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var (srcReconstruction, tgtReconstruction, gtTgtFromSrc) = GenerateAlignedPair();
 
 		List<PosePrior> tgtPosePriors = PosePriorsAtProjectionCenters(tgtReconstruction, 1e-4);
@@ -175,7 +172,6 @@ public class AlignmentTests
 	[Test]
 	public async Task Alignment_AlignReconstructionsViaReprojections()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var (srcReconstruction, tgtReconstruction, gtTgtFromSrc) = GenerateAlignedPair();
 
 		var tgtFromSrc = new Sim3d();
@@ -193,7 +189,6 @@ public class AlignmentTests
 	[Test]
 	public async Task Alignment_AlignReconstructionsViaProjCenters()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var (srcReconstruction, tgtReconstruction, gtTgtFromSrc) = GenerateAlignedPair();
 
 		var tgtFromSrc = new Sim3d();
@@ -210,7 +205,6 @@ public class AlignmentTests
 	[Test]
 	public async Task Alignment_AlignReconstructionsViaPoints()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var (srcReconstruction, tgtReconstruction, gtTgtFromSrc) = GenerateAlignedPair();
 
 		var tgtFromSrc = new Sim3d();
@@ -256,7 +250,6 @@ public class AlignmentTests
 	[Test]
 	public async Task Alignment_MergeReconstructions()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction srcReconstruction = GenerateReconstructionForMerge();
 		Reconstruction origReconstruction = srcReconstruction.Clone();
 		Reconstruction tgtReconstruction = srcReconstruction.Clone();
@@ -304,7 +297,6 @@ public class AlignmentTests
 		// distinct physical images. Merging by id would then silently drop images and
 		// corrupt tracks, so such an inconsistent id<->name mapping must be detected and
 		// rejected rather than merged (see issue #3405).
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction srcReconstruction = GenerateReconstructionForMerge();
 		Reconstruction tgtReconstruction = srcReconstruction.Clone();
 
@@ -341,7 +333,6 @@ public class AlignmentTests
 	[Test]
 	public async Task Alignment_AlignReconstructionToOrigRigScales()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{

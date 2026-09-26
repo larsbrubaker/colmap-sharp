@@ -7,9 +7,9 @@
 // Tier C (outcome): the reconstruction is compared with the synthetic ground truth through
 // ReconstructionNear at COLMAP's bounds.
 //
-// Translation notes: the SQLite database file is InMemoryDatabase. COLMAP's gtest_main seeds
-// the PRNG with 0 before every test; the PRNG is per thread, so each test seeds it and does
-// all of its mapping before its first await.
+// Translation notes: the SQLite database file is InMemoryDatabase. PrngTestIsolation seeds
+// the PRNG with 0 before every test, as COLMAP's gtest_main does; the PRNG is per thread, so
+// each test does all of its mapping before its first await.
 
 using ColmapSharp.Mathematics;
 using ColmapSharp.Scene;
@@ -35,7 +35,6 @@ public class GlobalMapperTests
 		double maxProjCenterError,
 		double numObsTolerance = 0.0)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var gtReconstruction = new Reconstruction();
 		using var database = new InMemoryDatabase();
 		Synthetic.SynthesizeDataset(datasetOptions, gtReconstruction, database);
@@ -178,6 +177,8 @@ public class GlobalMapperTests
 	// established tracks.
 	private static int EstablishTracksCount(GlobalMapperOptions options)
 	{
+		// Reseeded on every call, not only at test start: a test that compares counts
+		// needs every call to build the same scene.
 		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		Synthetic.SynthesizeDataset(

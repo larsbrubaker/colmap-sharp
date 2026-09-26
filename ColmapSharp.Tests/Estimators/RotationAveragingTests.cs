@@ -9,8 +9,10 @@
 // cases are in RotationAveragingTests.CSharpOnly.cs. Tier C (outcome): relative rotations
 // against ground truth within COLMAP's tolerances.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test; tests seed and draw before
-// their first await (the PRNG is thread-local).
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does;
+// tests draw before their first await (the PRNG is thread-local), and the few that draw
+// again after an await reseed first so the result cannot depend on which thread resumed
+// them.
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Geometry;
@@ -212,7 +214,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task RotationAveraging_WithoutNoise()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SmallRigOptions(numCamerasPerRig: 1, numFramesPerRig: 5, priorGravity: true));
 		double maxError = RunAndVerifyRotationAveraging(data, [true, false]);
 		await Assert.That(maxError).IsLessThanOrEqualTo(MathUtils.DegToRad(1e-2));
@@ -221,7 +222,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task RotationAveraging_WeightedNoiseFreeMatchesInvariant()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SmallRigOptions(numCamerasPerRig: 1, numFramesPerRig: 5, priorGravity: true));
 
 		// Assign varying positive match counts so the edge weighting is non-trivial.
@@ -262,7 +262,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task RotationAveraging_WeightedReducesErrorWithNoisyLowMatchEdges()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(new SyntheticDatasetOptions
 		{
 			NumRigs = 1,
@@ -319,7 +318,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task RotationAveraging_WithoutNoiseWithNonTrivialKnownRig()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SmallRigOptions(numCamerasPerRig: 2, numFramesPerRig: 4, priorGravity: true));
 		double maxError = RunAndVerifyRotationAveraging(data, [true, false]);
 		await Assert.That(maxError).IsLessThanOrEqualTo(MathUtils.DegToRad(1e-2));
@@ -328,7 +326,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task RotationAveraging_WithoutNoiseWithNonTrivialUnknownRig()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SmallRigOptions(numCamerasPerRig: 2, numFramesPerRig: 4, priorGravity: true));
 		ResetSensorsFromRig(data.Reconstruction);
 
@@ -340,7 +337,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task RotationAveraging_WithNoiseAndOutliers()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(NoisyOptions(numCamerasPerRig: 1), NoiseOptions());
 		double maxError = RunAndVerifyRotationAveraging(data, [true, false]);
 		await Assert.That(maxError).IsLessThanOrEqualTo(MathUtils.DegToRad(3.0));
@@ -349,7 +345,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task RotationAveraging_WithNoiseAndOutliersWithNonTrivialKnownRigs()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(NoisyOptions(numCamerasPerRig: 2), NoiseOptions());
 		double maxError = RunAndVerifyRotationAveraging(data, [true, false]);
 		await Assert.That(maxError).IsLessThanOrEqualTo(MathUtils.DegToRad(2.0));
@@ -358,7 +353,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task RotationAveraging_DeterministicRandomSeed()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SmallRigOptions(numCamerasPerRig: 1, numFramesPerRig: 5, priorGravity: false));
 		RotationEstimatorOptions options = CreateRATestOptions();
 		options.RandomSeed = 42;
@@ -388,7 +382,6 @@ public partial class RotationAveragingTests
 	{
 		// Use a noisy multi-rig setup to make the solution non-trivial and the
 		// regularization's effect non-degenerate.
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(NoisyOptions(numCamerasPerRig: 1), NoiseOptions());
 		RotationEstimatorOptions options = CreateRATestOptions(useGravity: true);
 		options.RandomSeed = 42;
@@ -418,7 +411,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task RotationAveraging_EmptyPoseGraph()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(new SyntheticDatasetOptions
 		{
 			NumRigs = 1,
@@ -442,7 +434,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task RotationAveraging_MultiImageRigFrameDeregisterDoesNotCrashOnSecondVisit()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(new SyntheticDatasetOptions
 		{
 			NumRigs = 1,
@@ -507,7 +498,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task RotationAveraging_GravityWithUnknownRigSensorsReturnsFalse()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SmallRigOptions(numCamerasPerRig: 2, numFramesPerRig: 4, priorGravity: true));
 		ResetSensorsFromRig(data.Reconstruction);
 
@@ -529,7 +519,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task RotationAveraging_InitializeSensorFromRigUsingCamsFromWorld()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SmallRigOptions(numCamerasPerRig: 2, numFramesPerRig: 4, priorGravity: false));
 
 		// Build cams_from_world from the ground truth.
@@ -559,7 +548,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task RotationAveraging_InitializeSensorFromRigPreservesCalibratedRig()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SmallRigOptions(numCamerasPerRig: 2, numFramesPerRig: 4, priorGravity: false));
 		Dictionary<uint, Rigid3d> camsFromWorld = GtCamsFromWorld(data);
 
@@ -577,7 +565,6 @@ public partial class RotationAveragingTests
 	public async Task RotationAveraging_RefineSensorFromRigFalsePreservesRig()
 	{
 		// A non-trivial multi-camera rig so both rotation AND translation are non-zero.
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SmallRigOptions(numCamerasPerRig: 2, numFramesPerRig: 4, priorGravity: true));
 
 		// Snapshot the rig BEFORE RA so we can compare element-wise.

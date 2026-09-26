@@ -4,9 +4,9 @@
 // RandomSamplerTests: colmap/optim/random_sampler_test.cc ported 1:1, one method per gtest
 // TEST(Suite, Name) named Suite_Name. Tests ColmapSharp/Optim/RandomSampler.cs.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so each test starts with
-// RandomUtils.SetPRNGSeed(0) and draws everything before its first await (the PRNG is per
-// thread and an await may resume elsewhere).
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test draws everything before its first await (the PRNG is per thread and an
+// await may resume elsewhere).
 
 using ColmapSharp.Mathematics;
 using ColmapSharp.Optim;
@@ -22,7 +22,6 @@ public class RandomSamplerTests
 	[Test]
 	public async Task RandomSampler_LessSamples()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var sampler = new RandomSampler(2);
 		sampler.Initialize(5);
 		ulong maxNumSamples = sampler.MaxNumSamples();
@@ -48,7 +47,6 @@ public class RandomSamplerTests
 	[Test]
 	public async Task RandomSampler_EqualSamples()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var sampler = new RandomSampler(5);
 		sampler.Initialize(5);
 		ulong maxNumSamples = sampler.MaxNumSamples();

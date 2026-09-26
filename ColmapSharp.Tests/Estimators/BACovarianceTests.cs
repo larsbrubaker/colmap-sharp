@@ -55,7 +55,6 @@ public class BACovarianceTests
 			or BACovarianceParams.PosesAndPoints or BACovarianceParams.All;
 		bool estimateOtherCovs = options.Params == BACovarianceParams.All;
 
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{

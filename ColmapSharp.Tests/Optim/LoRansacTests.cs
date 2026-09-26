@@ -7,9 +7,9 @@
 // (outcome). The test data and ValidateReport are SimilarityTransformTestData in
 // RansacTests.cs (the C++ files carry identical copies).
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so each test starts with
-// RandomUtils.SetPRNGSeed(0) and runs LO-RANSAC before its first await. num_threads = 4 is
-// validated and then run serially (Ransac.cs header).
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test runs LO-RANSAC before its first await. num_threads = 4 is validated and then
+// run serially (Ransac.cs header).
 
 using ColmapSharp.Estimators.Solvers;
 using ColmapSharp.LinearAlgebra;
@@ -47,7 +47,6 @@ public class LoRansacTests
 	[Test]
 	public async Task LORANSAC_SimilarityTransform()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var data = SimilarityTransformTestData.Generate();
 
 		var options = new RansacOptions();
@@ -61,7 +60,6 @@ public class LoRansacTests
 	[Test]
 	public async Task LORANSAC_ParallelSimilarityTransform()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var data = SimilarityTransformTestData.Generate();
 
 		var options = new RansacOptions();

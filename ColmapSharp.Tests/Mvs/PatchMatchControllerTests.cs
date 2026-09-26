@@ -53,9 +53,6 @@ public class PatchMatchControllerTests
 				CameraModelId = CameraModelId.Pinhole,
 				CameraParams = [25, 25, 10, 5],
 			};
-			// The synthetic dataset draws from the thread's PRNG, which earlier tests on this
-			// thread may have advanced; seed it so the shared-point counts below are fixed.
-			RandomUtils.SetPRNGSeed(0);
 			var reconstruction = new Reconstruction();
 			Synthetic.SynthesizeDataset(syntheticOptions, reconstruction);
 

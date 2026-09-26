@@ -10,9 +10,9 @@
 // decimal separator is "," (built from the invariant culture, so it works in invariant
 // globalization mode too). ReconstructionIOOracleTests.cs holds the C#-only pycolmap checks.
 //
-// The Export* cases are in ReconstructionIOTests.Export.cs.
-// COLMAP's gtest_main seeds the PRNG with 0 before every test; tests seed and synthesize
-// before their first await (the PRNG is thread-local).
+// The Export* cases are in ReconstructionIOTests.Export.cs. PrngTestIsolation seeds the
+// PRNG with 0 before every test, as COLMAP's gtest_main does; tests synthesize before
+// their first await (the PRNG is thread-local).
 
 using System.Globalization;
 
@@ -157,7 +157,6 @@ public partial class ReconstructionIOTests
 	[MethodDataSource(nameof(ReaderWriters))]
 	public async Task ParameterizedReaderWriterTests_Roundtrip(string kind)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var readerWriter = new ReaderWriter(kind);
 
 		var orig = new Reconstruction();
@@ -201,7 +200,6 @@ public partial class ReconstructionIOTests
 	[MethodDataSource(nameof(ReaderWriters))]
 	public async Task ParameterizedReaderWriterTests_LegacyWithoutRigsAndFrames(string kind)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var readerWriter = new ReaderWriter(kind);
 
 		var orig = new Reconstruction();
@@ -242,7 +240,6 @@ public partial class ReconstructionIOTests
 	[Test]
 	public async Task TextIO_LocaleIndependentRoundtrip()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		// Set global locale to use comma as decimal separator.
 		CultureInfo originalCulture = CultureInfo.CurrentCulture;
 		var commaDecimal = (CultureInfo)CultureInfo.InvariantCulture.Clone();

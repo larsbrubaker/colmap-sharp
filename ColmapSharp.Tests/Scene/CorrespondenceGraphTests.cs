@@ -8,10 +8,10 @@
 // [Arguments(false)] and [Arguments(true)]. Finalize() is FinalizeGraph(); FeatureMatches
 // equality is SequenceEqual; UnorderedElementsAre compares as sets.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so tests that draw start
-// with RandomUtils.SetPRNGSeed(0) and draw everything before their first await (the PRNG is
-// per thread). UpdateTwoViewGeometry draws its one pose earlier than the C++ does; it is the
-// only draw, so its value is unchanged.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and tests that draw do so before their first await (the PRNG is per thread).
+// UpdateTwoViewGeometry draws its one pose earlier than the C++ does; it is the only draw,
+// so its value is unchanged.
 
 using ColmapSharp.Feature;
 using ColmapSharp.Geometry;
@@ -83,7 +83,6 @@ public class CorrespondenceGraphTests
 	[Arguments(true)]
 	public async Task CorrespondenceGraphFinalizeTest_TwoView(bool finalize)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var correspondenceGraph = new CorrespondenceGraph();
 		correspondenceGraph.AddImage(0, 10);
 		correspondenceGraph.AddImage(1, 10);
@@ -328,7 +327,6 @@ public class CorrespondenceGraphTests
 	[Test]
 	public async Task CorrespondenceGraph_UpdateTwoViewGeometry()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Rigid3d updatedPose = RandomRigid3d();
 		var correspondenceGraph = new CorrespondenceGraph();
 		correspondenceGraph.AddImage(0, 10);
@@ -369,7 +367,6 @@ public class CorrespondenceGraphTests
 	[Test]
 	public async Task CorrespondenceGraph_UpdateTwoViewGeometrySwapped()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var correspondenceGraph = new CorrespondenceGraph();
 		// Use image IDs where ShouldSwapImagePair(1, 0) is true, i.e. id1 > id2.
 		correspondenceGraph.AddImage(0, 10);

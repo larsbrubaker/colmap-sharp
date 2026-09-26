@@ -12,8 +12,8 @@
 // equality; `frame.RigFromWorld().translation().z() = v` is SetRigFromWorld with that
 // translation; try { ... } catch (std::exception& e) { EXPECT_THAT(e.what(), HasSubstr(s)) }
 // stays a try/catch that only checks the message when something throws, as in C++.
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so tests that draw call
-// RandomUtils.SetPRNGSeed(0) and draw before their first await.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and tests that draw do so before their first await.
 //
 // ExtractColorsForAllImages is ReconstructionTests.Colors.cs. The SynthesizeDataset cases are ReconstructionTests.Synthetic.cs,
 // TranscribeImageIdsToDatabase is ReconstructionTests.Database.cs, and ConvertToPLY and
@@ -414,7 +414,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_AddPoint3D()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d xyz = RandomEigen.RandomEigenVector3d();
 		var reconstruction = new Reconstruction();
 		ulong point3DId = reconstruction.AddPoint3D(xyz, new Track());
@@ -450,7 +449,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_AddObservation()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d xyz = RandomEigen.RandomEigenVector3d();
 		Reconstruction reconstruction = GenerateReconstruction(3);
 		var track = new Track();
@@ -497,7 +495,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_DeletePoint3D()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d xyz = RandomEigen.RandomEigenVector3d();
 		Reconstruction reconstruction = GenerateReconstruction(1);
 		ulong point3DId = reconstruction.AddPoint3D(xyz, new Track());
@@ -553,7 +550,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_DeRegisterFrame()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d xyz = RandomEigen.RandomEigenVector3d();
 		Reconstruction reconstruction = GenerateReconstruction(3);
 		var track = new Track();

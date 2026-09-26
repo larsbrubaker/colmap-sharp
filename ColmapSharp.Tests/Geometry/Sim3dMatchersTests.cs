@@ -8,7 +8,7 @@
 // calling TestMethod with x and y) check that the matcher accepts each argument it was
 // built from; they are ported as those two matcher applications. Sim3d_Near perturbs the
 // rotation twice where one might expect the scale; that is COLMAP's test as written.
-// Each test seeds the PRNG with 0, as COLMAP's gtest_main does.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does.
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
@@ -56,7 +56,6 @@ public class Sim3dMatchersTests
 	[Test]
 	public async Task Sim3d_Eq()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Sim3d x = RandomSim3d();
 		Sim3d y = x;
 		bool equal = Sim3dEq(x, y);
@@ -82,7 +81,6 @@ public class Sim3dMatchersTests
 	[Test]
 	public async Task Sim3d_Near()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Sim3d x = RandomSim3d();
 		Sim3d y = x;
 		bool near = Sim3dNear(x, y, stol: 1e-8, rtol: 1e-8, ttol: 1e-8);

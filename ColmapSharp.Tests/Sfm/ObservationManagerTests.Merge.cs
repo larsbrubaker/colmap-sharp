@@ -30,6 +30,8 @@ public partial class ObservationManagerTests
 	// off its observations so that every one of its observations fails the reprojection test.
 	private static (Reconstruction Src, Reconstruction Tgt) MergeSceneWithOneCorruptTargetPoint()
 	{
+		// Reseeded on every call, not only at test start: a test that compares two merges
+		// needs both built from the same scene.
 		RandomUtils.SetPRNGSeed(0);
 		Reconstruction srcReconstruction = AlignmentTests.GenerateReconstructionForMerge();
 		Reconstruction tgtReconstruction = srcReconstruction.Clone();
@@ -71,7 +73,6 @@ public partial class ObservationManagerTests
 	[Test]
 	public async Task CSharpOnly_MergeAndFilterReconstructions_FailedMergeLeavesTarget()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction srcReconstruction = AlignmentTests.GenerateReconstructionForMerge();
 		Reconstruction tgtReconstruction = srcReconstruction.Clone();
 		AlignmentTests.RemoveRigFrames(srcReconstruction, 1);

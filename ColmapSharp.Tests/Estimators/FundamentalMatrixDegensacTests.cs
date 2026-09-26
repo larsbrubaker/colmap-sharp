@@ -7,9 +7,10 @@
 // FundamentalMatrixDegensacEstimator.cs. Tier B for the epipole and the compatible
 // homography, Tier C for the degeneracy test and the robust estimates.
 //
-// Each test seeds the PRNG with 0, as COLMAP's gtest_main does, and draws everything before
-// its first await (the PRNG is per thread). Draw order follows clang: constructor and
-// comma-initializer arguments are evaluated left to right.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test draws everything before its first await (the PRNG is per thread). Draw
+// order follows clang: constructor and comma-initializer arguments are evaluated left to
+// right.
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Estimators.Solvers;
@@ -29,7 +30,6 @@ public class FundamentalMatrixDegensacTests
 	[Test]
 	public async Task EpipoleFromFundamentalMatrix_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var log = new ExpectationLog();
 		for (int k = 0; k < 20; ++k)
 		{
@@ -48,7 +48,6 @@ public class FundamentalMatrixDegensacTests
 	[Test]
 	public async Task HomographyFromFundamentalAndPoints_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Matrix3d kMat = RandomCalibrationMatrix();
 		var cam2FromCam1 = new Rigid3d(RandomEigen.RandomEigenQuaterniond(), RandomEigen.RandomEigenVector3d());
 		Matrix3d f = EssentialMatrix.FundamentalFromEssentialMatrix(
@@ -85,7 +84,6 @@ public class FundamentalMatrixDegensacTests
 	[Test]
 	public async Task HomographyFromFundamentalAndPoints_CollinearReturnsNullopt()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Matrix3d kMat = RandomCalibrationMatrix();
 		var cam2FromCam1 = new Rigid3d(RandomEigen.RandomEigenQuaterniond(), RandomEigen.RandomEigenVector3d());
 		Matrix3d f = EssentialMatrix.FundamentalFromEssentialMatrix(
@@ -103,7 +101,6 @@ public class FundamentalMatrixDegensacTests
 	[Test]
 	public async Task IsSampleHDegenerate_DetectsAndRejects()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Matrix3d kMat = RandomCalibrationMatrix();
 		var cam2FromCam1 = new Rigid3d(RandomEigen.RandomEigenQuaterniond(), RandomEigen.RandomEigenVector3d());
 		Matrix3d f = EssentialMatrix.FundamentalFromEssentialMatrix(
@@ -138,7 +135,6 @@ public class FundamentalMatrixDegensacTests
 	[Test]
 	public async Task FundamentalMatrixDegensac_NonPlanarParity()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Matrix3d kMat = RandomCalibrationMatrix();
 		var cam2FromCam1 = new Rigid3d(RandomEigen.RandomEigenQuaterniond(), RandomEigen.RandomEigenVector3d());
 		Matrix3d expectedF = EssentialMatrix.FundamentalFromEssentialMatrix(
@@ -169,7 +165,6 @@ public class FundamentalMatrixDegensacTests
 	[Test]
 	public async Task FundamentalMatrixDegensac_RecoversFOnDominantPlane()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Matrix3d kMat = RandomCalibrationMatrix();
 		var cam2FromCam1 = new Rigid3d(
 			RandomEigen.RandomEigenQuaterniond(), RandomEigen.RandomEigenVector3d().Normalized());

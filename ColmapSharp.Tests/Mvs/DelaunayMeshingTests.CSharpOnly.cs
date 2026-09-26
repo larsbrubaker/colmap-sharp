@@ -285,7 +285,6 @@ public class DelaunayMeshingCSharpOnlyTests
 
 	private static Reconstruction Synthesize(int numFrames, int numPoints3D)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var options = new SyntheticDatasetOptions
 		{
 			NumRigs = 1,

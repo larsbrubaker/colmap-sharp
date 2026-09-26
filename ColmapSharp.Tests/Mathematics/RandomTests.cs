@@ -5,10 +5,10 @@
 // named Suite_Name, same checks and tolerances. Tests ColmapSharp/Mathematics/RandomUtils.cs.
 // The bit-exact comparison against libc++ lives in RandomOracleTests (C#-only).
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test (PRNGTestEventListener), so
-// each test here starts with RandomUtils.SetPRNGSeed(0). The PRNG is per thread, and an async
-// test may resume on another thread after an await, so every test draws all its numbers
-// before its first await.
+// COLMAP's gtest_main seeds the PRNG with 0 before every test (PRNGTestEventListener) and
+// PrngTestIsolation does the same here; the SetPRNGSeed calls left in these tests are the
+// ones random_test.cc makes itself. The PRNG is per thread, and an async test may resume on
+// another thread after an await, so every test draws all its numbers before its first await.
 
 using ColmapSharp.Mathematics;
 
@@ -20,13 +20,9 @@ namespace ColmapSharp.Tests.Mathematics;
 
 public class RandomTests
 {
-	// colmap/util/gtest_main.cc: kDefaultTestPRNGSeed.
-	private const uint DefaultTestPRNGSeed = 0;
-
 	[Test]
 	public async Task PRNGSeed_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(DefaultTestPRNGSeed);
 		RandomUtils.Prng = null;
 		bool nullAfterReset = RandomUtils.Prng == null;
 		RandomUtils.SetPRNGSeed();
@@ -105,7 +101,6 @@ public class RandomTests
 	[Test]
 	public async Task RandomUniformInteger_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(DefaultTestPRNGSeed);
 		var lower = new int[1000];
 		var upper = new int[1000];
 		for (int i = 0; i < 1000; ++i)
@@ -127,7 +122,6 @@ public class RandomTests
 	[Test]
 	public async Task RandomUniformReal_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(DefaultTestPRNGSeed);
 		var lower = new double[1000];
 		var upper = new double[1000];
 		for (int i = 0; i < 1000; ++i)
@@ -149,7 +143,6 @@ public class RandomTests
 	[Test]
 	public async Task RandomGaussian_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(DefaultTestPRNGSeed);
 		const double Mean = 1.0;
 		const double Sigma = 1.0;
 		const int NumValues = 100000;
@@ -172,7 +165,6 @@ public class RandomTests
 	[Test]
 	public async Task ShuffleNone_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(DefaultTestPRNGSeed);
 		var numbers = new List<int>();
 		RandomUtils.Shuffle(0, numbers);
 		numbers = [1, 2, 3, 4, 5];
@@ -185,7 +177,6 @@ public class RandomTests
 	[Test]
 	public async Task ShuffleAll_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(DefaultTestPRNGSeed);
 		var numbers = Enumerable.Range(0, 1000).ToList();
 		var shuffledNumbers = new List<int>(numbers);
 		RandomUtils.Shuffle(1000, shuffledNumbers);

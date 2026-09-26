@@ -5,9 +5,9 @@
 // named Suite_Name; the SpatialPairGenerator cases are PairingTests.Spatial.cs. Tests
 // ColmapSharp/Controllers/PairGenerator.cs, SequentialPairGenerator.cs,
 // SpatialPairGenerator.cs and PairingOptions.cs. Database::Open(kInMemorySqliteDatabasePath)
-// becomes an InMemoryDatabase. COLMAP's gtest_main seeds the PRNG with 0 before every test,
-// so each test seeds before synthesizing its dataset. Tier A (exact): testing::ElementsAre
-// compares the pair lists in order (ElementsAre below), UnorderedElementsAre sorted.
+// becomes an InMemoryDatabase. PrngTestIsolation seeds the PRNG with 0 before every test, as
+// COLMAP's gtest_main does. Tier A (exact): testing::ElementsAre compares the pair lists in
+// order (ElementsAre below), UnorderedElementsAre sorted.
 //
 // Skipped (vocabulary-tree retrieval, colmap/retrieval, is out of scope - PORTING_PLAN.md):
 // VocabTreePairGenerator.Nominal, VocabTreePairGenerator.DoesNotDeadlockOnFailedQuery,
@@ -28,7 +28,6 @@ public partial class PairingTests
 {
 	private static InMemoryDatabase CreateSyntheticDatabase(int numImages)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{
@@ -42,7 +41,6 @@ public partial class PairingTests
 
 	private static InMemoryDatabase CreateSyntheticRigDatabase()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{

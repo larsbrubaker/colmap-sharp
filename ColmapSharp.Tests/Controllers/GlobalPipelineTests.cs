@@ -9,9 +9,10 @@
 // Tier C (outcome): reconstructions against the ground truth through ReconstructionNear at
 // COLMAP's bounds; ReconstructionEq for the seeded single-threaded runs.
 //
-// Translation notes: the SQLite database file is InMemoryDatabase. COLMAP's gtest_main seeds
-// the PRNG with 0 before every test (several tests reseed it with 1); the PRNG is per thread,
-// so each test seeds it and runs everything before its first await. ASSERT_* preconditions
+// Translation notes: the SQLite database file is InMemoryDatabase. PrngTestIsolation seeds
+// the PRNG with 0 before every test, as COLMAP's gtest_main does (several tests reseed it with
+// 1, as the C++ does); the PRNG is per thread, so each test runs everything before its first
+// await. ASSERT_* preconditions
 // throw through Require. testing::UnorderedElementsAreArray over sets of image ids is
 // SameSets.
 
@@ -205,7 +206,6 @@ public partial class GlobalPipelineTests
 	[Test]
 	public async Task GlobalPipeline_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var gt = new Reconstruction();
 		using InMemoryDatabase database = Synthesize(
 			new SyntheticDatasetOptions
@@ -239,7 +239,6 @@ public partial class GlobalPipelineTests
 	[Test]
 	public async Task GlobalPipeline_SfMWithRandomSeedStability()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var gt = new Reconstruction();
 		using InMemoryDatabase database = Synthesize(
 			new SyntheticDatasetOptions { NumRigs = 2, NumCamerasPerRig = 1, NumFramesPerRig = 4, NumPoints3D = 100 },
@@ -281,7 +280,6 @@ public partial class GlobalPipelineTests
 	[Test]
 	public async Task GlobalPipeline_WithExistingRelativePoses()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var gt = new Reconstruction();
 		using InMemoryDatabase database = Synthesize(
 			new SyntheticDatasetOptions
@@ -307,7 +305,6 @@ public partial class GlobalPipelineTests
 	[Test]
 	public async Task GlobalPipeline_WithNoisyExistingRelativePoses()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var gt = new Reconstruction();
 		using InMemoryDatabase database = Synthesize(
 			new SyntheticDatasetOptions

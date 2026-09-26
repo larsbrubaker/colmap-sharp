@@ -34,7 +34,6 @@ public partial class ReconstructionIOTests
 
 	private static Reconstruction Synthesize(int numFramesPerRig, int numPoints3D, CameraModelId? cameraModelId = null, double[]? cameraParams = null)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions
 		{

@@ -274,7 +274,6 @@ public class SceneClusteringTests
 	[Test]
 	public async Task CSharpOnly_CreateSpreadsTiedOverlapAcrossFrames()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		Synthetic.SynthesizeDataset(
 			new SyntheticDatasetOptions

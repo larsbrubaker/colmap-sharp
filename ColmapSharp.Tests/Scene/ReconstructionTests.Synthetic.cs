@@ -21,7 +21,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_Print()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{
@@ -39,7 +38,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_SetRigsAndFramesResetsNumRegImages()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{
@@ -96,7 +94,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_DeleteAllPoints2DAndPoints3D()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{
@@ -114,7 +111,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_TearDown()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions
 		{

@@ -8,8 +8,8 @@
 //
 // The poses built from Eigen::Quaterniond(0.2, 0.3, 0.4, qz) use a non-unit quaternion,
 // as COLMAP's test does: q * v and ToRotationMatrix are the same polynomial in q, so the
-// projections and the projection matrices agree anyway.
-// Each test seeds the PRNG with 0, as COLMAP's gtest_main does.
+// projections and the projection matrices agree anyway. PrngTestIsolation seeds the PRNG
+// with 0 before every test, as COLMAP's gtest_main does.
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
@@ -120,7 +120,6 @@ public class TriangulationTests
 	[Test]
 	public async Task TriangulateMidPoint_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const int NumTrials = 10;
 		var failures = new List<string>();
 		for (int i = 0; i < NumTrials; ++i)

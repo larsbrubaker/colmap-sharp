@@ -7,8 +7,8 @@
 // DefaultBundleAdjuster.NominalMultiCameraRig and the five PosePriorBundleAdjuster cases
 // (Estimators/BundleAdjustmentCeres.PosePrior.cs). Tier C: the outcome bounds are COLMAP's.
 //
-// Translation notes: the SQLite test database is an InMemoryDatabase. COLMAP's gtest_main
-// reseeds the PRNG with 0 at every test start; each case does the same first.
+// Translation notes: the SQLite test database is an InMemoryDatabase. PrngTestIsolation
+// seeds the PRNG with 0 before every test, as COLMAP's gtest_main does.
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Geometry;
@@ -95,7 +95,6 @@ public partial class BundleAdjustmentCeresTests
 	[Test]
 	public async Task DefaultBundleAdjuster_NominalMultiCameraRig()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var gtReconstruction = new Reconstruction();
 		Synthetic.SynthesizeDataset(
 			new SyntheticDatasetOptions { NumRigs = 2, NumCamerasPerRig = 3, NumFramesPerRig = 5, NumPoints3D = 200 },
@@ -131,7 +130,6 @@ public partial class BundleAdjustmentCeresTests
 	[Test]
 	public async Task PosePriorBundleAdjuster_AlignmentRobustToOutliers()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		Reconstruction gtReconstruction = SynthesizeWithPriors(database, 1, 7, 50);
 
@@ -169,7 +167,6 @@ public partial class BundleAdjustmentCeresTests
 	[Test]
 	public async Task PosePriorBundleAdjuster_InsufficientPriorsUseTwoCameraGauge()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		Reconstruction reconstruction = SynthesizeWithPriors(database, 1, 3, 50);
 
@@ -195,7 +192,6 @@ public partial class BundleAdjustmentCeresTests
 	[Test]
 	public async Task PosePriorBundleAdjuster_MissingPositionCov()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		Reconstruction gtReconstruction = SynthesizeWithPriors(database, 1, 7, 100);
 
@@ -224,7 +220,6 @@ public partial class BundleAdjustmentCeresTests
 	[Test]
 	public async Task PosePriorBundleAdjuster_ConstantSensorFromRigWithMissingPositionCov()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		Reconstruction reconstruction = SynthesizeWithPriors(database, 2, 3, 50);
 
@@ -264,7 +259,6 @@ public partial class BundleAdjustmentCeresTests
 	[Test]
 	public async Task PosePriorBundleAdjuster_OptimizationRobustToOutliers()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		Reconstruction gtReconstruction = SynthesizeWithPriors(database, 1, 7, 100);
 

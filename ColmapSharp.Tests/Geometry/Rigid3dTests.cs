@@ -9,9 +9,9 @@
 // Eigen::Matrix<double, 12, 12> and <6, 12> are MatrixXd here, and
 // RandomEigenMatrixd<12, 12> is RandomEigenMatrixXd(12, 12) (same draw order).
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so each test starts with
-// RandomUtils.SetPRNGSeed(0) and draws everything before its first await (the PRNG is per
-// thread and an await may resume elsewhere).
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test draws everything before its first await (the PRNG is per thread and an
+// await may resume elsewhere).
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
@@ -85,7 +85,6 @@ public class Rigid3dTests
 	[Test]
 	public async Task Rigid3d_Inverse()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Rigid3d bFromA = TestRigid3d();
 		Rigid3d aFromB = bFromA.Inverse();
 		var results = new List<bool>();
@@ -102,7 +101,6 @@ public class Rigid3dTests
 	[Test]
 	public async Task Rigid3d_TgtOriginInSrc()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Rigid3d bFromA = TestRigid3d();
 		Vector3d originBInA = bFromA.TgtOriginInSrc();
 		await Assert.That((bFromA * originBInA - Vector3d.Zero).Norm).IsLessThan(1e-6);
@@ -111,7 +109,6 @@ public class Rigid3dTests
 	[Test]
 	public async Task Rigid3d_ToMatrix()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Rigid3d bFromA = TestRigid3d();
 		Matrix3x4d bFromAMat = bFromA.ToMatrix();
 		var errors = new List<double>();
@@ -127,7 +124,6 @@ public class Rigid3dTests
 	[Test]
 	public async Task Rigid3d_FromMatrix()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Rigid3d b1FromA = TestRigid3d();
 		Rigid3d b2FromA = Rigid3d.FromMatrix(b1FromA.ToMatrix());
 		var results = new List<bool>();
@@ -164,7 +160,6 @@ public class Rigid3dTests
 	[Test]
 	public async Task Rigid3d_ApplyChain()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Rigid3d bFromA = TestRigid3d();
 		Rigid3d cFromB = TestRigid3d();
 		Rigid3d dFromC = TestRigid3d();
@@ -178,7 +173,6 @@ public class Rigid3dTests
 	[Test]
 	public async Task Rigid3d_Compose()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Rigid3d bFromA = TestRigid3d();
 		Rigid3d cFromB = TestRigid3d();
 		Rigid3d dFromC = TestRigid3d();
@@ -193,7 +187,6 @@ public class Rigid3dTests
 	[Test]
 	public async Task Rigid3d_Adjoint()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Rigid3d bFromA = TestRigid3d();
 		Matrix6d adjoint = bFromA.Adjoint();
 		Matrix6d adjointInv = bFromA.AdjointInverse();
@@ -209,7 +202,6 @@ public class Rigid3dTests
 	[Test]
 	public async Task Rigid3d_CovarianceForInverse()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Rigid3d bFromA = TestRigid3d();
 		Matrix6d a = RandomEigen.RandomEigenMatrix6d();
 		Matrix6d covBFromA = a * a.Transpose();
@@ -222,7 +214,6 @@ public class Rigid3dTests
 	[Test]
 	public async Task Rigid3d_CovarianceForRelativeRigid3d_PerfectCorrelation()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Rigid3d worldFromA = TestRigid3d();
 		Rigid3d worldFromB = TestRigid3d();
 		MatrixXd a = RandomEigen.RandomEigenMatrixXd(6, 6);
@@ -248,7 +239,6 @@ public class Rigid3dTests
 	[Test]
 	public async Task Rigid3d_CovarianceForRelativeRigid3d()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Rigid3d aFromWorld = TestRigid3d();
 		Rigid3d bFromWorld = TestRigid3d();
 		MatrixXd a = RandomEigen.RandomEigenMatrixXd(12, 12);
@@ -287,7 +277,6 @@ public class Rigid3dTests
 	[Test]
 	public async Task Rigid3d_CovariancePropagation_Composed_vs_Relative()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Rigid3d aFromB = TestRigid3d();
 		Rigid3d bFromC = TestRigid3d();
 		MatrixXd a = RandomEigen.RandomEigenMatrixXd(12, 12);

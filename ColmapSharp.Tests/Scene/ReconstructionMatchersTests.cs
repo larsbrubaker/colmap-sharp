@@ -27,7 +27,6 @@ public class ReconstructionMatchersTests
 	[Test]
 	public async Task Reconstruction_Eq()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction1 = new Reconstruction();
 		var reconstruction2 = new Reconstruction();
 		bool emptyEqual = ReconstructionEq(reconstruction1, reconstruction2);
@@ -63,7 +62,6 @@ public class ReconstructionMatchersTests
 	[Test]
 	public async Task Reconstruction_Near()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction1 = new Reconstruction();
 		var reconstruction2 = new Reconstruction();
 		bool emptyNearUnaligned = ReconstructionNear(

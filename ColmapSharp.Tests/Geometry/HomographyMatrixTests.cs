@@ -4,8 +4,8 @@
 // HomographyMatrixTests: colmap/geometry/homography_matrix_test.cc ported 1:1, one method
 // per gtest TEST(Suite, Name) named Suite_Name, same checks and tolerances. Tests
 // ColmapSharp/Geometry/HomographyMatrix.cs. Tier B; the pycolmap comparison of
-// PoseFromHomographyMatrix is in GeometryTwoViewOracleTests (C#-only).
-// Each test seeds the PRNG with 0, as COLMAP's gtest_main does.
+// PoseFromHomographyMatrix is in GeometryTwoViewOracleTests (C#-only). PrngTestIsolation
+// seeds the PRNG with 0 before every test, as COLMAP's gtest_main does.
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
@@ -68,7 +68,6 @@ public class HomographyMatrixTests
 	[Test]
 	public async Task DecomposeHomographyMatrix_Random()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const int NumIters = 100;
 		const double Epsilon = 1e-6;
 		Matrix3d identity = Matrix3d.Identity;

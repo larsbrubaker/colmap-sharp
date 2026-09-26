@@ -39,7 +39,6 @@ public class RelativePoseSharedFocalTests
 	[Test]
 	public async Task RelativePoseSharedFocalEstimator_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const double kFocal = 1000.0;
 		int numFailures = 0;
 		var estimator = new RelativePoseSharedFocalEstimator();
@@ -69,7 +68,6 @@ public class RelativePoseSharedFocalTests
 	[Test]
 	public async Task RelativePoseSharedFocalEstimator_Residuals()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const double kFocal = 1000.0;
 		Rigid3d cam2FromCam1 = TestCam2FromCam1();
 		var points1 = new List<Vector2d>();
@@ -109,7 +107,6 @@ public class RelativePoseSharedFocalTests
 	[Test]
 	public async Task RelativePoseSharedFocalEstimator_RefineFromInitialModel()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const double kFocal = 1000.0;
 		var log = new ExpectationLog();
 		for (int k = 0; k < 50; ++k)

@@ -11,10 +11,10 @@
 // Tier C (outcome): ReconstructionNear against the synthetic ground truth with COLMAP's
 // bounds; ReconstructionEq for the seed-stability tests.
 //
-// Translation notes: the SQLite test database is InMemoryDatabase. COLMAP's gtest_main seeds
-// the PRNG with 0 before every test; the PRNG is per thread, so each test seeds it and runs
-// all of its mapping before its first await, collecting values to assert afterwards.
-// ASSERT_EQ(size, n) preconditions become Require.
+// Translation notes: the SQLite test database is InMemoryDatabase. PrngTestIsolation seeds
+// the PRNG with 0 before every test, as COLMAP's gtest_main does; the PRNG is per thread, so
+// each test runs all of its mapping before its first await, collecting values to assert
+// afterwards. ASSERT_EQ(size, n) preconditions become Require.
 
 using ColmapSharp.Controllers;
 using ColmapSharp.Geometry;
@@ -42,11 +42,10 @@ public partial class IncrementalPipelineTests
 		}
 	}
 
-	// Seeds the PRNG like gtest_main and synthesizes the dataset into a fresh database.
+	// Synthesizes the dataset into a fresh database.
 	private static InMemoryDatabase Synthesize(
 		SyntheticDatasetOptions options, Reconstruction gtReconstruction, SyntheticNoiseOptions? noise = null)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		Synthetic.SynthesizeDataset(options, gtReconstruction, database);
 		if (noise is not null)
@@ -303,7 +302,6 @@ public partial class IncrementalPipelineTests
 	[Test]
 	public async Task IncrementalPipeline_MultiReconstruction()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var gt1 = new Reconstruction();
 		var gt2 = new Reconstruction();

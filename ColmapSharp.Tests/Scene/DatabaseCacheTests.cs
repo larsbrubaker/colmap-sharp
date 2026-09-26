@@ -5,8 +5,8 @@
 // case named Suite_Name, against InMemoryDatabase (kInMemorySqliteDatabasePath). Tests
 // ColmapSharp/Scene/DatabaseCache.cs.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so tests that draw call
-// RandomUtils.SetPRNGSeed(0) and draw before their first await. The C++ test database sets
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and tests that draw do so before their first await. The C++ test database sets
 // pose_prior1.corr_data_id twice (the second time where pose_prior2 was meant); that is
 // kept, since it is the input COLMAP's expectations were written against.
 
@@ -114,7 +114,6 @@ public class DatabaseCacheTests
 	[Test]
 	public async Task DatabaseCache_ConstructFromDatabase()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using InMemoryDatabase database = CreateTestDatabase();
 		DatabaseCache cache = DatabaseCache.Create(database, new DatabaseCache.Options());
 
@@ -173,7 +172,6 @@ public class DatabaseCacheTests
 	[Test]
 	public async Task DatabaseCache_ConstructFromDatabaseWithCustomImages()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using InMemoryDatabase database = CreateTestDatabase();
 
 		// Note that the first two images are part of the same frame.
@@ -227,7 +225,6 @@ public class DatabaseCacheTests
 	[Test]
 	public async Task DatabaseCache_ConstructFromLegacyDatabaseWithoutRigsAndFrames()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using InMemoryDatabase database = CreateLegacyTestDatabase();
 		DatabaseCache cache = DatabaseCache.Create(database, new DatabaseCache.Options());
 		using (Assert.Multiple())
@@ -258,7 +255,6 @@ public class DatabaseCacheTests
 	[Test]
 	public async Task DatabaseCache_ConstructFromLegacyDatabaseWithCustomImages()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using InMemoryDatabase database = CreateLegacyTestDatabase();
 		List<Image> images = database.ReadAllImages();
 		var options = new DatabaseCache.Options { ImageNames = [images[0].Name, images[2].Name] };
@@ -286,7 +282,6 @@ public class DatabaseCacheTests
 	[Test]
 	public async Task DatabaseCache_ConstructFromCustom()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var cache = new DatabaseCache();
 		int numRigs0 = cache.NumRigs;
 		int numCameras0 = cache.NumCameras;
@@ -342,7 +337,6 @@ public class DatabaseCacheTests
 	[Test]
 	public async Task CSharpOnly_CreateFromCacheKeepsWholeFrames()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using InMemoryDatabase database = CreateTestDatabase();
 		DatabaseCache source = DatabaseCache.Create(database, new DatabaseCache.Options());
 		DatabaseCache cache = DatabaseCache.CreateFromCache(source, new DatabaseCache.Options { ImageNames = ["image3", "image4"] });
@@ -379,7 +373,6 @@ public class DatabaseCacheTests
 	[Test]
 	public async Task DatabaseCache_NonConstCorrespondenceGraph()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using InMemoryDatabase database = CreateTestDatabase();
 		DatabaseCache cache = DatabaseCache.Create(database, new DatabaseCache.Options());
 

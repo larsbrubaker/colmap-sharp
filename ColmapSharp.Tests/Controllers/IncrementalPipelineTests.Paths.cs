@@ -82,7 +82,6 @@ public partial class IncrementalPipelineTests
 	[Test]
 	public async Task IncrementalPipeline_MaxModelOverlapStopsSharedModel()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var gt1 = new Reconstruction();
 		var gt2 = new Reconstruction();

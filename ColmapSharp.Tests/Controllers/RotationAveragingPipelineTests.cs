@@ -9,9 +9,9 @@
 // Tier C (outcome): relative rotations against the ground truth within COLMAP's tolerances;
 // the seeded single-threaded runs must agree exactly.
 //
-// Translation notes: the SQLite database file is InMemoryDatabase. COLMAP's gtest_main seeds
-// the PRNG with 0 before every test; the PRNG is per thread, so each test seeds it and runs
-// the controllers before its first await, collecting the largest errors to assert afterwards.
+// Translation notes: the SQLite database file is InMemoryDatabase. PrngTestIsolation seeds
+// the PRNG with 0 before every test, as COLMAP's gtest_main does; the PRNG is per thread, so
+// each test runs the controllers before its first await, collecting the largest errors to assert afterwards.
 
 using ColmapSharp.Controllers;
 using ColmapSharp.Geometry;
@@ -84,7 +84,6 @@ public class RotationAveragingPipelineTests
 	[Test]
 	public async Task RotationAveragingPipeline_WithoutNoise()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var gtReconstruction = new Reconstruction();
 		Synthetic.SynthesizeDataset(
@@ -101,7 +100,6 @@ public class RotationAveragingPipelineTests
 	[Test]
 	public async Task RotationAveragingPipeline_WithNoiseAndOutliers()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var gtReconstruction = new Reconstruction();
 		Synthetic.SynthesizeDataset(
@@ -126,7 +124,6 @@ public class RotationAveragingPipelineTests
 	[Test]
 	public async Task RotationAveragingPipeline_WithRandomSeedStability()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var gtReconstruction = new Reconstruction();
 		Synthetic.SynthesizeDataset(
@@ -160,7 +157,6 @@ public class RotationAveragingPipelineTests
 	[Test]
 	public async Task CSharpOnly_CancellationStopsBeforeRotationAveraging()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		Synthetic.SynthesizeDataset(
 			new SyntheticDatasetOptions { NumRigs = 1, NumCamerasPerRig = 1, NumFramesPerRig = 5, NumPoints3D = 50 },
@@ -199,7 +195,6 @@ public class RotationAveragingPipelineTests
 	[Test]
 	public async Task CSharpOnly_GravityPriorsSeedTheirCorrespondingImage()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var gtReconstruction = new Reconstruction();
 		Synthetic.SynthesizeDataset(
@@ -237,7 +232,6 @@ public class RotationAveragingPipelineTests
 	// A database with a gravity prior per image, for the stop tests.
 	private static InMemoryDatabase GravityPriorDatabase()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		Synthetic.SynthesizeDataset(
 			new SyntheticDatasetOptions

@@ -3,9 +3,9 @@
 //
 // TranslationTransformTests: colmap/estimators/solvers/translation_transform_test.cc ported
 // 1:1 (TEST(TranslationTransform, Estimate) as TranslationTransform_Estimate), same checks
-// and tolerances. Tests ColmapSharp/Estimators/Solvers/TranslationTransform.cs. The test
-// seeds the PRNG with 0, as COLMAP's gtest_main does, and draws everything before its first
-// await.
+// and tolerances. Tests ColmapSharp/Estimators/Solvers/TranslationTransform.cs.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and the test draws everything before its first await.
 
 using ColmapSharp.Estimators.Solvers;
 using ColmapSharp.LinearAlgebra;
@@ -22,7 +22,6 @@ public class TranslationTransformTests
 	[Test]
 	public async Task TranslationTransform_Estimate()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const int kNumPoints = 100;
 
 		var src = new Vector2d[kNumPoints];

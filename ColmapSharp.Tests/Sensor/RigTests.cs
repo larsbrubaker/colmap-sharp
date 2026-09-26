@@ -5,9 +5,9 @@
 // named Suite_Name, same checks. Tests ColmapSharp/Sensor/Rig.cs. COLMAP's operator<< is
 // Rig.ToString(); UnorderedElementsAre compares as sets.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so each test starts with
-// RandomUtils.SetPRNGSeed(0) and draws everything before its first await (the PRNG is per
-// thread and an await may resume elsewhere).
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test draws everything before its first await (the PRNG is per thread and an
+// await may resume elsewhere).
 
 using ColmapSharp.Geometry;
 using ColmapSharp.Mathematics;
@@ -43,7 +43,6 @@ public class RigTests
 	[Test]
 	public async Task Rig_SetUp()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var rig = new Rig();
 		var sensorId0 = new SensorId(SensorType.Imu, 0);
 		rig.AddRefSensor(sensorId0);

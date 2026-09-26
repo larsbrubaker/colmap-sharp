@@ -3,8 +3,8 @@
 //
 // ProjectionTests: colmap/scene/projection_test.cc ported 1:1, one method per gtest
 // TEST(Suite, Name) named Suite_Name, testing ColmapSharp/Scene/Projection.cs. EIGEN_PI is
-// Math.PI. The random point of CalculateSquaredReprojectionError.Nominal is drawn after
-// RandomUtils.SetPRNGSeed(0), as COLMAP's gtest_main seeds it.
+// Math.PI. The random point of CalculateSquaredReprojectionError.Nominal is the first draw
+// after the per-test seed of 0 (PrngTestIsolation, as COLMAP's gtest_main).
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
@@ -25,7 +25,6 @@ public class ProjectionTests
 	[Test]
 	public async Task CalculateSquaredReprojectionError_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var camFromWorld = new Rigid3d(Quaterniond.Identity, Vector3d.Zero);
 		Matrix3x4d camFromWorldMat = camFromWorld.ToMatrix();
 

@@ -66,7 +66,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_ConstructCopy()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = SynthesizeCopyTestDataset();
 		Reconstruction reconstructionCopy = reconstruction.Clone();
 		await Assert.That(ExplainReconstructionEq(reconstruction, reconstructionCopy)).IsNull();
@@ -78,7 +77,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_AssignCopy()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = SynthesizeCopyTestDataset();
 		var reconstructionCopy = new Reconstruction();
 		reconstructionCopy = reconstruction.Clone();
@@ -91,7 +89,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_SetRigsAndFrames()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		Reconstruction reconstruction = SynthesizeCopyTestDataset(database);
 		foreach (uint frameId in reconstruction.Frames.Keys.ToList())
@@ -122,7 +119,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_ReadWriteTextRoundtrip()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = SynthesizeOneCameraDataset(numFramesPerRig: 3, numPoints3D: 5);
 
 		string testDir = CreateTestDir();
@@ -145,7 +141,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_ReadWriteBinaryRoundtrip()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = SynthesizeOneCameraDataset(numFramesPerRig: 3, numPoints3D: 5);
 
 		string testDir = CreateTestDir();
@@ -168,7 +163,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_ReadAutoDetectFormat()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = SynthesizeOneCameraDataset(numFramesPerRig: 2, numPoints3D: 3);
 
 		// Write binary and verify Read auto-detects binary format

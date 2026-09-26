@@ -82,7 +82,6 @@ public partial class BundleAdjustmentCeresTests
 
 	private static Reconstruction SynthesizeWithNoise(int numRigs, int numCamerasPerRig, int numFramesPerRig, int numPoints3D)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = BundleAdjustmentTests.Synthesize(numRigs, numCamerasPerRig, numFramesPerRig, numPoints3D);
 		BundleAdjustmentTests.AddPoint2DNoise(reconstruction, 1);
 		return reconstruction;
@@ -91,7 +90,6 @@ public partial class BundleAdjustmentCeresTests
 	[Test]
 	public async Task DefaultBundleAdjuster_Cancellation()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = BundleAdjustmentTests.Synthesize(1, 1, 3, 20);
 
 		var config = new BundleAdjustmentConfig();
@@ -121,7 +119,6 @@ public partial class BundleAdjustmentCeresTests
 	[Test]
 	public async Task DefaultBundleAdjuster_ThreeViewSpherical()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		Synthetic.SynthesizeDataset(
 			new SyntheticDatasetOptions
@@ -404,7 +401,6 @@ public partial class BundleAdjustmentCeresTests
 	[Test]
 	public async Task DefaultBundleAdjuster_PartiallyContainedTracksForceToOptimizePoint()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = BundleAdjustmentTests.Synthesize(3, 1, 1, 100, numPoints2DWithoutPoint3D: 0);
 		BundleAdjustmentTests.AddPoint2DNoise(reconstruction, 1);
 

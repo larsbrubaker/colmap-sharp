@@ -44,7 +44,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_ExtractColorsForAllImages()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions
 		{
@@ -77,7 +76,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_ExtractColorsForAllImagesIndependentOfThreadCount()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		Synthetic.SynthesizeDataset(new SyntheticDatasetOptions { NumFramesPerRig = 4, NumPoints3D = 50 }, reconstruction);
 

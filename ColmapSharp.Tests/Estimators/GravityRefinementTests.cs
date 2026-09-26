@@ -7,9 +7,9 @@
 // Ported: GravityRefinement.{RefineGravity, RefineGravityWithNonTrivialRigs}.
 // Tier C: COLMAP's own tolerance (1e-2 degrees).
 //
-// Translation notes: the SQLite test database is an InMemoryDatabase. COLMAP's gtest_main
-// reseeds the PRNG with 0 at every test start; RunRefineGravity does the same and makes every
-// draw before its first await (the PRNG is per thread).
+// Translation notes: the SQLite test database is an InMemoryDatabase. PrngTestIsolation seeds
+// the PRNG with 0 before every test, as COLMAP's gtest_main does; RunRefineGravity makes
+// every draw before its first await (the PRNG is per thread).
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Geometry;
@@ -79,8 +79,6 @@ public class GravityRefinementTests
 
 	private static async Task RunRefineGravity(int numCamerasPerRig)
 	{
-		RandomUtils.SetPRNGSeed(0);
-
 		var database = new InMemoryDatabase();
 		var gtReconstruction = new Reconstruction();
 		var syntheticDatasetOptions = new SyntheticDatasetOptions

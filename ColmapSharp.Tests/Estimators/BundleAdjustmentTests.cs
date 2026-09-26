@@ -146,7 +146,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task BundleAdjustmentConfig_NumResiduals()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = Synthesize(4, 1, 1, 100);
 
 		List<uint> imageIds = reconstruction.RegImageIds();
@@ -363,7 +362,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task BundleAdjusterBackendTest_TwoView()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = Synthesize(2, 1, 1, 100);
 		AddPoint2DNoise(reconstruction, 1);
 		Reconstruction origReconstruction = reconstruction.Clone();
@@ -388,7 +386,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task BundleAdjusterBackendTest_TwoViewConstantCamera()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = Synthesize(2, 1, 1, 100);
 		AddPoint2DNoise(reconstruction, 1);
 		Reconstruction origReconstruction = reconstruction.Clone();
@@ -418,7 +415,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task BundleAdjusterBackendTest_PartiallyContainedTracks()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = Synthesize(3, 1, 1, 100, numPoints2DWithoutPoint3D: 0);
 		AddPoint2DNoise(reconstruction, 1);
 		ulong variablePoint3DId = reconstruction.Image(3).Points2D[0].Point3DId;
@@ -456,7 +452,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task BundleAdjusterBackendTest_MinimumTrackLength()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = Synthesize(3, 1, 1, 100, numPoints2DWithoutPoint3D: 0);
 		AddPoint2DNoise(reconstruction, 1);
 
@@ -482,7 +477,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task BundleAdjusterBackendTest_MinimumTrackLengthWithExternalObservations()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = Synthesize(3, 1, 1, 100, numPoints2DWithoutPoint3D: 0);
 		AddPoint2DNoise(reconstruction, 1);
 
@@ -512,7 +506,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task BundleAdjusterBackendTest_ConstantPoints()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = Synthesize(2, 1, 1, 100);
 		AddPoint2DNoise(reconstruction, 1);
 		Reconstruction origReconstruction = reconstruction.Clone();
@@ -548,7 +541,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task BundleAdjusterBackendTest_ConstantPoints3D()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = Synthesize(2, 1, 1, 20);
 		AddPoint2DNoise(reconstruction, 1);
 		Reconstruction originalReconstruction = reconstruction.Clone();
@@ -573,7 +565,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task BundleAdjusterBackendTest_VariableImage()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = Synthesize(3, 1, 1, 100);
 		AddPoint2DNoise(reconstruction, 1);
 		Reconstruction origReconstruction = reconstruction.Clone();
@@ -600,7 +591,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task BundleAdjusterBackendTest_ConstantFocalLengthAndExtraParams()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = Synthesize(2, 1, 1, 100);
 		AddPoint2DNoise(reconstruction, 1);
 		Reconstruction origReconstruction = reconstruction.Clone();
@@ -631,7 +621,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task BundleAdjusterBackendTest_VariablePrincipalPoint()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = Synthesize(2, 1, 1, 100);
 		AddPoint2DNoise(reconstruction, 1);
 		Reconstruction origReconstruction = reconstruction.Clone();
@@ -659,7 +648,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task BundleAdjusterBackendTest_IgnorePoint()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = Synthesize(2, 1, 1, 100);
 		AddPoint2DNoise(reconstruction, 1);
 

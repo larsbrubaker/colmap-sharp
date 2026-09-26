@@ -7,9 +7,9 @@
 // TEST(Rigid3d, ApplyChain) although it tests Sim3d; the name is kept. The comparisons
 // against pycolmap are in GeometryOracleTests (C#-only), which states each function's tier.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so each test starts with
-// RandomUtils.SetPRNGSeed(0) and draws everything before its first await (the PRNG is per
-// thread and an await may resume elsewhere).
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test draws everything before its first await (the PRNG is per thread and an
+// await may resume elsewhere).
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
@@ -74,7 +74,6 @@ public class Sim3dTests
 	[Test]
 	public async Task Sim3d_Inverse()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Sim3d bFromA = TestSim3d();
 		Sim3d aFromB = bFromA.Inverse();
 		var results = new List<bool>();
@@ -91,7 +90,6 @@ public class Sim3dTests
 	[Test]
 	public async Task Sim3d_ToMatrix()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Sim3d bFromA = TestSim3d();
 		Matrix3x4d bFromAMat = bFromA.ToMatrix();
 		var errors = new List<double>();
@@ -107,7 +105,6 @@ public class Sim3dTests
 	[Test]
 	public async Task Sim3d_FromMatrix()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Sim3d b1FromA = TestSim3d();
 		Sim3d b2FromA = Sim3d.FromMatrix(b1FromA.ToMatrix());
 		var results = new List<bool>();
@@ -151,7 +148,6 @@ public class Sim3dTests
 	[Test]
 	public async Task Rigid3d_ApplyChain()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Sim3d bFromA = TestSim3d();
 		Sim3d cFromB = TestSim3d();
 		Sim3d dFromC = TestSim3d();
@@ -165,7 +161,6 @@ public class Sim3dTests
 	[Test]
 	public async Task Sim3d_Compose()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Sim3d bFromA = TestSim3d();
 		Sim3d cFromB = TestSim3d();
 		Sim3d dFromC = TestSim3d();
@@ -186,7 +181,6 @@ public class Sim3dTests
 		try
 		{
 			string path = Path.Combine(dir, "file.txt");
-			RandomUtils.SetPRNGSeed(0);
 			Sim3d written = TestSim3d();
 			written.ToFile(path);
 			Sim3d read = Sim3d.FromFile(path);

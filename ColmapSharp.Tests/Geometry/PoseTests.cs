@@ -7,9 +7,9 @@
 // tolerances are the bar. The comparisons against pycolmap are in
 // GeometryTwoViewOracleTests (C#-only).
 //
-// Each test seeds the PRNG with 0, as COLMAP's gtest_main does, and draws everything
-// before its first await (the PRNG is per thread). Loops collect their per-iteration
-// results and assert them together.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test draws everything before its first await (the PRNG is per thread). Loops
+// collect their per-iteration results and assert them together.
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
@@ -63,7 +63,6 @@ public class PoseTests
 	[Test]
 	public async Task DecomposeProjectionMatrix_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var failures = new List<int>();
 		for (int i = 1; i < 100; ++i)
 		{
@@ -85,7 +84,6 @@ public class PoseTests
 	[Test]
 	public async Task RotationMatrixToAngleAxis_Roundtrip()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Matrix3d r = RandomEigen.RandomEigenQuaterniond().ToRotationMatrix();
 		await Assert.That(EigenMatrixNear(Pose.AngleAxisToRotationMatrix(Pose.RotationMatrixToAngleAxis(r)), r, 1e-6)).IsTrue();
 	}
@@ -93,7 +91,6 @@ public class PoseTests
 	[Test]
 	public async Task AngleAxisToRotationMatrix_Roundtrip()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d w = RandomAngleAxisVector();
 		await Assert.That(EigenMatrixNear(Pose.RotationMatrixToAngleAxis(Pose.AngleAxisToRotationMatrix(w)), w, 1e-6)).IsTrue();
 	}
@@ -146,7 +143,6 @@ public class PoseTests
 	[Test]
 	public async Task InterpolateCameraPoses_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Rigid3d camFromWorld1 = RandomRigid3d();
 		Rigid3d camFromWorld2 = RandomRigid3d();
 
@@ -247,7 +243,6 @@ public class PoseTests
 	[Test]
 	public async Task GravityAlignedRotation_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d gravity1 = new Vector3d(0.5, 0.5, 0.5).Normalized();
 		Matrix3d r1 = Pose.GravityAlignedRotation(gravity1);
 		Matrix3d r2 = Pose.GravityAlignedRotation(Vector3d.UnitY);
@@ -275,7 +270,6 @@ public class PoseTests
 	[Test]
 	public async Task YAxisAngleFromRotation_Roundtrip()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var failures = new List<int>();
 		for (int i = 0; i < 100; ++i)
 		{
@@ -336,7 +330,6 @@ public class PoseTests
 	[Test]
 	public async Task QuaternionFromAngleAxis_Roundtrip()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var failures = new List<int>();
 		for (int i = 0; i < 100; ++i)
 		{
@@ -362,7 +355,6 @@ public class PoseTests
 	public async Task LeftJacobianFromAngleAxis_RelationToRight()
 	{
 		// Jr(w) = Jl(-w) for all w.
-		RandomUtils.SetPRNGSeed(0);
 		var failures = new List<int>();
 		for (int i = 0; i < 100; ++i)
 		{
@@ -408,7 +400,6 @@ public class PoseTests
 	public async Task RightJacobianFromAngleAxis_NumericDerivative()
 	{
 		// Verify Jr by numeric differentiation of Exp(w + dw) ~ Exp(w) * Exp(Jr*dw).
-		RandomUtils.SetPRNGSeed(0);
 		var failures = new List<int>();
 		for (int i = 0; i < 50; ++i)
 		{
@@ -426,7 +417,6 @@ public class PoseTests
 	public async Task LeftJacobianFromAngleAxis_NumericDerivative()
 	{
 		// Verify Jl by numeric differentiation of Exp(w + dw) ~ Exp(Jl*dw) * Exp(w).
-		RandomUtils.SetPRNGSeed(0);
 		var failures = new List<int>();
 		for (int i = 0; i < 50; ++i)
 		{

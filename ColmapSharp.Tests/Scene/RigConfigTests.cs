@@ -7,9 +7,9 @@
 // All cases are Tier A (bookkeeping; the only arithmetic is copied through). C#-only cases
 // are in RigConfigTests.CSharpOnly.cs.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test, so each test that draws
-// starts with RandomUtils.SetPRNGSeed(0) and draws everything before its first await (the
-// PRNG is per thread and an await may resume elsewhere).
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test that draws does so before its first await (the PRNG is per thread and an
+// await may resume elsewhere).
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
@@ -219,7 +219,6 @@ public partial class RigConfigTests
 	[Test]
 	public async Task ApplyRigConfig_WithReconstruction()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		CreateTestData(numFrames: 5, numCamerasPerRig: 2, database, reconstruction);
@@ -240,7 +239,6 @@ public partial class RigConfigTests
 	[Test]
 	public async Task ApplyRigConfig_WithDifferingDatabaseAndReconstructionIds()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		CreateTestData(numFrames: 5, numCamerasPerRig: 2, database, reconstruction);
@@ -309,7 +307,6 @@ public partial class RigConfigTests
 	[Test]
 	public async Task ApplyRigConfig_WithPartialReconstruction()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		CreateTestData(numFrames: 5, numCamerasPerRig: 2, database, reconstruction);
@@ -336,7 +333,6 @@ public partial class RigConfigTests
 	[Test]
 	public async Task ApplyRigConfig_WithoutReconstruction()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		CreateTestData(numFrames: 5, numCamerasPerRig: 2, database, reconstruction);
@@ -360,7 +356,6 @@ public partial class RigConfigTests
 	[Test]
 	public async Task ApplyRigConfig_WithUnconfiguredSingleAndConfiguredMultiCameraRigs()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		var reconstruction = new Reconstruction();
 		var options = new SyntheticDatasetOptions

@@ -9,8 +9,9 @@
 //
 // Translation notes: a default OptionManager is `new BundleAdjustmentOptions()` (the
 // controller takes OptionManager::bundle_adjustment, docs/CPP_DIVERGENCES.md entry 67);
-// std::make_shared<Reconstruction>(gt) is gt.Clone(). The PRNG is seeded with 0 like
-// gtest_main, and all work happens before the first await (the PRNG is per thread).
+// std::make_shared<Reconstruction>(gt) is gt.Clone(). The PRNG is seeded with 0 before
+// every test (PrngTestIsolation, like gtest_main), and all work happens before the first
+// await (the PRNG is per thread).
 
 using ColmapSharp.Controllers;
 using ColmapSharp.Estimators;
@@ -40,7 +41,6 @@ public class BundleAdjustmentControllerTests
 	[Test]
 	public async Task BundleAdjustmentController_StopsBeforeOptimization()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var gtReconstruction = new Reconstruction();
 		var syntheticOptions = new SyntheticDatasetOptions { NumRigs = 1, NumCamerasPerRig = 1, NumFramesPerRig = 3, NumPoints3D = 50 };
 		Synthetic.SynthesizeDataset(syntheticOptions, gtReconstruction);
@@ -63,7 +63,6 @@ public class BundleAdjustmentControllerTests
 	[Test]
 	public async Task BundleAdjustmentController_Reconstruction()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var gtReconstruction = new Reconstruction();
 		var syntheticOptions = new SyntheticDatasetOptions { NumRigs = 1, NumCamerasPerRig = 2, NumFramesPerRig = 3, NumPoints3D = 100 };
 		Synthetic.SynthesizeDataset(syntheticOptions, gtReconstruction);

@@ -9,9 +9,10 @@
 //
 // The RefineFundamentalMatrixSampson cases test the TinySolver refiner (Tier C).
 //
-// Each test seeds the PRNG with 0, as COLMAP's gtest_main does, and draws everything before
-// its first await (the PRNG is per thread). The loops record EXPECT_* / ADD_FAILURE failures
-// in an ExpectationLog and the test asserts it is empty.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test draws everything before its first await (the PRNG is per thread). The loops
+// record EXPECT_* / ADD_FAILURE failures in an ExpectationLog and the test asserts it is
+// empty.
 
 using ColmapSharp.Estimators.Solvers;
 using ColmapSharp.Geometry;
@@ -69,7 +70,6 @@ public class FundamentalMatrixTests
 	[Test]
 	public async Task FundamentalSevenPointEstimator_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const int kNumPoints = 7;
 		var log = new ExpectationLog();
 		for (int k = 0; k < 100; ++k)
@@ -131,7 +131,6 @@ public class FundamentalMatrixTests
 	[Arguments(1024)]
 	public async Task FundamentalMatrixEightPointEstimatorTests_Nominal(int kNumPoints)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var log = new ExpectationLog();
 		for (int k = 0; k < 100; ++k)
 		{
@@ -153,7 +152,6 @@ public class FundamentalMatrixTests
 	[Arguments(1024)]
 	public async Task FundamentalMatrixEightPointEstimatorTests_NumericalStability(int kNumPoints)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const double kCoordinateScale = 1e3;
 		var log = new ExpectationLog();
 		for (int k = 0; k < 100; ++k)
@@ -176,7 +174,6 @@ public class FundamentalMatrixTests
 	[Arguments(1024)]
 	public async Task FundamentalMatrixEightPointEstimatorTests_NoiseStability(int kNumPoints)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const double kNoise = 1e-4;
 		var log = new ExpectationLog();
 		for (int k = 0; k < 100; ++k)
@@ -202,7 +199,6 @@ public class FundamentalMatrixTests
 	[Test]
 	public async Task RefineFundamentalMatrixSampson_IsFixedPointAtOptimum()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const int kNumPoints = 64;
 		var successes = new List<bool>();
 		var errors = new List<double>();
@@ -235,7 +231,6 @@ public class FundamentalMatrixTests
 	[Test]
 	public async Task RefineFundamentalMatrixSampson_PreservesRankTwo()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const int kNumPoints = 100;
 		var (points1, points2, f) = RandomProblem(kNumPoints, coordinateScale: 1);
 		AddNoise(0.5, points1, points2);
@@ -252,7 +247,6 @@ public class FundamentalMatrixTests
 	[Test]
 	public async Task RefineFundamentalMatrixSampson_RejectsDegenerateModels()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		const int kNumPoints = 32;
 		var (points1, points2, _) = RandomProblem(kNumPoints, coordinateScale: 1);
 

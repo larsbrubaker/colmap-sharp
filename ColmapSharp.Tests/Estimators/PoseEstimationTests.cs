@@ -6,8 +6,8 @@
 // PoseEstimation.cs (and, through the covariance checks, Solver/Covariance.cs). Tier C:
 // RANSAC and the nonlinear refinement are judged by outcome at COLMAP's tolerances.
 //
-// Each test seeds the PRNG with 0, as COLMAP's gtest_main does, and draws everything before
-// its first await (the PRNG is per thread).
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does,
+// and each test draws everything before its first await (the PRNG is per thread).
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Geometry;
@@ -85,7 +85,6 @@ public class PoseEstimationTests
 	[Test]
 	public async Task EstimateAbsolutePose_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		AbsolutePoseProblem problem = CreateAbsolutePoseTestData();
 
 		var options = new AbsolutePoseEstimationOptions();
@@ -104,7 +103,6 @@ public class PoseEstimationTests
 	[Test]
 	public async Task EstimateAbsolutePose_EstimateFocalLength()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		AbsolutePoseProblem problem = CreateAbsolutePoseTestData();
 
 		var options = new AbsolutePoseEstimationOptions { EstimateFocalLength = true };
@@ -125,7 +123,6 @@ public class PoseEstimationTests
 	[Test]
 	public async Task EstimateAbsolutePose_EstimateSeparateFocalLengths()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		// PINHOLE camera with distinct fx and fy (fx, fy, cx, cy).
 		AbsolutePoseProblem problem = CreateAbsolutePoseTestData(CameraModelId.Pinhole, [1280, 1000, 512, 384]);
 
@@ -146,7 +143,6 @@ public class PoseEstimationTests
 	[Test]
 	public async Task EstimateRelativePose_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Camera camera = Camera.CreateFromModelId(1, CameraModelId.SimplePinhole, 512.0, 1024, 1024);
 		var cam1FromWorld = new Rigid3d();
 		var cam2FromWorld = new Rigid3d(Quaterniond.Identity, new Vector3d(1, 0.1, 0.2).Normalized());
@@ -177,7 +173,6 @@ public class PoseEstimationTests
 	[Test]
 	public async Task EstimateRelativePose_ZeroSentinelRaysExcluded()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Camera camera = Camera.CreateFromModelId(1, CameraModelId.SimplePinhole, 512.0, 1024, 1024);
 		var cam1FromWorld = new Rigid3d();
 		var cam2FromWorld = new Rigid3d(Quaterniond.Identity, new Vector3d(1, 0.1, 0.2).Normalized());
@@ -221,7 +216,6 @@ public class PoseEstimationTests
 	[Test]
 	public async Task RefineAbsolutePose_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		AbsolutePoseProblem problem = CreateAbsolutePoseTestData();
 		bool[] inlierMask = Enumerable.Repeat(true, problem.Points2D.Count).ToArray();
 
@@ -244,7 +238,6 @@ public class PoseEstimationTests
 	[Test]
 	public async Task RefineAbsolutePose_RefineFocalLength()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		AbsolutePoseProblem problem = CreateAbsolutePoseTestData();
 		bool[] inlierMask = Enumerable.Repeat(true, problem.Points2D.Count).ToArray();
 
@@ -267,7 +260,6 @@ public class PoseEstimationTests
 	[Test]
 	public async Task RefineAbsolutePose_RefineExtraParams()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		AbsolutePoseProblem problem = CreateAbsolutePoseTestData();
 		bool[] inlierMask = Enumerable.Repeat(true, problem.Points2D.Count).ToArray();
 
@@ -290,7 +282,6 @@ public class PoseEstimationTests
 	[Test]
 	public async Task RefineAbsolutePose_PositionPrior()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		AbsolutePoseProblem problem = CreateAbsolutePoseTestData();
 		// Isolate the position-prior-only refinement path without reprojection terms.
 		bool[] inlierMask = new bool[problem.Points2D.Count];
@@ -318,7 +309,6 @@ public class PoseEstimationTests
 	[Test]
 	public async Task RefineAbsolutePose_PositionPriorCovariance()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		AbsolutePoseProblem problem = CreateAbsolutePoseTestData();
 		bool[] inlierMask = Enumerable.Repeat(true, problem.Points2D.Count).ToArray();
 
@@ -360,7 +350,6 @@ public class PoseEstimationTests
 	[Test]
 	public async Task RefineEssentialMatrix_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var cam1FromWorld = new Rigid3d();
 		var cam2FromWorld = new Rigid3d(Quaterniond.Identity, new Vector3d(1, 0, 0).Normalized());
 		Matrix3d e = EssentialMatrix.EssentialMatrixFromPose(cam2FromWorld * cam1FromWorld.Inverse());

@@ -7,7 +7,7 @@
 // the mocked method is called with (x matches Rigid3dEq(x), y matches Rigid3dEq(y)); with
 // predicates that is the matcher applied to (x, x) and (y, y).
 //
-// Each test seeds the PRNG with 0 first, as COLMAP's gtest_main does.
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does.
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
@@ -38,7 +38,6 @@ public class Rigid3dMatchersTests
 	[Test]
 	public async Task Rigid3d_Eq()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var x = new Rigid3d(RandomEigen.RandomEigenQuaterniond(), RandomEigen.RandomEigenVector3d());
 		Rigid3d y = x;
 		bool equal = Rigid3dEq(x, y);
@@ -60,7 +59,6 @@ public class Rigid3dMatchersTests
 	[Test]
 	public async Task Rigid3d_Near()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var x = new Rigid3d(RandomEigen.RandomEigenQuaterniond(), RandomEigen.RandomEigenVector3d());
 		Rigid3d y = x;
 		bool near = Rigid3dNear(x, y, rtol: 1e-8, ttol: 1e-8);

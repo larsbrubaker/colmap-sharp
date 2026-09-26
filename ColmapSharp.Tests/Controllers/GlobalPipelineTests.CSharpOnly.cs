@@ -31,7 +31,6 @@ public partial class GlobalPipelineTests
 	[Test]
 	public async Task CSharpOnly_ProgressReportsEveryStage()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using InMemoryDatabase database = Synthesize(SmallDatasetOptions(), new Reconstruction());
 
 		var stages = new List<GlobalPipelineStage>();
@@ -63,7 +62,6 @@ public partial class GlobalPipelineTests
 	[Test]
 	public async Task CSharpOnly_CancelledTokenMapsNothing()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using InMemoryDatabase database = Synthesize(SmallDatasetOptions(), new Reconstruction());
 
 		var reconstructionManager = new ReconstructionManager();

@@ -8,8 +8,8 @@
 // place of the spanning-tree initialization. The ported cases and the shared helpers are in
 // RotationAveragingTests.cs. Tier C (outcome): relative rotations against ground truth.
 //
-// COLMAP's gtest_main seeds the PRNG with 0 before every test; tests seed and draw before
-// their first await (the PRNG is thread-local).
+// PrngTestIsolation seeds the PRNG with 0 before every test, as COLMAP's gtest_main does;
+// tests draw before their first await (the PRNG is thread-local).
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Geometry;
@@ -85,7 +85,6 @@ public partial class RotationAveragingTests
 	[Arguments(false)]
 	public async Task CSharpOnly_ProblemAndSolverWithoutNoise(bool useGravity)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SingleRigOptions(numCamerasPerRig: 1, numFramesPerRig: 5));
 		InitializePerturbed(data, maxPerturbationDeg: 10);
 
@@ -105,7 +104,6 @@ public partial class RotationAveragingTests
 	[Arguments(false)]
 	public async Task CSharpOnly_ProblemAndSolverWithKnownRig(bool useGravity)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SingleRigOptions(numCamerasPerRig: 2, numFramesPerRig: 4));
 		InitializePerturbed(data, maxPerturbationDeg: 10);
 
@@ -133,7 +131,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task CSharpOnly_ProblemAndSolverEstimateUnknownCamFromRig()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SingleRigOptions(numCamerasPerRig: 2, numFramesPerRig: 4));
 		foreach ((uint rigId, Rig rig) in data.Reconstruction.Rigs)
 		{
@@ -179,7 +176,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task CSharpOnly_ConstraintMatrixLayout()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SingleRigOptions(numCamerasPerRig: 1, numFramesPerRig: 5));
 		HashSet<uint> imageIds = AllImageIds(data.Reconstruction);
 		int numPairs = data.PoseGraph.NumEdges;
@@ -212,7 +208,6 @@ public partial class RotationAveragingTests
 	[Arguments(false)]
 	public async Task CSharpOnly_InlierMatchCountReweighting(bool useGravity)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SingleRigOptions(numCamerasPerRig: 1, numFramesPerRig: 5));
 		int counter = 1;
 		foreach (PoseGraph.Edge edge in data.PoseGraph.Edges.Values)
@@ -273,7 +268,6 @@ public partial class RotationAveragingTests
 	[Test]
 	public async Task CSharpOnly_DeterministicWithSeed()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		TestData data = CreateTestData(SingleRigOptions(numCamerasPerRig: 1, numFramesPerRig: 5));
 		InitializePerturbed(data, maxPerturbationDeg: 10);
 		Reconstruction recon1 = data.Reconstruction.Clone();

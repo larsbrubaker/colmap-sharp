@@ -65,7 +65,6 @@ public class TriangulationEstimationTests
 	[Arguments(TriangulationEstimator.ResidualType.ReprojectionError)]
 	public async Task CSharpOnly_EstimateTriangulation_Nominal(TriangulationEstimator.ResidualType residualType)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = SynthesizeScene();
 		var options = new EstimateTriangulationOptions { ResidualType = residualType };
 		if (residualType == TriangulationEstimator.ResidualType.ReprojectionError)
@@ -98,7 +97,6 @@ public class TriangulationEstimationTests
 	[Test]
 	public async Task CSharpOnly_EstimateTriangulation_RejectsOutlier()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = SynthesizeScene();
 		var options = new EstimateTriangulationOptions();
 
@@ -129,7 +127,6 @@ public class TriangulationEstimationTests
 	[Test]
 	public async Task CSharpOnly_EstimateTriangulation_Equirectangular()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Reconstruction reconstruction = SynthesizeScene(CameraModelId.Equirectangular);
 		var options = new EstimateTriangulationOptions();
 

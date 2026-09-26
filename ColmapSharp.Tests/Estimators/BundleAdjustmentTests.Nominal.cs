@@ -9,8 +9,8 @@
 // Estimators/BundleAdjustmentCeres.PosePrior.cs). CERES backend only, as in
 // BundleAdjustmentTests.cs. Tier C: the outcome bounds are COLMAP's.
 //
-// Translation notes: the SQLite test database is an InMemoryDatabase. COLMAP's gtest_main
-// reseeds the PRNG with 0 at every test start; each case does the same first.
+// Translation notes: the SQLite test database is an InMemoryDatabase. PrngTestIsolation
+// seeds the PRNG with 0 before every test, as COLMAP's gtest_main does.
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Geometry;
@@ -63,7 +63,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task BundleAdjusterBackendTest_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		(Reconstruction gtReconstruction, Reconstruction reconstruction) = SynthesizeNoisy(1, 10, 200);
 
 		var config = new BundleAdjustmentConfig();
@@ -99,7 +98,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task BundleAdjusterBackendTest_NominalMultiCameraRigConstantSensorFromRig()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		(Reconstruction gtReconstruction, Reconstruction reconstruction) = SynthesizeNoisy(2, 10, 200);
 
 		var config = new BundleAdjustmentConfig();
@@ -130,7 +128,6 @@ public partial class BundleAdjustmentTests
 	[Test]
 	public async Task PosePriorBundleAdjusterBackendTest_Nominal()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var database = new InMemoryDatabase();
 		(Reconstruction gtReconstruction, Reconstruction reconstruction) = SynthesizeNoisy(1, 7, 100, database);
 

@@ -28,7 +28,6 @@ public partial class DatabaseTests
 	[Test]
 	public async Task ParameterizedDatabaseTests_TwoViewGeometry()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		const uint ImageId1 = 1;
 		const uint ImageId2 = 2;
@@ -143,7 +142,6 @@ public partial class DatabaseTests
 	[Test]
 	public async Task ParameterizedDatabaseTests_TwoViewGeometryWithoutCameras()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database = new InMemoryDatabase();
 		const uint ImageId1 = 1;
 		const uint ImageId2 = 2;
@@ -178,7 +176,6 @@ public partial class DatabaseTests
 	[Test]
 	public async Task ParameterizedDatabaseTests_Merge()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using var database1 = new InMemoryDatabase();
 		using var database2 = new InMemoryDatabase();
 
@@ -387,7 +384,6 @@ public partial class DatabaseTests
 	[Test]
 	public async Task LoadRandomDatabaseDescriptorsTest_LoadSubset()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using Database database = CreateDatabaseWithRandomDescriptors([10, 20, 30]);
 		FeatureDescriptorsFloat result = Database.LoadRandomDatabaseDescriptors(database, 10);
 		await ExpectDescriptors(result, 10, FeatureExtractorType.Sift);
@@ -396,7 +392,6 @@ public partial class DatabaseTests
 	[Test]
 	public async Task LoadRandomDatabaseDescriptorsTest_LoadSubsetWithSomeEmpty()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		using Database database = CreateDatabaseWithRandomDescriptors([0, 10, 0, 15, 0, 20, 0]);
 		FeatureDescriptorsFloat result = Database.LoadRandomDatabaseDescriptors(database, 15);
 		await ExpectDescriptors(result, 15, FeatureExtractorType.Sift);

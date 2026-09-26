@@ -11,8 +11,8 @@
 // Translation notes: the gtest fixtures (IncrementalMapperTest and
 // IncrementalMapperLargeDatasetTest) are the Fixture class, constructed per test with the
 // fixture's number of frames per rig; TearDown is Fixture.TearDown. The in-memory SQLite
-// database is InMemoryDatabase. COLMAP's gtest_main seeds the PRNG with 0 before every test;
-// the PRNG is per thread, so each test seeds it (in the Fixture) and does all of its mapping
+// database is InMemoryDatabase. PrngTestIsolation seeds the PRNG with 0 before every test,
+// as COLMAP's gtest_main does; the PRNG is per thread, so each test does all of its mapping
 // before its first await, collecting values to assert afterwards. ASSERT_* preconditions
 // throw through Require.
 
@@ -68,7 +68,6 @@ public class IncrementalMapperTests
 		// priorPosition is for the C#-only pose-prior test at the bottom.
 		public Fixture(int numFramesPerRig = 5, bool priorPosition = false)
 		{
-			RandomUtils.SetPRNGSeed(0);
 			SyntheticDatasetOptions syntheticOptions = DefaultSyntheticOptions();
 			syntheticOptions.NumFramesPerRig = numFramesPerRig;
 			syntheticOptions.PriorPosition = priorPosition;
@@ -194,7 +193,6 @@ public class IncrementalMapperTests
 	[Test]
 	public async Task IncrementalMapper_GettersAfterBeginReconstruction()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var gtReconstruction = new Reconstruction();
 		using var database = new InMemoryDatabase();
 		Synthetic.SynthesizeDataset(DefaultSyntheticOptions(), gtReconstruction, database);

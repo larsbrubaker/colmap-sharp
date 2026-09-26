@@ -9,11 +9,11 @@
 // scenes, exactly the counts C++ expects.
 //
 // Translation notes: the in-memory SQLite database is InMemoryDatabase and DatabaseCache is
-// loaded from it, as in the other ported tests. COLMAP's gtest_main seeds the PRNG with 0
-// before every test; the PRNG is per thread, so each test seeds it and does all of its
-// synthesis and triangulation before its first await. FlatHashSet{...} arguments are
-// collection expressions. `Points3D().begin()` is the first point in the port's ascending id
-// order; any point satisfies the C++ test.
+// loaded from it, as in the other ported tests. PrngTestIsolation seeds the PRNG with 0
+// before every test, as COLMAP's gtest_main does; the PRNG is per thread, so each test does
+// all of its synthesis and triangulation before its first await. FlatHashSet{...} arguments
+// are collection expressions. `Points3D().begin()` is the first point in the port's
+// ascending id order; any point satisfies the C++ test.
 
 using ColmapSharp.Mathematics;
 using ColmapSharp.Scene;
@@ -80,7 +80,6 @@ public class IncrementalTriangulatorTests
 
 	private static (Reconstruction Reconstruction, CorrespondenceGraph Graph) Synthesize(int numFramesPerRig, int numPoints3D)
 	{
-		RandomUtils.SetPRNGSeed(0);
 		var reconstruction = new Reconstruction();
 		var syntheticOptions = new SyntheticDatasetOptions
 		{

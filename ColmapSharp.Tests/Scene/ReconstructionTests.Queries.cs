@@ -210,7 +210,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_ComputeNumObservations()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d xyz = RandomEigen.RandomEigenVector3d();
 		Reconstruction reconstruction = GenerateReconstruction(2);
 		ulong point3DId1 = reconstruction.AddPoint3D(xyz, new Track());
@@ -226,7 +225,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_ComputeMeanTrackLength()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d xyz = RandomEigen.RandomEigenVector3d();
 		Reconstruction reconstruction = GenerateReconstruction(2);
 		await Assert.That(reconstruction.ComputeMeanTrackLength()).IsEqualTo(0.0);
@@ -243,7 +241,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_ComputeMeanObservationsPerRegImage()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d xyz = RandomEigen.RandomEigenVector3d();
 		Reconstruction reconstruction = GenerateReconstruction(2);
 		await Assert.That(reconstruction.ComputeMeanObservationsPerRegImage()).IsEqualTo(0.0);
@@ -260,7 +257,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_ComputeMeanReprojectionError()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d xyz = RandomEigen.RandomEigenVector3d();
 		Reconstruction reconstruction = GenerateReconstruction(2);
 		await Assert.That(reconstruction.ComputeMeanReprojectionError()).IsEqualTo(0.0);
@@ -294,7 +290,6 @@ public partial class ReconstructionTests
 	[Test]
 	public async Task Reconstruction_IsValid()
 	{
-		RandomUtils.SetPRNGSeed(0);
 		Vector3d xyz = RandomEigen.RandomEigenVector3d();
 		Reconstruction reconstruction = GenerateReconstruction(2);
 		var track = new Track();
