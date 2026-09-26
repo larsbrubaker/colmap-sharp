@@ -1344,3 +1344,59 @@ id from the map key, so file output is the same either way.
 cameras: each id equals its map key, rig lookups by `SensorId` succeed, and `Crop` keeps both
 cameras) failed before the change and passes after it; the ported undistortion_test.cc cases
 pass unchanged.
+
+## 62. Reading a truncated MVS .bin file throws
+
+**What differs.** `Mvs/Mat.cs` `Read` (and so `DepthMap`/`NormalMap`, and
+`ConsistencyGraph`'s payload reader) throws `EndOfStreamException` when the file holds fewer
+elements than its `width&height&depth&` header announces. COLMAP's `Mat<float>::Read` reads
+element by element with `ReadBinaryLittleEndian`, whose stream silently fails at end of file,
+leaving the rest of the buffer with whatever the stream read produced (unspecified values)
+and no error.
+
+**Why.** A real upstream robustness bug: a half-written depth map (a crash or a cancelled
+PatchMatch run, which MatterCAD's cancel button makes routine) would otherwise be fused as
+garbage depths. Well-formed files read identically.
+
+**Evidence.** `MatTests.Mat_ReadInvalid` (C#-only) pins the throw; `Mat_WriteReadByteExact`
+and `ConsistencyGraph_WriteByteExact` pin that complete files are byte-identical to COLMAP's
+format.
+
+## 63. The MVS projection matrices can differ from COLMAP's in the last float bits
+
+**What differs.** Two things in `Mvs/Image.cs`, both Tier B:
+- `ComposeInverseProjectionMatrix` inverts the float 4x4 `[K [R | T]; 0 0 0 1]` with the
+  textbook adjugate (Laplace expansion over 2x2 minors) where COLMAP calls Eigen's
+  `Matrix4f::inverse()`. Both are exact up to float rounding, but the rounding of the
+  operations differs, so `GetInvP` can differ from COLMAP in the last bits.
+- The fixed-size float products (`P = K [R | T]`, `RotatePose`, `ComputeRelativePose`,
+  `ComputeProjectionCenter`) are summed in Eigen's coefficient order as separate multiplies
+  and adds. Eigen 3.4 on aarch64 may evaluate them with a fused multiply-add (`pmadd`), and
+  compilers with `-ffp-contract=on` may fuse them too, so last-bit differences are possible
+  from FMA contraction on the C++ side (as in entry 1). K, R and T themselves, the sizes and
+  Rescale's K scaling are exact.
+
+**Why.** Eigen is excluded (docs/LICENSE_AUDIT.md); its 4x4 inverse cannot be transcribed.
+CLAUDE.md's "No FMA" rule keeps the products unfused so results are the same on every
+platform.
+
+**Evidence.** `MvsImageTests.Image_InverseProjectionMatrix` (C#-only): `P * InvP` is the
+identity within 8 float epsilons of the summed products for a realistic camera. The ported
+image_test.cc cases pass with gtest's 4-ulp EXPECT_FLOAT_EQ. No oracle fixture pins the
+products bit for bit. PatchMatch (the only consumer) is Tier C.
+
+## 64. GetMaxOverlappingImages orders equal shared-point counts by image index
+
+**What differs.** `mvs::Model::GetMaxOverlappingImages` (model.cc) sorts each image's
+overlapping images by shared-point count, descending, with `std::partial_sort` or
+`std::sort`, which leave images with equal counts in an implementation-defined order. The
+port (`Mvs/Model.cs`) breaks ties by ascending image index, the order the candidates come
+out of COLMAP's `std::map`. When a count tie straddles the `num_images` cut-off, the chosen
+source images can differ from COLMAP's.
+
+**Why.** Reproducing libc++'s heap-based `partial_sort` and introsort exactly would tie the
+result to one standard library version; the index order is deterministic (as entries 40
+and 57).
+
+**Evidence.** `ModelTests.Model_GetMaxOverlappingImagesTies` (C#-only) pins the order;
+`Model_GetMaxOverlappingImages` (model_test.cc 1:1) passes.
