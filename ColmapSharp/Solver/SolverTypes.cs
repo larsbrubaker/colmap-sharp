@@ -158,6 +158,9 @@ public sealed class SolverOptions
 	/// <summary>The linear solver for the LM step.</summary>
 	public LinearSolverType LinearSolverType { get; set; } = LinearSolverType.SparseNormalCholesky;
 
+	/// <summary>Preconditioner of ITERATIVE_SCHUR (Ceres' default: JACOBI).</summary>
+	public PreconditionerType PreconditionerType { get; set; } = PreconditionerType.Jacobi;
+
 	/// <summary>Minimum iterations of an iterative linear solver.</summary>
 	public int MinLinearSolverIterations { get; set; }
 

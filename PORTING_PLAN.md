@@ -70,19 +70,25 @@ Then the estimators: `two_view_geometry`, `pose`, `generalized_pose`, `triangula
 
 ### Phase 7 — Nonlinear least-squares solver (Ceres replacement)
 Done: Jet/autodiff, losses, manifolds, Problem, LM trust region, DENSE_QR,
-DENSE_NORMAL_CHOLESKY, SPARSE_NORMAL_CHOLESKY (`Solver/`). Open: Schur solvers (DENSE_SCHUR,
-SPARSE_SCHUR, ITERATIVE_SCHUR with PCG + Jacobi/Schur-Jacobi) behind `LinearSolver.Create`
-with `numEliminateBlocks`; parameter bounds (`SetParameterLowerBound/UpperBound` + Ceres'
-projected line search; view-graph calibration needs them); `Problem.Evaluate` (covariance,
-view-graph calibration). Not ported on purpose: `Summary.FullReport` (log-only), Dogleg,
-inner iterations. Skipped Ceres tests: `trust_region_minimizer_test.cc`
-PowellsSingularFunctionUsingDogleg (Dogleg not used by COLMAP),
-GradientToleranceConvergenceUpdatesStep (needs bounds — port with them). Validate BA against
-pycolmap on synthetic scenes (Tier C).
-The simplicial sparse Cholesky factors a 1000-camera Schur-like pattern in ~3.5 s (scalar,
-~1.3 GFLOP/s): add a supernodal or 6x6-blocked numeric phase before BA at that scale.
-Cancellation is checked between iterations only (like COLMAP). Optional later speedup:
-Vector128 lanes in `Jet` (IEEE-exact, no FMA) need a CLAUDE.md rule clarification first.
+DENSE_NORMAL_CHOLESKY, SPARSE_NORMAL_CHOLESKY, DENSE_SCHUR, SPARSE_SCHUR, ITERATIVE_SCHUR
+(Jacobi/SchurJacobi), automatic Schur ordering (`Solver/`). Open: parameter bounds
+(`SetParameterLowerBound/UpperBound` + Ceres' projected line search; view-graph calibration
+and GlobalPositioner need them) with Ceres' GradientToleranceConvergenceUpdatesStep test;
+`Problem.Evaluate` (covariance, view-graph calibration); user `ParameterBlockOrdering` with
+several groups (`ApplyOrdering` + reorder_program_test ApplyOrderingOrderingTooSmall /
+ApplyOrderingNormal; GlobalPositioner needs it). Not ported on purpose: `Summary.FullReport`
+(log-only), Dogleg, inner iterations, SuiteSparse/LAPACK/Accelerate/NESDIS/SPSE/SUBSET/CGNR
+variants and their Ceres tests, static-size Schur specializations
+(SchurEliminatorForOneFBlock), unstable independent-set ordering, visibility-clustering
+preconditioners, Ceres' bit-packed cell-key tests.
+Performance (before BA at scale), keeping results bit-identical and thread-count independent:
+the Schur eliminator is ~88% of SPARSE_SCHUR (0.32 s/solve at 200 cams/20k pts, Release):
+fixed-size kernels for the 2/3/6 BA shapes, precomputed cell offsets (no Dictionary lookups),
+two-phase parallel elimination (per-chunk slots, then per-camera block rows in chunk order),
+cached E'E inverses for back substitution, parallel implicit products for ITERATIVE_SCHUR,
+blocked LLT for DENSE_SCHUR; supernodal/blocked simplicial Cholesky for large reduced systems.
+Cancellation is checked between iterations only (like COLMAP). Optional: Vector128 lanes in
+`Jet` (IEEE-exact, no FMA) need a CLAUDE.md rule clarification first.
 
 ### Phase 8 — Bundle adjustment
 `estimators/bundle_adjustment*` (the non-GPU paths), `cost_functions/*`,

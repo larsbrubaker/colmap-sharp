@@ -11,9 +11,10 @@
 // usable (CONVERGENCE, NO_CONVERGENCE, USER_SUCCESS; otherwise the original values are
 // restored) and fill in the summary.
 //
-// The parameter blocks keep Problem's insertion order; Ceres reorders them only for the
-// Schur solvers and for SuiteSparse's own fill-reducing ordering, which the simplicial
-// Cholesky here does itself (docs/CPP_DIVERGENCES.md entry 22).
+// The parameter blocks keep Problem's insertion order except for the Schur solvers, which
+// put the eliminated blocks first (SchurOrdering.cs); Ceres also reorders for SuiteSparse's
+// own fill-reducing ordering, which the simplicial Cholesky here does itself
+// (docs/CPP_DIVERGENCES.md entry 22).
 
 namespace ColmapSharp.Solver;
 
@@ -123,10 +124,18 @@ public static class LeastSquaresSolver
 			return pp;
 		}
 
+		// SetupLinearSolver: the Schur solvers eliminate an independent set of blocks, which
+		// reorders the program (ReorderProgramForSchurTypeLinearSolver).
 		LinearSolverType type = options.LinearSolverType;
-		pp.LinearSolver = LinearSolver.Create(type);
+		int numEliminateBlocks = LinearSolver.IsSchurType(type) ? SchurOrdering.ReorderProgramForSchurTypeLinearSolver(reduced) : 0;
+		pp.LinearSolver = LinearSolver.Create(new LinearSolverOptions(
+			type,
+			options.PreconditionerType,
+			numEliminateBlocks,
+			options.MinLinearSolverIterations,
+			options.MaxLinearSolverIterations));
 		bool dense = type is LinearSolverType.DenseQr or LinearSolverType.DenseNormalCholesky;
-		pp.Evaluator = new ProgramEvaluator(reduced, dense, numEliminateBlocks: 0, options.NumThreads);
+		pp.Evaluator = new ProgramEvaluator(reduced, dense, numEliminateBlocks, options.NumThreads);
 		pp.Jacobian = pp.Evaluator.CreateJacobian();
 		pp.Strategy = new LevenbergMarquardtStrategy(
 			pp.LinearSolver,

@@ -321,7 +321,7 @@ internal sealed class TrustRegionMinimizer
 	{
 		double strategyStartTime = Now;
 		iterationSummary = iterationSummary with { StepIsValid = false };
-		TrustRegionStrategySummary strategySummary = strategy.ComputeStep(jacobian, residuals, trustRegionStep);
+		TrustRegionStrategySummary strategySummary = strategy.ComputeStep(jacobian, residuals, trustRegionStep, options.Eta);
 		if (strategySummary.TerminationType == LinearSolverTerminationType.FatalError)
 		{
 			summary.Message =

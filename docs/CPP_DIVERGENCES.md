@@ -738,6 +738,48 @@ a long run of equal counts could differ.
 **Evidence.** `ReconstructionManagerTests.CSharpOnly_WriteOrdersByPointCountThenIndex` writes
 models with point counts 1, 2, 1, 2 and reads back sources 1, 3, 0, 2.
 
+## 35. The Schur solvers eliminate sequentially with dynamic-size kernels and their own sparse ordering
+
+**What differs.** `Solver/SchurEliminator.cs`, `SchurComplementSolvers.cs`,
+`ImplicitSchurComplement.cs`, `IterativeSchurSolver.cs` and `SchurOrdering.cs` port Ceres
+2.2's DENSE_SCHUR, SPARSE_SCHUR and ITERATIVE_SCHUR with these differences:
+1. The chunks (one E block's rows) are eliminated one after another in row order. Ceres runs
+   them in parallel and serializes the updates of each reduced-camera-matrix cell and
+   right-hand-side block with a mutex, so with `num_threads > 1` the order of additions into a
+   cell depends on scheduling. The order here is Ceres' single-threaded order.
+2. Only the dynamic-size eliminator is ported. Ceres picks a template specialization from the
+   Jacobian's static block sizes (for COLMAP's BA typically `<2, 3, 6>`, and
+   `SchurEliminatorForOneFBlock<2, 3, 6>` when there is a single camera block); those use
+   Eigen's fixed-size products and invert 3x3 E'E blocks with Eigen's cofactor `inverse()`,
+   where the port uses Ceres' naive loop kernels (`SmallBlas.cs`) and a Cholesky solve of the
+   identity (Ceres' own dynamic-size path). Results agree to rounding, not bit for bit.
+3. SPARSE_SCHUR factors the lower triangle of the reduced camera matrix with
+   `LinearAlgebra/SimplicialCholesky.cs` (AMD on the scalar pattern). Ceres with EIGEN_SPARSE
+   first reorders the F blocks by AMD on the block pattern of the Schur complement
+   (`ReorderSchurComplementColumnsUsingEigen`) and factors in natural order; with SuiteSparse
+   it uses CAMD/CHOLMOD. The factorization differs, as for SPARSE_NORMAL_CHOLESKY (entry 22).
+4. The CG vector reductions (dot products, norms) are left-to-right sums; Ceres uses Eigen's
+   (vectorized) `norm()`/`dot()` or per-thread partial sums.
+5. A non-positive-definite E'E or diagonal preconditioner block becomes NaN (the LM step is
+   then invalid and the radius shrinks), where Eigen's LLT leaves unspecified values.
+6. Only the automatic elimination ordering is ported (one elimination group: the greedy
+   independent set, `ComputeStableSchurOrdering`); a user `ParameterBlockOrdering` with
+   several groups (only COLMAP's global positioner sets one) is not.
+
+**Why.** CLAUDE.md's threading rule (sequential and parallel runs must give the same result;
+Ceres' multithreaded order is not reproducible anyway), and Eigen and SuiteSparse are
+replaced rather than ported (CLAUDE.md contract 2). Bundle adjustment is Tier C.
+
+**Evidence.** The ported Ceres tests pass with Ceres' tolerances:
+`SchurEliminatorTests` (reduced system and solution vs. the dense reference, 1e-14 relative),
+`ImplicitSchurComplementTests.SchurMatrixValuesTest` (1e-14), `SchurComplementSolverTests`
+and `IterativeSchurComplementSolverTests` (vs. DENSE_QR, 1e-10 and 1e-14),
+`ConjugateGradientsSolverTests` (4 ULP). `BundleAdjustmentProblemTests` runs every Schur
+solver: ground truth recovered (`RecoversGroundTruth`), DENSE_QR's optimum on noisy
+observations (`EverySolver_ReachesTheSameOptimum`, cost to 1e-9 relative, parameters to
+1e-6), and bit-identical results for 1 and 4 threads (`ThreadCount_DoesNotChangeTheResult`).
+Not compared against C++ Ceres.
+
 ## 40. ExtractTopScaleFeatures keeps equal-scale keypoints in input order
 
 **What differs.** COLMAP's `ExtractTopScaleFeatures` (feature/utils.cc) selects the largest

@@ -11,7 +11,8 @@
 // - The evaluator's gradient (robust loss, manifolds) agrees with central finite
 //   differences of its cost in the tangent space, and the dense and block-sparse Jacobians
 //   hold the same bits.
-// - Every linear solver, with and without a robust loss, recovers the ground truth.
+// - Every linear solver, with and without a robust loss, recovers the ground truth, and on
+//   noisy observations every solver (the Schur ones included) reaches DENSE_QR's optimum.
 // - Results are bit-identical for 1 and 4 evaluation threads.
 // - Cancellation and callbacks stop the solve with Ceres' termination types and leave the
 //   parameters where Ceres would.
@@ -194,6 +195,50 @@ public class BundleAdjustmentProblemTests
 		await Assert.That(scene.Rotations[1].SequenceEqual(truth.Rotations[1])).IsTrue();
 		await Assert.That(scene.Camera[1]).IsEqualTo(320.0);
 		await Assert.That(scene.Camera[2]).IsEqualTo(240.0);
+	}
+
+	// Observations off by a deterministic pseudo-noise of about a pixel, so the optimum has
+	// a non-zero cost and is not the ground truth.
+	private static Scene NoisyPerturbed()
+	{
+		Scene scene = Perturbed();
+		for (int k = 0; k < scene.Observations.Length; k++)
+		{
+			scene.Observations[k][0] += 0.8 * Math.Sin(1.7 * k);
+			scene.Observations[k][1] += 0.8 * Math.Cos(2.3 * k);
+		}
+
+		return scene;
+	}
+
+	[Test]
+	[MethodDataSource(typeof(CeresExampleTests), nameof(CeresExampleTests.AllLinearSolvers))]
+	public async Task EverySolver_ReachesTheSameOptimum(LinearSolverType linearSolver)
+	{
+		var options = new SolverOptions
+		{
+			MaxNumIterations = 100,
+			FunctionTolerance = 1e-12,
+			GradientTolerance = 1e-12,
+			ParameterTolerance = 1e-12,
+		};
+		Scene reference = NoisyPerturbed();
+		options.LinearSolverType = LinearSolverType.DenseQr;
+		SolverSummary expected = LeastSquaresSolver.Solve(options, BuildProblem(reference, new CauchyLoss(1.0)));
+		Scene scene = NoisyPerturbed();
+		options.LinearSolverType = linearSolver;
+		SolverSummary summary = LeastSquaresSolver.Solve(options, BuildProblem(scene, new CauchyLoss(1.0)));
+
+		await Assert.That(summary.TerminationType).IsEqualTo(TerminationType.Convergence);
+		await Assert.That(expected.FinalCost).IsGreaterThan(1.0);
+		await Assert.That(summary.FinalCost).IsEqualTo(expected.FinalCost).Within(1e-9 * expected.FinalCost);
+		foreach ((double[] p, double[] q) in scene.AllBlocks().Zip(reference.AllBlocks()))
+		{
+			for (int k = 0; k < p.Length; k++)
+			{
+				await Assert.That(p[k]).IsEqualTo(q[k]).Within(1e-6 * Math.Max(1.0, Math.Abs(q[k])));
+			}
+		}
 	}
 
 	[Test]

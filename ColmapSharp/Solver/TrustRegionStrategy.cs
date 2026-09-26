@@ -49,8 +49,10 @@ internal sealed class LevenbergMarquardtStrategy
 	/// <summary>
 	/// Computes the LM step for <paramref name="jacobian"/> and <paramref name="residuals"/>
 	/// into <paramref name="step"/> (already negated, so x + step decreases the model).
+	/// <paramref name="eta"/> is the forcing sequence value an iterative linear solver
+	/// stops at (Solver::Options::eta).
 	/// </summary>
-	public TrustRegionStrategySummary ComputeStep(SparseMatrix jacobian, ReadOnlySpan<double> residuals, Span<double> step)
+	public TrustRegionStrategySummary ComputeStep(SparseMatrix jacobian, ReadOnlySpan<double> residuals, Span<double> step, double eta)
 	{
 		int numParameters = jacobian.NumCols;
 		if (!reuseDiagonal)
@@ -81,7 +83,11 @@ internal sealed class LevenbergMarquardtStrategy
 		// generated numerical garbage. This is known to happen for the DENSE_QR and then
 		// DENSE_SCHUR solver when the Jacobian is severely rank deficient and mu is too small.
 		ArrayValidity.Invalidate(step[..numParameters]);
-		LinearSolverSummary linearSolverSummary = linearSolver.Solve(jacobian, residuals, lmDiagonal, step);
+		// Disable r_tolerance checking. Since we only care about termination via the
+		// q_tolerance. As Nash and Sofer show, r_tolerance based termination is essentially
+		// useless in Truncated Newton methods.
+		LinearSolverSummary linearSolverSummary = linearSolver.Solve(
+			jacobian, residuals, lmDiagonal, step, qTolerance: eta, rTolerance: -1.0);
 		LinearSolverTerminationType terminationType = linearSolverSummary.TerminationType;
 		if (terminationType is LinearSolverTerminationType.Success or LinearSolverTerminationType.NoConvergence)
 		{

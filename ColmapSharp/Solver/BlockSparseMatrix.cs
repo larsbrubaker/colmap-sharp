@@ -8,8 +8,8 @@
 // on a parameter block. The evaluator writes each cell in place (no copy), which is why the
 // layout is computed here from the program. Ceres puts the cells of the first
 // num_eliminate_blocks column blocks (the Schur "E" blocks) before all the others in the
-// value array; the Schur solvers (next phase) rely on that, and with no eliminated blocks
-// the layout is simply residual-block order. SparseNormalCholeskySolver (LinearSolvers.cs)
+// value array; the Schur solvers (SchurEliminator.cs) rely on that, and with no eliminated
+// blocks the layout is simply residual-block order. SparseNormalCholeskySolver (LinearSolvers.cs)
 // forms J'J from this structure.
 
 namespace ColmapSharp.Solver;

@@ -14,7 +14,7 @@ using ColmapSharp.LinearAlgebra;
 namespace ColmapSharp.Solver;
 
 /// <summary>ceres::internal::SparseMatrix: the minimizer's view of a Jacobian.</summary>
-internal abstract class SparseMatrix
+internal abstract class SparseMatrix : ILinearOperator
 {
 	/// <summary>Number of rows (residuals).</summary>
 	public abstract int NumRows { get; }

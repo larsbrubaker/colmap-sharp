@@ -13,14 +13,15 @@
 // - SPARSE_NORMAL_CHOLESKY: A'A + D^2 formed from BlockSparseMatrix's block structure and
 //   factored by LinearAlgebra/SimplicialCholesky.cs (LLT, AMD ordering), the stand-in for
 //   Ceres' SuiteSparse/Eigen sparse Cholesky (docs/CPP_DIVERGENCES.md entries 13 and 22).
-// The Schur solvers (DENSE_SCHUR, SPARSE_SCHUR, ITERATIVE_SCHUR) are the next step; they
-// plug in here through LinearSolver.Create and the block layout's E-block ordering.
+// The Schur solvers (DENSE_SCHUR, SPARSE_SCHUR: SchurComplementSolvers.cs; ITERATIVE_SCHUR:
+// IterativeSchurSolver.cs) are created here too; they need the Jacobian's first
+// num_eliminate_blocks column blocks to be the E blocks (SchurOrdering.cs).
 
 using ColmapSharp.LinearAlgebra;
 
 namespace ColmapSharp.Solver;
 
-/// <summary>ceres::LinearSolverType (the ones ported so far).</summary>
+/// <summary>ceres::LinearSolverType (all but CGNR, which COLMAP never selects).</summary>
 public enum LinearSolverType
 {
 	/// <summary>Dense QR of the Jacobian; small problems, best accuracy.</summary>
@@ -31,7 +32,27 @@ public enum LinearSolverType
 
 	/// <summary>Sparse Cholesky of the normal equations.</summary>
 	SparseNormalCholesky,
+
+	/// <summary>Eliminate the E blocks (points), dense Cholesky of the reduced camera matrix.</summary>
+	DenseSchur,
+
+	/// <summary>Eliminate the E blocks, sparse Cholesky of the reduced camera matrix.</summary>
+	SparseSchur,
+
+	/// <summary>Preconditioned conjugate gradients on the implicit Schur complement.</summary>
+	IterativeSchur,
 }
+
+/// <summary>
+/// The LinearSolver::Options that choose and configure a solver: the Schur solvers eliminate
+/// the first <paramref name="NumEliminateBlocks"/> column blocks (Ceres' elimination_groups[0]).
+/// </summary>
+internal readonly record struct LinearSolverOptions(
+	LinearSolverType Type,
+	PreconditionerType PreconditionerType = PreconditionerType.Jacobi,
+	int NumEliminateBlocks = 0,
+	int MinNumIterations = 1,
+	int MaxNumIterations = 1);
 
 /// <summary>ceres::internal::LinearSolverTerminationType.</summary>
 internal enum LinearSolverTerminationType
@@ -59,27 +80,41 @@ internal abstract class LinearSolver
 	/// <summary>Number of Solve calls.</summary>
 	public int NumSolves { get; private set; }
 
-	/// <summary>Creates the solver for <paramref name="type"/>.</summary>
-	public static LinearSolver Create(LinearSolverType type) => type switch
+	/// <summary>Creates the solver for a type with default options (the direct solvers).</summary>
+	public static LinearSolver Create(LinearSolverType type) => Create(new LinearSolverOptions(type));
+
+	/// <summary>LinearSolver::Create.</summary>
+	public static LinearSolver Create(LinearSolverOptions options) => options.Type switch
 	{
 		LinearSolverType.DenseQr => new DenseQrSolver(),
 		LinearSolverType.DenseNormalCholesky => new DenseNormalCholeskySolver(),
 		LinearSolverType.SparseNormalCholesky => new SparseNormalCholeskySolver(),
-		_ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown linear solver type."),
+		LinearSolverType.DenseSchur => new DenseSchurComplementSolver(options.NumEliminateBlocks),
+		LinearSolverType.SparseSchur => new SparseSchurComplementSolver(options.NumEliminateBlocks),
+		LinearSolverType.IterativeSchur => new IterativeSchurComplementSolver(
+			options.NumEliminateBlocks, options.PreconditionerType, options.MinNumIterations, options.MaxNumIterations),
+		_ => throw new ArgumentOutOfRangeException(nameof(options), options.Type, "Unknown linear solver type."),
 	};
+
+	/// <summary>True for the solvers that eliminate E blocks (ceres::IsSchurType).</summary>
+	public static bool IsSchurType(LinearSolverType type) =>
+		type is LinearSolverType.DenseSchur or LinearSolverType.SparseSchur or LinearSolverType.IterativeSchur;
 
 	/// <summary>
 	/// Solves min |A x - b|^2 + |D x|^2 (D may be empty for no regularization) into
-	/// <paramref name="x"/>.
+	/// <paramref name="x"/>. The tolerances are LinearSolver::PerSolveOptions' q_tolerance
+	/// and r_tolerance, which only the iterative solver reads.
 	/// </summary>
-	public LinearSolverSummary Solve(SparseMatrix a, ReadOnlySpan<double> b, ReadOnlySpan<double> d, Span<double> x)
+	public LinearSolverSummary Solve(
+		SparseMatrix a, ReadOnlySpan<double> b, ReadOnlySpan<double> d, Span<double> x, double qTolerance = 0.0, double rTolerance = 0.0)
 	{
 		NumSolves++;
-		return SolveImpl(a, b, d, x);
+		return SolveImpl(a, b, d, x, qTolerance, rTolerance);
 	}
 
 	/// <summary>The solver-specific work.</summary>
-	protected abstract LinearSolverSummary SolveImpl(SparseMatrix a, ReadOnlySpan<double> b, ReadOnlySpan<double> d, Span<double> x);
+	protected abstract LinearSolverSummary SolveImpl(
+		SparseMatrix a, ReadOnlySpan<double> b, ReadOnlySpan<double> d, Span<double> x, double qTolerance, double rTolerance);
 }
 
 /// <summary>ceres::internal::DenseQRSolver.</summary>
@@ -90,7 +125,8 @@ internal sealed class DenseQrSolver : LinearSolver
 	private VectorXd? rhs;
 
 	/// <inheritdoc/>
-	protected override LinearSolverSummary SolveImpl(SparseMatrix a, ReadOnlySpan<double> b, ReadOnlySpan<double> d, Span<double> x)
+	protected override LinearSolverSummary SolveImpl(
+		SparseMatrix a, ReadOnlySpan<double> b, ReadOnlySpan<double> d, Span<double> x, double qTolerance, double rTolerance)
 	{
 		MatrixXd matrix = ((DenseSparseMatrix)a).Matrix;
 		int numRows = matrix.Rows;
@@ -127,7 +163,8 @@ internal sealed class DenseNormalCholeskySolver : LinearSolver
 	private VectorXd? rhs;
 
 	/// <inheritdoc/>
-	protected override LinearSolverSummary SolveImpl(SparseMatrix a, ReadOnlySpan<double> b, ReadOnlySpan<double> d, Span<double> x)
+	protected override LinearSolverSummary SolveImpl(
+		SparseMatrix a, ReadOnlySpan<double> b, ReadOnlySpan<double> d, Span<double> x, double qTolerance, double rTolerance)
 	{
 		MatrixXd matrix = ((DenseSparseMatrix)a).Matrix;
 		int numRows = matrix.Rows;
@@ -200,7 +237,8 @@ internal sealed class SparseNormalCholeskySolver : LinearSolver
 	private int[] pairOffsets = [];
 
 	/// <inheritdoc/>
-	protected override LinearSolverSummary SolveImpl(SparseMatrix a, ReadOnlySpan<double> b, ReadOnlySpan<double> d, Span<double> x)
+	protected override LinearSolverSummary SolveImpl(
+		SparseMatrix a, ReadOnlySpan<double> b, ReadOnlySpan<double> d, Span<double> x, double qTolerance, double rTolerance)
 	{
 		var matrix = (BlockSparseMatrix)a;
 		int numCols = matrix.NumCols;

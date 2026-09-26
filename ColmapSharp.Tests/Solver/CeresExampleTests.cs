@@ -137,7 +137,14 @@ public class CeresExampleTests
 	}
 
 	public static IEnumerable<LinearSolverType> AllLinearSolvers() =>
-		[LinearSolverType.DenseQr, LinearSolverType.DenseNormalCholesky, LinearSolverType.SparseNormalCholesky];
+		[
+			LinearSolverType.DenseQr,
+			LinearSolverType.DenseNormalCholesky,
+			LinearSolverType.SparseNormalCholesky,
+			LinearSolverType.DenseSchur,
+			LinearSolverType.SparseSchur,
+			LinearSolverType.IterativeSchur,
+		];
 
 	[Test]
 	public async Task HelloWorld()
@@ -191,8 +198,18 @@ public class CeresExampleTests
 
 	private static AutoDiffCostFunction<PowellFunctor, Grad2> PowellTerm(int term) => new(new PowellFunctor(term), 1, 1, 1);
 
+	/// <summary>
+	/// The solvers that reproduce the tutorial's trajectory. ITERATIVE_SCHUR cannot: curve
+	/// fitting's reduced system is 1 x 1, so CG's first step solves it exactly and the
+	/// residual is often exactly zero. Ceres' CG then reports "Numerical failure. rho = r'z =
+	/// 0" on its second iteration, which makes the LM step invalid; the solve ends in
+	/// FAILURE with m and c left at 0 (CurveFitting_IterativeSchurFailsOnItsOneByOneReducedSystem).
+	/// </summary>
+	public static IEnumerable<LinearSolverType> DirectLinearSolvers() =>
+		AllLinearSolvers().Where(type => type != LinearSolverType.IterativeSchur);
+
 	[Test]
-	[MethodDataSource(nameof(AllLinearSolvers))]
+	[MethodDataSource(nameof(DirectLinearSolvers))]
 	public async Task CurveFitting(LinearSolverType linearSolver)
 	{
 		double[] m = [0.0];
@@ -220,5 +237,38 @@ public class CeresExampleTests
 		await Assert.That(summary.Iterations.Count).IsEqualTo(14);
 		await Assert.That(summary.NumUnsuccessfulSteps).IsEqualTo(5);
 		await Assert.That(summary.NumResidualsReduced).IsEqualTo(67);
+	}
+
+	// C#-only: pins the ITERATIVE_SCHUR outcome on curve fitting described at
+	// DirectLinearSolvers. Every step whose CG hits rho = r'z = 0 is invalid; after
+	// max_num_consecutive_invalid_steps (5) of them the solve fails and the parameters are
+	// restored to their starting values.
+	[Test]
+	public async Task CurveFitting_IterativeSchurFailsOnItsOneByOneReducedSystem()
+	{
+		double[] m = [0.0];
+		double[] c = [0.0];
+		var problem = new Problem();
+		for (int i = 0; i < CurveData.Length / 2; ++i)
+		{
+			problem.AddResidualBlock(
+				new AutoDiffCostFunction<ExponentialResidual, Grad2>(new ExponentialResidual(CurveData[2 * i], CurveData[(2 * i) + 1]), 1, 1, 1),
+				null,
+				m,
+				c);
+		}
+
+		var options = new SolverOptions { MaxNumIterations = 25, LinearSolverType = LinearSolverType.IterativeSchur };
+		SolverSummary summary = LeastSquaresSolver.Solve(options, problem);
+
+		await Assert.That(summary.TerminationType).IsEqualTo(TerminationType.Failure);
+		await Assert.That(summary.Message)
+			.IsEqualTo("Number of consecutive invalid steps more than Solver::Options::max_num_consecutive_invalid_steps: 5");
+		await Assert.That(summary.IsSolutionUsable).IsFalse();
+		await Assert.That(summary.InitialCost).IsEqualTo(1.211734e+02).Within(5e-5);
+		await Assert.That(summary.Iterations[1].StepIsValid).IsFalse();
+		await Assert.That(summary.Iterations[^1].StepIsValid).IsFalse();
+		await Assert.That(m[0]).IsEqualTo(0.0);
+		await Assert.That(c[0]).IsEqualTo(0.0);
 	}
 }

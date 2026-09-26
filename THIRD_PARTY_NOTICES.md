@@ -69,8 +69,26 @@ and summary (`internal/ceres/problem_impl.cc`, `program.cc`, `parameter_block.h`
 `trust_region_minimizer.cc`, `trust_region_preprocessor.cc`, `minimizer.cc`, `solver.cc`) in
 `Problem.cs`, `Program.cs`, `ParameterBlock.cs`, `ResidualBlock.cs`, `ProgramEvaluator.cs`,
 `SparseMatrix.cs`, `BlockSparseMatrix.cs`, `LinearSolvers.cs`, `TrustRegionStrategy.cs`,
-`TrustRegionMinimizer.cs`, `SolverTypes.cs` and `LeastSquaresSolver.cs` (with
-`corrector_test.cc` and `trust_region_minimizer_test.cc` ported in the tests, and the data of
+`TrustRegionMinimizer.cs`, `SolverTypes.cs` and `LeastSquaresSolver.cs`; the Schur
+complement solvers DENSE_SCHUR / SPARSE_SCHUR / ITERATIVE_SCHUR, their elimination ordering,
+conjugate gradients and the JACOBI / SCHUR_JACOBI preconditioners
+(`internal/ceres/schur_eliminator.h`, `schur_eliminator_impl.h`,
+`schur_complement_solver.cc`, `block_random_access_dense_matrix.cc`,
+`block_random_access_sparse_matrix.cc`, `block_random_access_diagonal_matrix.cc`,
+`small_blas.h`, `invert_psd_matrix.h`, `implicit_schur_complement.cc`,
+`partitioned_matrix_view_impl.h`, `conjugate_gradients_solver.h`,
+`iterative_schur_complement_solver.cc`, `schur_jacobi_preconditioner.cc`, `preconditioner.h`,
+`parameter_block_ordering.cc`, `graph_algorithms.h`, `reorder_program.cc`) in
+`SchurEliminator.cs`, `SchurComplementSolvers.cs`, `BlockRandomAccessMatrix.cs`,
+`SmallBlas.cs`, `ImplicitSchurComplement.cs`, `IterativeSchurSolver.cs` and
+`SchurOrdering.cs` (with `corrector_test.cc`, `trust_region_minimizer_test.cc`,
+`schur_eliminator_test.cc`, `implicit_schur_complement_test.cc`,
+`conjugate_gradients_solver_test.cc`, `schur_complement_solver_test.cc`,
+`iterative_schur_complement_solver_test.cc`, `parameter_block_ordering_test.cc`,
+`small_blas_test.cc`, `block_random_access_dense_matrix_test.cc`,
+`block_random_access_sparse_matrix_test.cc`, `block_random_access_diagonal_matrix_test.cc`,
+parts of `graph_algorithms_test.cc` and `reorder_program_test.cc`, and problems 2-4 of
+`linear_least_squares_problems.cc` ported in the tests, and the data of
 `examples/curve_fitting.cc` in `CeresExampleTests.cs`). `ColmapSharp/Optim/TinySolver.cs` ports COLMAP's
 `colmap/optim/tiny_solver.h`, which is COLMAP's modified copy of Ceres'
 `include/ceres/tiny_solver.h` and carries this notice.
