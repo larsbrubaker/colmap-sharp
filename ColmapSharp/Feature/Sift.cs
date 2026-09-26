@@ -2,18 +2,22 @@
 // Ported from COLMAP (BSD-3-Clause, see THIRD_PARTY_NOTICES.md).
 //
 // Sift: the CPU SIFT extraction half of colmap/feature/sift.h and sift.cc -
-// SiftExtractionOptions, TransformVLFeatToUBCFeatureDescriptors and SiftCPUFeatureExtractor
-// (VLFeat's SIFT, VLFeat/VlSiftFilter*.cs, driven octave by octave). Neighbors:
-// FeatureUtils.cs (descriptor normalization and quantization), Sensor/Bitmap.cs (the grey
-// input image). Tests: ColmapSharp.Tests/Feature/SiftTests.cs (sift_test.cc) and
+// SiftExtractionOptions, CreateSiftFeatureExtractor, TransformVLFeatToUBCFeatureDescriptors
+// and SiftCPUFeatureExtractor (VLFeat's SIFT, VLFeat/VlSiftFilter*.cs, driven octave by
+// octave). Neighbors: FeatureExtractor.cs (FeatureExtractionOptions and the FeatureExtractor
+// interface), FeatureUtils.cs (descriptor normalization and quantization), Sensor/Bitmap.cs
+// (the grey input image). Tests: ColmapSharp.Tests/Feature/SiftTests.cs (sift_test.cc) and
 // SiftOracleTests.cs (C#-only, pycolmap fixtures).
 //
 // Not here yet: CovariantSiftCPUFeatureExtractor (estimate_affine_shape, domain-size
-// pooling, force_covariant_extractor) needs VLFeat's covdet, which is not ported, so this
-// extractor rejects those options exactly like COLMAP's SiftCPUFeatureExtractor does; the
-// CreateSiftFeatureExtractor factory and FeatureExtractionOptions land with
-// feature/extractor. The matching half of sift.cc is SiftMatcher.cs. SiftGPU is excluded
-// (docs/LICENSE_AUDIT.md).
+// pooling, force_covariant_extractor) needs VLFeat's covdet, which is not ported, so
+// CreateSiftFeatureExtractor throws NotSupportedException for those options. The matching
+// half of sift.cc is SiftMatcher.cs. SiftGPU is excluded (docs/LICENSE_AUDIT.md), so there
+// is no use_gpu branch.
+//
+// Cancellation (not in COLMAP): Extract checks its token between scale levels (in the
+// filter) and between DoG levels of descriptor computation, so MatterCAD can stop a
+// multi-second extraction mid-image. The checks never touch the numbers.
 //
 // Tier A (exact) against unfused VLFeat: the VLFeat layer matches VLFeat compiled without
 // FMA contraction bit for bit (VlSiftFilterTests). The macOS arm64 pycolmap wheel fuses
@@ -128,12 +132,33 @@ public sealed class SiftExtractionOptions
 	public SiftExtractionOptions Clone() => (SiftExtractionOptions)MemberwiseClone();
 }
 
+/// <summary>Port of the SIFT extractor factory of colmap/feature/sift.h.</summary>
+public static class SiftFeatureExtractors
+{
+	/// <summary>
+	/// Port of CreateSiftFeatureExtractor: the SIFT CPU extractor. The covariant extractor
+	/// (estimate_affine_shape, domain_size_pooling, force_covariant_extractor) is not ported
+	/// yet, and the GPU extractor is excluded.
+	/// </summary>
+	public static FeatureExtractor CreateSiftFeatureExtractor(FeatureExtractionOptions options)
+	{
+		if (options.Sift.EstimateAffineShape || options.Sift.DomainSizePooling || options.Sift.ForceCovariantExtractor)
+		{
+			throw new NotSupportedException(
+				"The covariant SIFT extractor (affine shape estimation, domain-size pooling) is not available yet; "
+				+ "turn off EstimateAffineShape, DomainSizePooling and ForceCovariantExtractor.");
+		}
+
+		return new SiftCpuFeatureExtractor(options);
+	}
+}
+
 /// <summary>
 /// Port of colmap's SiftCPUFeatureExtractor: VLFeat SIFT on a grey bitmap. One instance can
 /// extract from many images on one thread; it keeps its VLFeat filter while the image size
 /// stays the same.
 /// </summary>
-public sealed class SiftCpuFeatureExtractor
+public sealed class SiftCpuFeatureExtractor : FeatureExtractor
 {
 	/// <summary>kSiftDescriptorDim.</summary>
 	public const int SiftDescriptorDim = 128;
@@ -142,14 +167,20 @@ public sealed class SiftCpuFeatureExtractor
 	private VlSiftFilter? sift;
 
 	/// <summary>Creates the extractor; the options must pass Check and not ask for the covariant extractor.</summary>
-	public SiftCpuFeatureExtractor(SiftExtractionOptions options)
+	public SiftCpuFeatureExtractor(FeatureExtractionOptions options)
 	{
-		this.options = options.Clone();
-		Util.Check.That(this.options.Check());
+		Util.Check.That(options.Check());
+		this.options = options.Sift.Clone();
 		Util.Check.That(!this.options.EstimateAffineShape);
 		Util.Check.That(!this.options.DomainSizePooling);
 		Util.Check.That(!this.options.ForceCovariantExtractor);
 	}
+
+	/// <summary>
+	/// Test diagnostic: called at every cancellation check (see
+	/// <see cref="VlSiftFilter.CancellationCheckpoint"/>).
+	/// </summary>
+	internal Action? CancellationCheckpoint { get; set; }
 
 	/// <summary>
 	/// Port of SiftCPUFeatureExtractor::Extract: detects keypoints (and, when
@@ -157,10 +188,18 @@ public sealed class SiftCpuFeatureExtractor
 	/// Keypoints come out octave by octave, DoG level by level; when there are more than
 	/// max_num_features, whole lowest (finest) DoG levels are dropped.
 	/// </summary>
-	public bool Extract(Bitmap bitmap, List<FeatureKeypoint> keypoints, FeatureDescriptors? descriptors)
+	public override bool Extract(
+		Bitmap bitmap,
+		List<FeatureKeypoint> keypoints,
+		FeatureDescriptors? descriptors,
+		CancellationToken cancellationToken = default)
 	{
 		Util.Check.That(bitmap.IsGrey);
 		Util.Check.NotNull(keypoints);
+
+		// Checked before the filter is built: its scale space can take gigabytes.
+		CancellationCheckpoint?.Invoke();
+		cancellationToken.ThrowIfCancellationRequested();
 
 		if (sift == null || sift.Width != bitmap.Width || sift.Height != bitmap.Height)
 		{
@@ -168,6 +207,27 @@ public sealed class SiftCpuFeatureExtractor
 				bitmap.Width, bitmap.Height, options.NumOctaves, options.OctaveResolution, options.FirstOctave);
 		}
 
+		sift.CancellationCheckpoint = CancellationCheckpoint;
+		try
+		{
+			return ExtractWithFilter(sift, bitmap, keypoints, descriptors, cancellationToken);
+		}
+		catch (OperationCanceledException)
+		{
+			// A cancelled run leaves the filter mid-octave; dropping it means the next image
+			// is extracted exactly as a fresh extractor would.
+			sift = null;
+			throw;
+		}
+	}
+
+	private bool ExtractWithFilter(
+		VlSiftFilter sift,
+		Bitmap bitmap,
+		List<FeatureKeypoint> keypoints,
+		FeatureDescriptors? descriptors,
+		CancellationToken cancellationToken)
+	{
 		sift.PeakThreshold = options.PeakThreshold;
 		sift.EdgeThreshold = options.EdgeThreshold;
 
@@ -189,20 +249,20 @@ public sealed class SiftCpuFeatureExtractor
 					dataFloat[i] = (float)dataUint8[i] / 255.0f;
 				}
 
-				if (!sift.ProcessFirstOctave(dataFloat))
+				if (!sift.ProcessFirstOctave(dataFloat, cancellationToken))
 				{
 					break;
 				}
 
 				firstOctave = false;
 			}
-			else if (!sift.ProcessNextOctave())
+			else if (!sift.ProcessNextOctave(cancellationToken))
 			{
 				break;
 			}
 
 			// Detect keypoints.
-			sift.Detect();
+			sift.Detect(cancellationToken);
 
 			// Extract detected keypoints.
 			ReadOnlySpan<VlSiftKeypoint> vlKeypoints = sift.Keypoints;
@@ -218,6 +278,9 @@ public sealed class SiftCpuFeatureExtractor
 			{
 				if (vlKeypoints[i].IS != prevLevel)
 				{
+					// A DoG level's orientations and descriptors are one unit of work.
+					sift.ThrowIfCancellationRequested(cancellationToken);
+
 					// Add containers for new DOG level.
 					levelNumFeatures.Add(0);
 					levelKeypoints.Add(new List<FeatureKeypoint>());

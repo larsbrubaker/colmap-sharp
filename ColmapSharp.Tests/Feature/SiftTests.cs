@@ -10,9 +10,7 @@
 // CovariantSiftCPUFeatureExtractor (VLFeat covdet), which is not ported yet; they land with it.
 // Skipped: ExtractSiftFeaturesGPU.Nominal (SiftGPU, excluded). The matcher tests of
 // sift_test.cc are in SiftMatcherTests.cs and SiftMatcherGuidedTests.cs.
-//
-// The extractor is constructed directly: CreateSiftFeatureExtractor returns exactly this
-// SiftCPUFeatureExtractor for these options, and the factory lands with feature/extractor.
+// The cancellation tests (C#-only) are in SiftCancellationTests.cs.
 
 using ColmapSharp.Feature;
 using ColmapSharp.Sensor;
@@ -25,7 +23,7 @@ namespace ColmapSharp.Tests.Feature;
 
 public class SiftTests
 {
-	private static Bitmap CreateImageWithSquare(int size)
+	internal static Bitmap CreateImageWithSquare(int size)
 	{
 		var bitmap = new Bitmap(size, size, asRgb: false);
 		bitmap.Fill(new BitmapColor<byte>(0, 0, 0));
@@ -83,14 +81,12 @@ public class SiftTests
 		_ = name;
 		Bitmap bitmap = CreateImageWithSquare(256);
 
-		var options = new SiftExtractionOptions
-		{
-			EstimateAffineShape = estimateAffineShape,
-			DomainSizePooling = domainSizePooling,
-			ForceCovariantExtractor = forceCovariantExtractor,
-			Upright = upright,
-		};
-		var extractor = new SiftCpuFeatureExtractor(options);
+		var options = new FeatureExtractionOptions(FeatureExtractorType.Sift);
+		options.Sift.EstimateAffineShape = estimateAffineShape;
+		options.Sift.DomainSizePooling = domainSizePooling;
+		options.Sift.ForceCovariantExtractor = forceCovariantExtractor;
+		options.Sift.Upright = upright;
+		FeatureExtractor extractor = SiftFeatureExtractors.CreateSiftFeatureExtractor(options);
 
 		var keypoints = new List<FeatureKeypoint>();
 		var descriptors = new FeatureDescriptors();

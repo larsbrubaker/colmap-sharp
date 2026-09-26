@@ -40,7 +40,7 @@ public class SiftOracleTests
 		Bitmap bitmap = LoadImage(root.GetProperty("images").GetProperty(c.GetProperty("image").GetString()!));
 		SiftExtractionOptions options = ParseOptions(c.GetProperty("options"));
 
-		var extractor = new SiftCpuFeatureExtractor(options);
+		FeatureExtractor extractor = FeatureExtractor.Create(new FeatureExtractionOptions { Sift = options });
 		var keypoints = new List<FeatureKeypoint>();
 		var descriptors = new FeatureDescriptors();
 		await Assert.That(extractor.Extract(bitmap, keypoints, descriptors)).IsTrue();

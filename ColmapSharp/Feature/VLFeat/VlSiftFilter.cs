@@ -18,6 +18,12 @@
 //   downsample that writes the next octave's base over the current octave's first level.
 // - Errors: VLFeat returns VL_ERR_EOF when there is no further octave; here the process
 //   methods return false in that case.
+// - Cancellation (not in VLFeat): the process methods and Detect take a CancellationToken
+//   and check it between scale levels, so a cancelled extraction stops within one level's
+//   smoothing of the current octave. The checks never touch the numbers.
+// - Deliberate fix (docs/CPP_DIVERGENCES.md entry 43): ProcessFirstOctave resets the
+//   gradient cache's octave (grad_o), which VLFeat resets only in vl_sift_new, so a filter
+//   reused for a new image never computes it from the previous image's gradient.
 
 namespace ColmapSharp.Feature.VLFeat;
 
@@ -71,6 +77,12 @@ public sealed partial class VlSiftFilter
 
 	private VlSiftKeypoint[] keys = [];
 	private int gradO;
+
+	/// <summary>
+	/// Test diagnostic: called at every cancellation check, just before the token is read, so
+	/// a test can cancel at an exact point and count how finely the work is divided.
+	/// </summary>
+	internal Action? CancellationCheckpoint { get; set; }
 
 	/// <summary>
 	/// Port of vl_sift_new. A negative <paramref name="noctaves"/> selects the most octaves
@@ -181,14 +193,23 @@ public sealed partial class VlSiftFilter
 	/// octave of <paramref name="im"/> (row-major, <see cref="Width"/> x <see cref="Height"/>).
 	/// Returns false (VL_ERR_EOF) when there are no octaves.
 	/// </summary>
-	public bool ProcessFirstOctave(ReadOnlySpan<float> im)
+	public bool ProcessFirstOctave(ReadOnlySpan<float> im, CancellationToken cancellationToken = default)
 	{
+		ThrowIfCancellationRequested(cancellationToken);
+
 		int width = Width;
 		int height = Height;
 		int oMin = OctaveMin;
 
 		CurrentOctave = oMin;
 		NumKeypoints = 0;
+
+		// Not in VLFeat, which resets grad_o only in vl_sift_new: a filter reused for a new
+		// image would otherwise keep the previous image's gradient when that image's last
+		// octave with keypoints is this one's first, making results depend on image order
+		// (docs/CPP_DIVERGENCES.md entry 43).
+		gradO = oMin - 1;
+
 		int w = OctaveWidth = ShiftLeft(Width, -CurrentOctave);
 		int h = OctaveHeight = ShiftLeft(Height, -CurrentOctave);
 
@@ -213,6 +234,7 @@ public sealed partial class VlSiftFilter
 				int n = (width << -o) * (height << -o);
 				CopyAndUpsampleRows(temp, 0, octave.AsSpan(octaveBase, n), width << -o, height << -o);
 				CopyAndUpsampleRows(octave, octaveBase, temp.AsSpan(0, 2 * n), width << -o, 2 * (height << -o));
+				ThrowIfCancellationRequested(cancellationToken);
 			}
 		}
 		else if (oMin > 0)
@@ -235,7 +257,7 @@ public sealed partial class VlSiftFilter
 			Smooth(octave, octaveBase, octave, octaveBase, w, h, sd);
 		}
 
-		FillOctave(w, h);
+		FillOctave(w, h, cancellationToken);
 		return true;
 	}
 
@@ -244,7 +266,7 @@ public sealed partial class VlSiftFilter
 	/// scale space. Clears the keypoints of the previous octave. Returns false (VL_ERR_EOF)
 	/// after the last octave.
 	/// </summary>
-	public bool ProcessNextOctave()
+	public bool ProcessNextOctave(CancellationToken cancellationToken = default)
 	{
 		if (CurrentOctave == OctaveMin + NumOctaves - 1)
 		{
@@ -257,6 +279,8 @@ public sealed partial class VlSiftFilter
 		int h = OctaveHeight;
 		int pt = OctaveOffset(sBest);
 		int octaveBase = OctaveOffset(SMin);
+
+		ThrowIfCancellationRequested(cancellationToken);
 
 		// Next octave.
 		CopyAndDownsample(octave, octaveBase, octave, pt, w, h, 1);
@@ -277,7 +301,7 @@ public sealed partial class VlSiftFilter
 			Smooth(octave, octaveBase, octave, octaveBase, w, h, sd);
 		}
 
-		FillOctave(w, h);
+		FillOctave(w, h, cancellationToken);
 		return true;
 	}
 
@@ -285,13 +309,24 @@ public sealed partial class VlSiftFilter
 	private int OctaveOffset(int s) => OctaveWidth * OctaveHeight * (s - SMin);
 
 	// Smooths each level from the one below it (the "Fill octave" loop of both process calls).
-	private void FillOctave(int w, int h)
+	private void FillOctave(int w, int h, CancellationToken cancellationToken)
 	{
 		for (int s = SMin + 1; s <= SMax; ++s)
 		{
+			ThrowIfCancellationRequested(cancellationToken);
 			double sd = dsigma0 * Math.Pow(sigmak, s);
 			Smooth(octave, OctaveOffset(s), octave, OctaveOffset(s - 1), w, h, sd);
 		}
+	}
+
+	/// <summary>
+	/// The cancellation check between units of work (a scale level, an octave step), shared
+	/// with the SIFT extractor that drives this filter so one diagnostic sees every check.
+	/// </summary>
+	internal void ThrowIfCancellationRequested(CancellationToken cancellationToken)
+	{
+		CancellationCheckpoint?.Invoke();
+		cancellationToken.ThrowIfCancellationRequested();
 	}
 
 	// VL_SHIFT_LEFT: a left shift for n >= 0, an arithmetic right shift otherwise.

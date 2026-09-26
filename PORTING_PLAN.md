@@ -88,13 +88,14 @@ with the EigenQuaternion × Euclidean<3> product manifold, as in COLMAP 4.2.
 `feature/sift` covariant extractor (`CovariantSiftCPUFeatureExtractor`: affine shape, DSP-SIFT
 / domain-size pooling, force_covariant — needs VLFeat `covdet.c`, `vl_sift_calc_raw_descriptor`,
 `vl_imgradient_polar_f`; then the five pending `SiftCpuExtraction` rows CovariantSift,
-CovariantAffineSift, CovariantAffineSiftUpright, CovariantDSPSift, CovariantAffineDSPSift),
-`feature/extractor`; `MemoryConstrainedLRUCache` (util/cache.h) + its 7 `cache_test.cc` cases.
+CovariantAffineSift, CovariantAffineSiftUpright, CovariantDSPSift, CovariantAffineDSPSift).
 Skipped (SiftGPU excluded): `sift_test.cc` ExtractSiftFeaturesGPU.Nominal,
 CreateSiftGPUMatcherOpenGL/CUDA.Nominal, MatchSiftFeaturesGPU.{Nominal,TypeMismatch},
 MatchSiftFeaturesCPUvsGPU.Nominal, MatchGuidedSiftFeaturesGPU.* (7),
 MatchGuidedSiftFeaturesCPUvsGPUGuided.EssentialMatrix. Skipped (ONNX learned features out of
 scope): `matcher_test.cc` Check for the 9 non-SIFT-bruteforce types and the aliked lines of
+Copy/CopyAssignment; `extractor_test.cc` Move and MoveAssignment (they only move the LoMa
+shared_ptr), Check for ALIKED_N16ROT/ALIKED_N32/LOMA_B/LOMA_B128, and the aliked/loma lines of
 Copy/CopyAssignment. The feature index is exact (divergence 42), not faiss.
 Memory: VLFeat's scale space for a 6400×4800 upsampled first octave is multi-GB (as in COLMAP);
 MatterCAD (esp. wasm32) must cap `max_image_size` accordingly.

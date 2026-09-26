@@ -19,7 +19,7 @@ public sealed partial class VlSiftFilter
 	/// Port of vl_sift_detect: finds the DoG extrema of the current octave and refines them.
 	/// Results are in <see cref="Keypoints"/>.
 	/// </summary>
-	public void Detect()
+	public void Detect(CancellationToken cancellationToken = default)
 	{
 		int w = OctaveWidth;
 		int h = OctaveHeight;
@@ -48,12 +48,15 @@ public sealed partial class VlSiftFilter
 			}
 		}
 
+		ThrowIfCancellationRequested(cancellationToken);
+
 		// Find local maxima of DoG, starting from dog[1, 1, s_min + 1].
 		float[] dg = dog;
 		p = Xo + yo + so;
 		double peakFloor = 0.8 * tp;
 		for (int s = SMin + 1; s <= SMax - 2; ++s)
 		{
+			ThrowIfCancellationRequested(cancellationToken);
 			for (int y = 1; y < h - 1; ++y)
 			{
 				for (int x = 1; x < w - 1; ++x)

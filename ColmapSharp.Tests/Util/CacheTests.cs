@@ -3,8 +3,7 @@
 //
 // CacheTests: the LRUCache and ThreadSafeLRUCache cases of colmap/util/cache_test.cc, 1:1
 // (TEST(Suite, Name) becomes Suite_Name). Tests ColmapSharp/Util/Cache.cs.
-// Pending, not skipped: the eight MemoryConstrainedLRUCache cases land with
-// MemoryConstrainedLRUCache, which nothing ported uses yet.
+// The eight MemoryConstrainedLRUCache cases are in CacheTests.MemoryConstrained.cs.
 // ConcurrentGet's gmock expectations (Load(0) and Load(1) called exactly once) become call
 // counters.
 
@@ -16,7 +15,7 @@ using TUnit.Core;
 
 namespace ColmapSharp.Tests.Util;
 
-public class CacheTests
+public partial class CacheTests
 {
 	private static async Task FillFive(Func<int, int> get, Func<int> numElems, Func<int, bool> exists)
 	{

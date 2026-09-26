@@ -957,3 +957,39 @@ best neighbour either way.
 where COLMAP uses IVF) and `SiftMatcherTests.SiftCPUFeatureMatcherFaissVsBruteForce_Nominal`
 (sift_test.cc 1:1) pass. Speed: an 8192 x 8192 SIFT pair with cross-check takes about 114 ms
 through the index and 51 ms brute force on a 10-core Apple M-series machine (Release build).
+
+## 43. SIFT never reuses a previous image's gradient, and extraction can be cancelled
+
+**What differs.** COLMAP's SiftCPUFeatureExtractor keeps one VLFeat filter while the image
+size stays the same, and VLFeat resets the octave its gradient cache belongs to (`grad_o`)
+only in `vl_sift_new`, not in `vl_sift_process_first_octave`. When the previous image's last
+octave with keypoints is the new image's first octave, the new image's orientations and
+descriptors in that octave are computed from the previous image's gradient. That always
+happens with `num_octaves = 1`, and with the default options whenever the previous image's
+keypoints all sit in the finest octave (a low-contrast, fine-textured photo). The port
+(`Feature/VLFeat/VlSiftFilter.cs`) resets the cache at the start of every image, so a reused
+extractor gives exactly what a fresh one gives.
+
+Separately, `FeatureExtractor.Extract` takes a `CancellationToken` (COLMAP's has none). The SIFT
+extractor checks it before building the scale space, before every Gaussian level and DoG
+extremum scan of every octave, and before each DoG level's orientations and descriptors. A
+cancel throws `OperationCanceledException` and leaves the outputs untouched. The extractor
+then drops its filter, so the next image is extracted exactly as by a fresh extractor.
+Uncancelled results are unchanged.
+
+**Why.** The stale gradient is an upstream bug: it makes COLMAP's features for an image depend
+on which image the same worker extracted before it, so on image order and on how images are
+spread over extraction threads. MatterCAD needs results that don't depend on either.
+Cancellation is needed because one 12 MP extraction takes seconds and the user must be able
+to stop a reconstruction (CLAUDE.md "Cancellation and progress").
+
+**Evidence.** `oracle/fixture_sift_reuse.py` writes `sift_reuse.json`: pycolmap's features of
+a texture image B from a fresh extractor and from one reused after a fine-noise image A of the
+same size whose 23 keypoints are all in octave -1. The reused extractor gives 155 keypoints
+where the fresh one gives 154 (default options), and 30 where it gives 29 (`num_octaves = 1`).
+`SiftExtractorReuseTests` (C#-only) requires the port's reused extractor to equal its fresh
+one bit for bit, and to match pycolmap's fresh output within the FMA tolerance of entry 41;
+before the reset the port reproduced pycolmap's 155 and 30. `SiftCancellationTests` (C#-only):
+a pre-cancelled token throws at the first check before any allocation; a cancel at a check in
+the middle of an image throws at that check; runs with a live token, with no token, and on the
+same extractor after a cancel give bit-identical features.
