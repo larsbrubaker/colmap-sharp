@@ -24,7 +24,9 @@
 // - COLMAP's image_t -> int narrowing of the edge endpoints is kept (unchecked casts), so
 //   the graph cut sees the same vertex ids.
 // - Create's pair order (entry 120). COLMAP iterates a hash map of image pairs; here the
-//   pairs are ordered by a scrambled pair id, so ties do not all break toward low image ids.
+//   pairs are ordered by Boost.Unordered's mulx mix of the pair id (ported from Boost,
+//   BSL-1.0, see THIRD_PARTY_NOTICES.md), modelling COLMAP's default Boost backend, so ties
+//   do not all break toward low image ids.
 // - The other hash containers COLMAP uses here (FlatHashSet of a child's images, NodeHashMap
 //   of related images) are only looked up, never iterated in a way that reaches an output.
 
@@ -164,9 +166,9 @@ public sealed class SceneClustering
 	/// <summary>
 	/// Port of SceneClustering::Create: partitions the scene graph of
 	/// <paramref name="databaseCache"/>'s correspondence graph, with the number of matches
-	/// between two images as the edge weight. Pairs are taken in a fixed pseudo-random order
-	/// of their pair ids, not the graph's ascending insertion order
-	/// (docs/CPP_DIVERGENCES.md, entry 120).
+	/// between two images as the edge weight. Pairs are taken in the order of Boost's mixed
+	/// hash of their pair ids, modelling COLMAP's Boost hash map backend, not the graph's
+	/// ascending insertion order (docs/CPP_DIVERGENCES.md, entry 120).
 	/// </summary>
 	public static SceneClustering Create(Options options, DatabaseCache databaseCache)
 	{
@@ -177,10 +179,12 @@ public sealed class SceneClustering
 		// correspondence graph's insertion order is ascending pair id, which breaks all ties
 		// toward the same few low image ids. Those are usually the images of one rig frame,
 		// so sibling clusters could overlap in a single frame, too few to align
-		// zero-baseline (panoramic) rigs. Scrambling the pair id restores the property
-		// COLMAP relies on and stays deterministic.
+		// zero-baseline (panoramic) rigs. Ordering by Boost's mixed hash models the order of
+		// COLMAP's default (Boost) hash map backend and stays deterministic. The mix is not
+		// a bijection, so equal mixed values fall back to the pair id (Boost keeps them in
+		// insertion order).
 		var orderedPairs = numMatchesBetweenImages
-			.OrderBy(pair => ScramblePairId(pair.Key))
+			.OrderBy(pair => BoostMulxMix(pair.Key))
 			.ThenBy(pair => pair.Key);
 
 		var allImagePairs = new List<(uint, uint)>(numMatchesBetweenImages.Count);
@@ -196,17 +200,16 @@ public sealed class SceneClustering
 		return sceneClustering;
 	}
 
-	// The SplitMix64 finalizer (Steele, Lea and Flood, OOPSLA 2014): a bijection on 64-bit
-	// values whose output order is unrelated to the input order.
-	private static ulong ScramblePairId(ulong pairId)
+	// Boost.Unordered's mulx_mix (boost/unordered/detail/mulx.hpp, Boost 1.87, BSL-1.0),
+	// which its open-addressing tables apply to a non-avalanching hash such as the identity
+	// std::hash<uint64_t> of COLMAP's pair ids: the 128-bit product with the golden-ratio
+	// constant, low half xor high half. A table of 2^k groups puts the key in group
+	// mix >> (64 - k) and iterates groups in ascending order, so ascending mixed value is
+	// the table's order up to the order of keys within one group.
+	private static ulong BoostMulxMix(ulong pairId)
 	{
-		unchecked
-		{
-			var z = pairId + 0x9E3779B97F4A7C15UL;
-			z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
-			z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
-			return z ^ (z >> 31);
-		}
+		ulong high = Math.BigMul(pairId, 0x9E3779B97F4A7C15UL, out ulong low);
+		return low ^ high;
 	}
 
 	private void PartitionHierarchicalCluster(IReadOnlyList<(int, int)> edges, IReadOnlyList<int> weights, Cluster cluster)

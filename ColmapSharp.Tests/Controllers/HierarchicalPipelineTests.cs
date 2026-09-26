@@ -307,6 +307,38 @@ public class HierarchicalPipelineTests
 		await Assert.That(eightWorkers).IsEquivalentTo(oneWorker, TUnit.Assertions.Enums.CollectionOrdering.Matching);
 	}
 
+	// C#-only: the cluster reports come from the worker threads, but one at a time under a
+	// lock, so their Done counts run 1, 2, ..., N in order; the merge report comes last.
+	[Test]
+	public async Task CSharpOnly_ClusterProgressCountsIncrease()
+	{
+		RandomUtils.SetPRNGSeed(0);
+		using var database = new InMemoryDatabase();
+		Synthetic.SynthesizeDataset(
+			new SyntheticDatasetOptions { NumRigs = 2, NumCamerasPerRig = 1, NumFramesPerRig = 20, NumPoints3D = 100 },
+			new Reconstruction(),
+			database);
+
+		var mapperOptions = new HierarchicalPipelineOptions { NumWorkers = 8, NumThreads = 8 };
+		mapperOptions.ClusteringOptions.LeafMaxNumImages = 5;
+		mapperOptions.ClusteringOptions.ImageOverlap = 3;
+		var reports = new List<ControllerProgress>();
+		var mapper = new HierarchicalPipeline(mapperOptions, database, new ReconstructionManager())
+		{
+			// Reports arrive on several threads, but the pipeline serializes them.
+			Progress = new SynchronousProgress(reports.Add),
+		};
+		mapper.Run();
+
+		List<int> clusterCounts = [.. reports.Where(r => r.Stage == HierarchicalPipeline.ReconstructionStage).Select(r => r.Done)];
+		int numClusters = reports.First(r => r.Stage == HierarchicalPipeline.ReconstructionStage).Total;
+
+		await Assert.That(numClusters).IsGreaterThan(1);
+		await Assert.That(clusterCounts).IsEquivalentTo(
+			Enumerable.Range(1, numClusters), TUnit.Assertions.Enums.CollectionOrdering.Matching);
+		await Assert.That(reports[^1].Stage).IsEqualTo(HierarchicalPipeline.MergingStage);
+	}
+
 	// Progress<T> posts to the thread pool; this one reports inline so the cancellation
 	// happens before the next cluster starts.
 	private sealed class SynchronousProgress(Action<ControllerProgress> report) : IProgress<ControllerProgress>

@@ -287,14 +287,8 @@ list, `ExtractMatchesBetweenImages` and `ExtractTransitiveCorrespondences` are i
 order already (they come from vectors, not hash iteration).
 
 **Evidence.** `CorrespondenceGraphTests` (all 11 cases) pass. Code that walks the pairs in
-this order (`PoseGraph.Load` and `SceneClustering.Create`, and through the pose graph the
-global mapper once it is ported) sees them in load order; a pycolmap fixture for such a
-pipeline is then compared at Tier C, not Tier A.
-
-**Evidence.** `CorrespondenceGraphTests` (all 11 cases) pass. Code ported later that walks
-the pairs in this order (COLMAP's `PoseGraph::Load`, and through it the global mapper) will
-see them in load order; a pycolmap fixture for such a pipeline is then compared at Tier C,
-not Tier A. `SceneClustering.Create` reorders the pairs itself (entry 120).
+this order (`PoseGraph.Load`, and through it the global mapper) sees them in load order; a
+pycolmap fixture for such a pipeline is then compared at Tier C, not Tier A. `SceneClustering.Create` reorders the pairs itself (entry 120).
 
 ## 15. ComputeBoundingBoxAndCentroid sorts instead of std::nth_element
 
@@ -2137,6 +2131,74 @@ every image has one prior written in image order.
 renumbers the priors to 101..105: the pose_prior_id lookup failed with "Image with ID 101 does
 not exist"; with the fix all five images are posed within 1e-2 degrees of the ground truth.
 
+## 103. Delaunay meshing uses our own tetrahedralization, not CGAL's
+
+**What differs.** COLMAP's `mvs/delaunay_meshing.cc` triangulates the points with
+`CGAL::Delaunay_triangulation_3<Epick, Fast_location>`. The port uses
+`Geometry/Delaunay/DelaunayTriangulation3` (Bowyer-Watson with a visibility walk, BRIO +
+Hilbert range insertion, Shewchuk-filtered exact predicates). With default options COLMAP
+builds it through `CreateSubSampledDelaunayTriangulation`, one point at a time in a shuffled
+order (the range constructor is used only when `max_proj_dist` is 0). For points in general
+position the Delaunay triangulation is unique, so both build the same cells. They differ in:
+- **Cospherical points.** CGAL documents that its Delaunay triangulation resolves five or more
+  cospherical points by symbolic perturbation, so its result does not depend on insertion
+  order. Ours uses a strict in-sphere conflict test, so which of the valid triangulations is
+  built depends on the insertion order (it is still deterministic for a given order).
+- **Locate on a facet, edge or vertex.** When a query point lies exactly on a shared facet,
+  edge or vertex, several cells contain it; CGAL's locate and our walk can return different
+  ones (ours depends on the hint and the walk's pseudo-random facet order). This changes
+  which cell's vertices the subsampling compares against, and where the ray caster starts.
+- **Enumeration order and handles.** Cells, facets and edges come in a different order and
+  with different handles (entry 109 covers where that reaches the output).
+- **Constructions.** Circumcenters and segment/triangle intersection points are inexact
+  double constructions on both sides and may differ in the last bits.
+  `TryIntersectSegmentTriangle`, standing in for `CGAL::intersection(Segment_3, Triangle_3)`
+  assigned to a point, reports no intersection for a segment lying in the triangle's plane;
+  CGAL returns a segment there (which COLMAP's ray caster rejects too) except when the two
+  touch in a single point, where CGAL returns that point.
+
+**Why.** CGAL is GPL and excluded (docs/LICENSE_AUDIT.md), so its insertion order, locate
+tie-breaking and cell storage cannot be matched by reading it. Implementing symbolic
+perturbation (Devillers and Teillaud, "Perturbations for Delaunay and weighted Delaunay 3D
+triangulations", CGTA 2011) would remove the order dependence for cospherical input; it is
+not done yet.
+
+**Evidence.** `DelaunayTriangulation3Tests` and `DelaunayDegenerateTests` (C#-only): the
+empty-circumsphere property on random, grid (coplanar and cospherical) and exactly
+cospherical inputs, the Euler characteristic, duplicate handling, and incremental versus
+range insertion producing the same cell set in general position. Downstream, Delaunay
+meshing is compared at Tier C.
+
+## 104. Subsampled Delaunay triangulation inserts every point until the points span 3D
+
+**What differs.** COLMAP's `CreateSubSampledDelaunayTriangulation` inserts points
+unconditionally only while `number_of_vertices() < 4`; after that it locates each point and
+skips it when it reprojects close to the vertices of its cell. If the first four or more
+(shuffled) points are coplanar, CGAL's triangulation is still 2D and `locate` returns a
+2D face whose `vertex(3)` COLMAP's loop then reads. `DelaunayMeshingInput` keeps inserting
+unconditionally while `DelaunayTriangulation3.Dimension < 3`, and applies COLMAP's test from
+the first 3D cell on.
+
+**Why.** Our triangulation has no 2D cells to locate in (it holds points pending until four
+are affinely independent, entry 103), and COLMAP's 2D path reads a vertex slot a 2D face does
+not have. With non-degenerate input the two agree after the first four points.
+
+**Evidence.** `DelaunayMeshingTests.CSharpOnly_SubsampledTriangulationInsertsEveryPointWhileFlat`:
+50 coplanar points all become vertices and the triangulation stays 2D.
+
+## 105. Sparse Delaunay meshing numbers the points in ascending point3D id
+
+**What differs.** COLMAP's `CopyFromSparseReconstruction` numbers the input points in the
+iteration order of `reconstruction.Points3D()`, an `unordered_map`. `DelaunayMeshingInput.
+FromSparseReconstruction` numbers them in ascending point3D id. The numbering feeds the
+shuffle in `CreateSubSampledDelaunayTriangulation`, so which points are kept can differ.
+
+**Why.** CLAUDE.md's rule for hash-container order: libc++'s bucket order is not
+reproducible from .NET, and ascending id is deterministic.
+
+**Evidence.** `DelaunayMeshingTests.CSharpOnly_InputFromSparseReconstruction` pins the
+ascending-id order; the meshing result is compared at Tier C.
+
 ## 106. Poisson splatting runs sequentially in sample order
 
 **What differs.** PoissonRecon splats the samples' normals (`setInterpolatedDataField`) in a
@@ -2188,6 +2250,90 @@ nobody asked for, and could fail COLMAP's final "at least one registered image" 
 **Evidence.** `HierarchicalPipelineTests.CSharpOnly_CancellationStopsBeforeMerging` (C#-only)
 cancels after the first cluster and sees no merge and an empty manager; the four ported
 cases run without a stop request and pass at COLMAP's bounds.
+
+## 109. Delaunay meshing assembles the graph and the surface in cell and facet order
+
+**What differs.** COLMAP numbers the s-t graph nodes and adds the edges while iterating a
+`NodeHashMap<Cell_handle, DelaunayCellData>`, walks the finite facets in CGAL's order, and
+collects the surface vertices in a `FlatHashSet<Vertex_handle>` whose iteration order becomes
+the output vertex order. `DelaunayMeshing` (Mvs/DelaunayMeshing.cs) numbers nodes and adds
+edges in cell-handle order, walks `FiniteFacets()` in handle order, and numbers surface
+vertices in order of first appearance. Node and edge order can change which minimum cut
+Boykov-Kolmogorov returns when several cuts have equal cost, and the vertex and face order of
+the output mesh differ.
+
+**Why.** Hash-container order (pointer hashes in COLMAP) cannot be reproduced and is not
+stable even between COLMAP runs; CLAUDE.md asks for a deterministic order.
+
+**Evidence.** `DelaunayMeshingSceneCSharpOnlyTests.CSharpOnly_ThreadCountDoesNotChangeTheMesh`
+(identical meshes) and the ported `DelaunayMeshingTests`.
+
+## 110. Delaunay meshing sums per-image weights in image order for any thread count
+
+**What differs.** COLMAP integrates images on a thread pool and adds each image's cell
+weights to the graph in the order the jobs finish, so with more than one thread the float sums,
+and so the cut, can vary from run to run. The port integrates batches of images in parallel,
+each into its own map, and adds them in image order, which is what COLMAP does with one thread.
+Each worker also locates points with its own `LocateCursor`, so no result depends on another
+thread's walk.
+
+**Why.** CLAUDE.md: sequential and parallel runs must give the same result.
+
+**Evidence.** `DelaunayMeshingSceneCSharpOnlyTests.CSharpOnly_ThreadCountDoesNotChangeTheMesh`:
+1 and 5 threads give identical vertex and face lists.
+
+## 111. When the ray leaves the hull at a point, the sink vote goes to the infinite cell behind it
+
+**What differs.** For each observation COLMAP locates the cell just behind the point
+(`point + epsilon` along the viewing ray), intersects the viewing ray with all four facets of
+that cell (`triangulation.triangle(cell, i)`), and puts the sink vote in the cell across the
+farthest hit facet. That cell is infinite exactly when the viewing ray leaves the convex hull
+at the point: a hull vertex seen through the point set from the far side (the see-through
+synthetic scenes of `delaunay_meshing_test.cc`, where every point is visible in every image),
+or a ray grazing the silhouette. A hull vertex seen from outside, facing the camera, has a
+finite cell behind it. Three facets of an infinite cell run through CGAL's infinite vertex,
+and COLMAP intersects them anyway, with whatever point CGAL stores for that vertex; the value
+is not documented. The port (Mvs/DelaunayMeshing.Integrate.cs):
+- if the cast segment entered the hull before reaching the point (it crossed at least one
+  facet), gives the sink vote to the infinite cell behind the point (no edge weight);
+- otherwise (the ray stayed outside the hull, e.g. grazing), adds nothing behind the point;
+- applies COLMAP's rule unchanged whenever the cell behind the point is finite.
+
+**Why.** Our infinite vertex has no geometric position, and CGAL's is not observable without
+reading CGAL. Black-box checking was not possible: the pinned pycolmap 4.2.0 wheel is built
+without CGAL (`sparse_delaunay_meshing` / `dense_delaunay_meshing` are compiled only under
+`COLMAP_CGAL_ENABLED` in `pycolmap/pipeline/meshing.cc`, and the wheel has neither). Skipping
+the infinite facets altogether gives the see-through scenes almost no sink votes, the cut has
+no surface, and all three ported tests fail. The gate matters for object-only captures: an
+ungated vote on grazing rays pushes cells outside the object towards "inside" and loses
+surface (1733 faces instead of 2054 on the 1500-point, noise-0.01 object-only sphere). With
+the gate the review's occluded object-only scenes gave the same meshes as both "skip" and
+"infinite vertex at the origin", and the see-through scenes still give outward faces.
+
+**Object-only captures.** When every observed point is a hull vertex (an exact convex object
+seen only from outside), no viewing ray enters the hull, no cell gets a source vote, and the
+cut has no surface - in COLMAP as here (entry 112 gives the readable error). Noisy or concave
+real captures put points inside the hull and do produce closed, outward surfaces.
+
+**Uncertainty:** where the ray leaves the hull at the point, which hull facets are cut can
+differ from COLMAP, whose result there depends on an undocumented CGAL value.
+
+**Evidence.** The three ported `DelaunayMeshingTests` pass; `DelaunayMeshingSceneCSharpOnlyTests`
+`CSharpOnly_ObjectOnlyNoisySphereGivesAClosedOutwardSurface` (closed, outward, and the
+1500-point face count that the ungated rule lost) and `CSharpOnly_SphereMeshIsOrientedOutward`.
+
+## 112. Delaunay meshing explains an empty cut instead of failing a Check
+
+**What differs.** When the graph cut labels every cell the same, COLMAP reaches
+`Percentile` with no surface facets and fails `THROW_CHECK(!elems.empty())`. `DelaunayMeshing`
+throws `InvalidOperationException` with `DelaunayMeshing.NoSurfaceMessage` ("Delaunay meshing
+found no surface: too few views see into the scene's free space ... Try Poisson meshing or add
+views.") at the same point. Only the exception type and message differ.
+
+**Why.** MatterCAD shows the message to the user, and the common cause (a smooth convex object
+seen only from outside, entry 111) has a clear remedy.
+
+**Evidence.** `DelaunayMeshingSceneCSharpOnlyTests.CSharpOnly_NoSurfaceThrowsAReadableError`.
 
 ## 113. Reading a truncated binary PLY mesh throws inside the texcoord lists
 
@@ -2307,11 +2453,21 @@ thread-static PRNG state earlier tests left behind. `UndistortionTests.CSharpOnl
 
 ## 120. SceneClustering.Create hands the image pairs over in a scrambled order
 
+## 120. SceneClustering.Create hands the image pairs over in Boost hash order
+
 **What differs.** COLMAP's `SceneClustering::Create` builds the edge list by iterating the
 `NodeHashMap` from `NumMatchesBetweenAllImages()`, so the edges come in hash order. The
-port (`Scene/SceneClustering.cs`) orders the pairs by the SplitMix64 finalizer of the pair
-id (then by pair id), instead of the correspondence graph's insertion order (entry 14),
-which is ascending pair id.
+port (`Scene/SceneClustering.cs`) models the order of COLMAP's default backend, which CMake
+picks when Boost >= 1.84 is found (`cmake/FindDependencies.cmake`): `boost::unordered_node_map`
+with the identity `std::hash<uint64_t>`. Boost marks that hash non-avalanching
+(`hash_traits.hpp`), so its table mixes it with `mulx(h) = lo ^ hi` of `h * 0x9E3779B97F4A7C15`
+(`detail/mulx.hpp`), puts the key in group `mix >> size_index` (`pow2_size_policy::position`
+in `detail/foa/core.hpp`) and iterates groups in ascending order. The port orders the pairs
+by that mixed value (then by pair id), instead of the correspondence graph's insertion order
+(entry 14), which is ascending pair id. This is Boost's order up to the order of the keys
+that share a group (Boost keeps insertion order within a group and moves overflow to later
+groups), which depends on the table size and the insertion history; verified against the
+Boost.Unordered 1.87.0 source.
 
 **Why.** The edge order decides every weight tie: the vertex numbering of the graph cut
 (entry 77) and which overlap images each child cluster gets (entry 93). COLMAP relies,
@@ -2322,14 +2478,14 @@ frame consecutively. With `hierarchical_pipeline_test.cc`'s panoramic case, wher
 per side. A zero-baseline rig's images of one frame share a projection center, so the two
 halves had only two distinct centers in common. `AlignReconstructionsViaReprojections`
 cannot estimate a similarity from that, the final merge failed, and the run ended with two
-reconstructions. The hash order is backend-specific (entry 14), so a fixed bijection that
-scrambles the ids reproduces the property, not the exact order, and stays deterministic.
+reconstructions. The hash order is backend-specific (entry 14); modelling the default Boost
+backend reproduces the property, and most of the order, and stays deterministic.
 
 **Evidence.** Tier C. `SceneClusteringTests.CSharpOnly_CreateSpreadsTiedOverlapAcrossFrames`
-(C#-only) fails with the insertion order (2 shared frames) and passes with the scrambled
-order (at least 3). `HierarchicalPipeline_WithoutNoiseAndPanoramicNonTrivialFrames` (1:1)
-now merges into one reconstruction. The leaf reconstructions register 27-36 images from
-12-13 image clusters, as pycolmap 4.2.0's `hierarchical_mapping` does on the same dataset
+(C#-only) fails with the insertion order (2 shared frames) and passes with the Boost order
+(at least 3). `HierarchicalPipeline_WithoutNoiseAndPanoramicNonTrivialFrames` (1:1)
+now merges into one reconstruction. The leaf reconstructions register 27-39 images from
+12-13 image clusters, close to pycolmap 4.2.0's `hierarchical_mapping` on the same dataset
 (27-33); with the insertion order they registered 15-18. The ported
 `scene_clustering_test.cc` cases call `Partition` directly and are unaffected.
 
@@ -2373,155 +2529,3 @@ half-computed maps.
 
 **Evidence.** `PatchMatchControllerTests.Run_CancelledMidProblemWritesNothingForIt` and
 `Run_StopsWithoutErrorWhenCancelled` (C#-only).
-
-## 103. Delaunay meshing uses our own tetrahedralization, not CGAL's
-
-**What differs.** COLMAP's `mvs/delaunay_meshing.cc` triangulates the points with
-`CGAL::Delaunay_triangulation_3<Epick, Fast_location>`. The port uses
-`Geometry/Delaunay/DelaunayTriangulation3` (Bowyer-Watson with a visibility walk, BRIO +
-Hilbert range insertion, Shewchuk-filtered exact predicates). With default options COLMAP
-builds it through `CreateSubSampledDelaunayTriangulation`, one point at a time in a shuffled
-order (the range constructor is used only when `max_proj_dist` is 0). For points in general
-position the Delaunay triangulation is unique, so both build the same cells. They differ in:
-- **Cospherical points.** CGAL documents that its Delaunay triangulation resolves five or more
-  cospherical points by symbolic perturbation, so its result does not depend on insertion
-  order. Ours uses a strict in-sphere conflict test, so which of the valid triangulations is
-  built depends on the insertion order (it is still deterministic for a given order).
-- **Locate on a facet, edge or vertex.** When a query point lies exactly on a shared facet,
-  edge or vertex, several cells contain it; CGAL's locate and our walk can return different
-  ones (ours depends on the hint and the walk's pseudo-random facet order). This changes
-  which cell's vertices the subsampling compares against, and where the ray caster starts.
-- **Enumeration order and handles.** Cells, facets and edges come in a different order and
-  with different handles (entry 109 covers where that reaches the output).
-- **Constructions.** Circumcenters and segment/triangle intersection points are inexact
-  double constructions on both sides and may differ in the last bits.
-  `TryIntersectSegmentTriangle`, standing in for `CGAL::intersection(Segment_3, Triangle_3)`
-  assigned to a point, reports no intersection for a segment lying in the triangle's plane;
-  CGAL returns a segment there (which COLMAP's ray caster rejects too) except when the two
-  touch in a single point, where CGAL returns that point.
-
-**Why.** CGAL is GPL and excluded (docs/LICENSE_AUDIT.md), so its insertion order, locate
-tie-breaking and cell storage cannot be matched by reading it. Implementing symbolic
-perturbation (Devillers and Teillaud, "Perturbations for Delaunay and weighted Delaunay 3D
-triangulations", CGTA 2011) would remove the order dependence for cospherical input; it is
-not done yet.
-
-**Evidence.** `DelaunayTriangulation3Tests` and `DelaunayDegenerateTests` (C#-only): the
-empty-circumsphere property on random, grid (coplanar and cospherical) and exactly
-cospherical inputs, the Euler characteristic, duplicate handling, and incremental versus
-range insertion producing the same cell set in general position. Downstream, Delaunay
-meshing is compared at Tier C.
-
-## 104. Subsampled Delaunay triangulation inserts every point until the points span 3D
-
-**What differs.** COLMAP's `CreateSubSampledDelaunayTriangulation` inserts points
-unconditionally only while `number_of_vertices() < 4`; after that it locates each point and
-skips it when it reprojects close to the vertices of its cell. If the first four or more
-(shuffled) points are coplanar, CGAL's triangulation is still 2D and `locate` returns a
-2D face whose `vertex(3)` COLMAP's loop then reads. `DelaunayMeshingInput` keeps inserting
-unconditionally while `DelaunayTriangulation3.Dimension < 3`, and applies COLMAP's test from
-the first 3D cell on.
-
-**Why.** Our triangulation has no 2D cells to locate in (it holds points pending until four
-are affinely independent, entry 103), and COLMAP's 2D path reads a vertex slot a 2D face does
-not have. With non-degenerate input the two agree after the first four points.
-
-**Evidence.** `DelaunayMeshingTests.CSharpOnly_SubsampledTriangulationInsertsEveryPointWhileFlat`:
-50 coplanar points all become vertices and the triangulation stays 2D.
-
-## 105. Sparse Delaunay meshing numbers the points in ascending point3D id
-
-**What differs.** COLMAP's `CopyFromSparseReconstruction` numbers the input points in the
-iteration order of `reconstruction.Points3D()`, an `unordered_map`. `DelaunayMeshingInput.
-FromSparseReconstruction` numbers them in ascending point3D id. The numbering feeds the
-shuffle in `CreateSubSampledDelaunayTriangulation`, so which points are kept can differ.
-
-**Why.** CLAUDE.md's rule for hash-container order: libc++'s bucket order is not
-reproducible from .NET, and ascending id is deterministic.
-
-**Evidence.** `DelaunayMeshingTests.CSharpOnly_InputFromSparseReconstruction` pins the
-ascending-id order; the meshing result is compared at Tier C.
-
-## 109. Delaunay meshing assembles the graph and the surface in cell and facet order
-
-**What differs.** COLMAP numbers the s-t graph nodes and adds the edges while iterating a
-`NodeHashMap<Cell_handle, DelaunayCellData>`, walks the finite facets in CGAL's order, and
-collects the surface vertices in a `FlatHashSet<Vertex_handle>` whose iteration order becomes
-the output vertex order. `DelaunayMeshing` (Mvs/DelaunayMeshing.cs) numbers nodes and adds
-edges in cell-handle order, walks `FiniteFacets()` in handle order, and numbers surface
-vertices in order of first appearance. Node and edge order can change which minimum cut
-Boykov-Kolmogorov returns when several cuts have equal cost, and the vertex and face order of
-the output mesh differ.
-
-**Why.** Hash-container order (pointer hashes in COLMAP) cannot be reproduced and is not
-stable even between COLMAP runs; CLAUDE.md asks for a deterministic order.
-
-**Evidence.** `DelaunayMeshingSceneCSharpOnlyTests.CSharpOnly_ThreadCountDoesNotChangeTheMesh`
-(identical meshes) and the ported `DelaunayMeshingTests`.
-
-## 110. Delaunay meshing sums per-image weights in image order for any thread count
-
-**What differs.** COLMAP integrates images on a thread pool and adds each image's cell
-weights to the graph in the order the jobs finish, so with more than one thread the float sums,
-and so the cut, can vary from run to run. The port integrates batches of images in parallel,
-each into its own map, and adds them in image order, which is what COLMAP does with one thread.
-Each worker also locates points with its own `LocateCursor`, so no result depends on another
-thread's walk.
-
-**Why.** CLAUDE.md: sequential and parallel runs must give the same result.
-
-**Evidence.** `DelaunayMeshingSceneCSharpOnlyTests.CSharpOnly_ThreadCountDoesNotChangeTheMesh`:
-1 and 5 threads give identical vertex and face lists.
-
-## 111. When the ray leaves the hull at a point, the sink vote goes to the infinite cell behind it
-
-**What differs.** For each observation COLMAP locates the cell just behind the point
-(`point + epsilon` along the viewing ray), intersects the viewing ray with all four facets of
-that cell (`triangulation.triangle(cell, i)`), and puts the sink vote in the cell across the
-farthest hit facet. That cell is infinite exactly when the viewing ray leaves the convex hull
-at the point: a hull vertex seen through the point set from the far side (the see-through
-synthetic scenes of `delaunay_meshing_test.cc`, where every point is visible in every image),
-or a ray grazing the silhouette. A hull vertex seen from outside, facing the camera, has a
-finite cell behind it. Three facets of an infinite cell run through CGAL's infinite vertex,
-and COLMAP intersects them anyway, with whatever point CGAL stores for that vertex; the value
-is not documented. The port (Mvs/DelaunayMeshing.Integrate.cs):
-- if the cast segment entered the hull before reaching the point (it crossed at least one
-  facet), gives the sink vote to the infinite cell behind the point (no edge weight);
-- otherwise (the ray stayed outside the hull, e.g. grazing), adds nothing behind the point;
-- applies COLMAP's rule unchanged whenever the cell behind the point is finite.
-
-**Why.** Our infinite vertex has no geometric position, and CGAL's is not observable without
-reading CGAL. Black-box checking was not possible: the pinned pycolmap 4.2.0 wheel is built
-without CGAL (`sparse_delaunay_meshing` / `dense_delaunay_meshing` are compiled only under
-`COLMAP_CGAL_ENABLED` in `pycolmap/pipeline/meshing.cc`, and the wheel has neither). Skipping
-the infinite facets altogether gives the see-through scenes almost no sink votes, the cut has
-no surface, and all three ported tests fail. The gate matters for object-only captures: an
-ungated vote on grazing rays pushes cells outside the object towards "inside" and loses
-surface (1733 faces instead of 2054 on the 1500-point, noise-0.01 object-only sphere). With
-the gate the review's occluded object-only scenes gave the same meshes as both "skip" and
-"infinite vertex at the origin", and the see-through scenes still give outward faces.
-
-**Object-only captures.** When every observed point is a hull vertex (an exact convex object
-seen only from outside), no viewing ray enters the hull, no cell gets a source vote, and the
-cut has no surface - in COLMAP as here (entry 112 gives the readable error). Noisy or concave
-real captures put points inside the hull and do produce closed, outward surfaces.
-
-**Uncertainty:** where the ray leaves the hull at the point, which hull facets are cut can
-differ from COLMAP, whose result there depends on an undocumented CGAL value.
-
-**Evidence.** The three ported `DelaunayMeshingTests` pass; `DelaunayMeshingSceneCSharpOnlyTests`
-`CSharpOnly_ObjectOnlyNoisySphereGivesAClosedOutwardSurface` (closed, outward, and the
-1500-point face count that the ungated rule lost) and `CSharpOnly_SphereMeshIsOrientedOutward`.
-
-## 112. Delaunay meshing explains an empty cut instead of failing a Check
-
-**What differs.** When the graph cut labels every cell the same, COLMAP reaches
-`Percentile` with no surface facets and fails `THROW_CHECK(!elems.empty())`. `DelaunayMeshing`
-throws `InvalidOperationException` with `DelaunayMeshing.NoSurfaceMessage` ("Delaunay meshing
-found no surface: too few views see into the scene's free space ... Try Poisson meshing or add
-views.") at the same point. Only the exception type and message differ.
-
-**Why.** MatterCAD shows the message to the user, and the common cause (a smooth convex object
-seen only from outside, entry 111) has a clear remedy.
-
-**Evidence.** `DelaunayMeshingSceneCSharpOnlyTests.CSharpOnly_NoSurfaceThrowsAReadableError`.

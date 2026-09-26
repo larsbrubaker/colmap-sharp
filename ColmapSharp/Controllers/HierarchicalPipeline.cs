@@ -26,8 +26,14 @@
 // - Cancellation: COLMAP's Run never checks CheckIfStopped. Here BaseController's
 //   CancellationToken and stop function reach every cluster's IncrementalPipeline, and a
 //   stopped run returns before merging (docs/CPP_DIVERGENCES.md entry 108).
+// - Exceptions: COLMAP's ThreadPool::Wait rethrows every task exception at once as a
+//   colmap::AggregateException (util/threading.cc, CheckFinishedTasks). Parallel.ForEach's
+//   System.AggregateException is the same contract, so it propagates as is; unlike
+//   ProgramEvaluator (where one thread would surface the cost function's own exception),
+//   COLMAP itself aggregates here.
 // - Progress (C#-only): Progress, when set, receives a ControllerProgress per reconstructed
-//   cluster and one when merging is done.
+//   cluster and one when merging is done. The cluster reports are sent from the worker
+//   threads, one at a time under a lock, so their Done counts strictly increase.
 // - LOG(WARNING) goes to Util/Log.cs; LOG(INFO) and the timers are dropped.
 
 using ColmapSharp.Mathematics;
@@ -170,15 +176,21 @@ public sealed class HierarchicalPipeline : BaseController
 			reconstructionManagers[cluster] = new ReconstructionManager();
 		}
 
+		// Count and report under one lock, so the reports (sent from worker threads) carry
+		// strictly increasing counts.
 		int numReconstructed = 0;
+		var progressLock = new object();
 		Parallel.ForEach(
 			scheduled,
 			new ParallelOptions { MaxDegreeOfParallelism = numEffWorkers },
 			cluster =>
 			{
 				ReconstructCluster(cluster, reconstructionManagers[cluster], imageIdToName, numThreadsPerWorker);
-				int done = Interlocked.Increment(ref numReconstructed);
-				Progress?.Report(new ControllerProgress(ReconstructionStage, done, scheduled.Count, ""));
+				lock (progressLock)
+				{
+					numReconstructed++;
+					Progress?.Report(new ControllerProgress(ReconstructionStage, numReconstructed, scheduled.Count, ""));
+				}
 			});
 
 		// A stopped run leaves partial cluster reconstructions that are not merged (entry 108).
