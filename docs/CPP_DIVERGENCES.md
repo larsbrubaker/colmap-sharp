@@ -1322,3 +1322,25 @@ abseil's per-process hash seed.
 **Evidence.** `IncrementalMapperTests` (incremental_mapper_test.cc 1:1) pass; `FullPipeline`
 registers all 10 frames and matches the ground truth within COLMAP's ReconstructionNear
 bounds (0.1 deg, 0.1).
+
+## 60. UndistortReconstruction keeps each camera's id
+
+**What differs.** COLMAP's `UndistortReconstruction` (image/undistortion.cc) assigns
+`UndistortCamera(...)` to the stored camera (`reconstruction->Camera(camera_id) = ...`).
+`UndistortCamera` builds a default-constructed `Camera`, so every undistorted camera's
+`camera_id` becomes `kInvalidCameraId` while its map key stays. The port
+(`ImageProcessing/Undistortion.cs`) writes the undistorted model, size, parameters and prior
+flag into the stored camera but keeps its `CameraId` (and so its `SensorId`).
+`UndistortCamera` itself still returns a camera with the invalid id, as in COLMAP.
+
+**Why.** Code here keys by `camera.CameraId` or `camera.SensorId` (Reconstruction.Crop,
+Alignment's merge, rotation averaging, the default bundle adjuster, the triangulator's
+bogus-params cache); with two or more cameras they would collide on the invalid id.
+MatterCAD undistorts and then densifies the same in-memory reconstruction. COLMAP avoids the
+problem because its undistorter writes the reconstruction to disk, and the writers take the
+id from the map key, so file output is the same either way.
+
+**Evidence.** `UndistortionTests.CSharpOnly_UndistortReconstruction_KeepsCameraIds` (two
+cameras: each id equals its map key, rig lookups by `SensorId` succeed, and `Crop` keeps both
+cameras) failed before the change and passes after it; the ported undistortion_test.cc cases
+pass unchanged.

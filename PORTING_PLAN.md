@@ -109,7 +109,7 @@ Skipped (retrieval out of scope): `pairing_test.cc` VocabTreePairGenerator.Nomin
 VocabTreePairGenerator.DoesNotDeadlockOnFailedQuery, SequentialPairGenerator.LoopDetectionMinIndexDistance.
 
 ### Phase 12 — Dense reconstruction (MVS)
-`image/undistortion`, `image/warp`, `mvs/mat`, `image`, `depth_map`, `normal_map`,
+`mvs/mat`, `image`, `depth_map`, `normal_map`,
 `model`, `workspace`, `consistency_graph`, `patch_match` + a managed CPU port of
 `patch_match_cuda.cu` (parallel over pixels/rows, deterministic), `fusion`,
 `poisson_meshing` (PoissonRecon MIT port, add notice), `delaunay_meshing` (tetrahedralization

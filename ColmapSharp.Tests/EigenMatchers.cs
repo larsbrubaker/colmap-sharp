@@ -8,7 +8,8 @@
 // the pose, essential/homography matrix, triangulation and normalization tests; the VectorXd overload
 // serves Optim/SparseCholeskyTests.cs and LeastAbsoluteDeviationsTests.cs; the MatrixXd
 // overload Estimators/CostFunctions/TinyManifoldTests.cs and QuaternionUtilsTests.cs; the float
-// RowMajorMatrix overload Controllers/PairingTests.cs).
+// RowMajorMatrix overload Controllers/PairingTests.cs; the Matrix4d overload
+// ImageProcessing/UndistortionTests.cs).
 //
 // Semantics, as in COLMAP: if rhs is zero (Eigen's isZero(), every coefficient within
 // dummy_precision = 1e-12 of 0), lhs matches when lhs.norm() <= tol, because isApprox is
@@ -61,6 +62,19 @@ internal static class EigenMatchers
 	public static bool EigenMatrixNear(Matrix3d lhs, Matrix3d rhs, double tol = LinearAlgebraConstants.DummyPrecision)
 	{
 		Span<double> coefficients = stackalloc double[9];
+		rhs.CopyToColumnMajor(coefficients);
+		if (IsZero(coefficients))
+		{
+			return lhs.Norm() <= tol;
+		}
+
+		return lhs.IsApprox(rhs, tol);
+	}
+
+	/// <summary>EigenMatrixNear(rhs, tol) applied to lhs (ImageProcessing/UndistortionTests).</summary>
+	public static bool EigenMatrixNear(Matrix4d lhs, Matrix4d rhs, double tol = LinearAlgebraConstants.DummyPrecision)
+	{
+		Span<double> coefficients = stackalloc double[16];
 		rhs.CopyToColumnMajor(coefficients);
 		if (IsZero(coefficients))
 		{
