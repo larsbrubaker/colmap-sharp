@@ -2451,8 +2451,6 @@ made `UndistortersTests.StereoImageRectifier_Integration` fail intermittently de
 thread-static PRNG state earlier tests left behind. `UndistortionTests.CSharpOnly_RectifyAndUndistortStereoImages_FarSourceSamples`
 (seed 25) and `BitmapTests.CSharpOnly_InterpolateFarOutsideOrNaN_ReturnsNull` pin it.
 
-## 120. SceneClustering.Create hands the image pairs over in a scrambled order
-
 ## 120. SceneClustering.Create hands the image pairs over in Boost hash order
 
 **What differs.** COLMAP's `SceneClustering::Create` builds the edge list by iterating the
