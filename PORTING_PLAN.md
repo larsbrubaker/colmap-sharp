@@ -39,8 +39,17 @@ Each phase ends with its ported tests green. Test names follow COLMAP's.
 
 ### Phase 3 — Sensor
 `sensor/models` (all camera models; Tier A, bit-exact projection/unprojection, including the
-iterative undistortion), `rig`, `specs` (camera sensor-width DB), `bitmap` as a managed pixel
-buffer (host decodes images; managed EXIF reader for focal length/make/model), `database`.
+iterative undistortion), `rig`.
+
+Skipped `bitmap_test.cc` cases (the host decodes and encodes images, so OIIO file I/O is not
+ported; C# `Bitmap` is a reference type, so C++ move semantics have no counterpart):
+`MoveConstructEmpty`, `MoveConstruct`, `MoveAssignEmpty`, `MoveAssign`, `ReadWriteAsRGB`,
+`ReadWriteUnicodePath`, `ReadWriteAsGrey`, `ReadWriteAsGreyNonLinear`,
+`ReadWriteLinearColorspace`, `WriteJpegWithQuality`, `WriteInvalidFormat`, `ReadNonImageFile`,
+`ReadNonExistentFile`, `ReadUnsupportedChannels`, all `ParameterizedBitmapFormatTests`, and
+the PNG round-trip tails of `CloneAsRGB` / `CloneAsGrey`. `Bitmap.Rescale` is Tier B (managed
+resampler matching OIIO within 1 grey level, `docs/CPP_DIVERGENCES.md`); porting OIIO's
+resize (Apache-2.0) would make it exact if a fixture ever needs that.
 
 ### Phase 4 — Scene
 `point2d`, `point3d`, `track`, `camera`, `frame`, `image`, `rig`, `correspondence_graph`,

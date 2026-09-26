@@ -7,3 +7,4 @@ TestResults/
 cpp-reference/
 oracle/.venv/
 __pycache__/
+.claude/worktrees/

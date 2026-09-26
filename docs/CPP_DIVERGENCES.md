@@ -128,3 +128,59 @@ routine.
 **Evidence.** `oracle/linear_algebra_rotations.py`: all fixture cases but one are
 bit-identical with libm `sin`, and that one becomes identical when `sin(a/2)` moves one
 ulp. `RotationOracleTests.ToleranceFields("from_axis_angle")` pins it at 1e-14 relative.
+
+## 8. CameraDatabase iterates the sensor-width table in specs.cc order, not hash order
+
+**What differs.** COLMAP's `camera_specs_t` is a `NodeHashMap` (a `std::unordered_map` or
+`boost::unordered_node_map`, depending on the build), and `CameraDatabase::QuerySensorWidth`
+iterates it, writing the output width on every match and stopping after the second
+non-exact match per make. `CameraSpecs.InitializeCameraSpecs` returns a list in `specs.cc`
+source order, so when a cleaned EXIF make matches more than one table make (a substring
+match either way round, e.g. an empty make matches all of them), which widths are seen,
+and so the width left behind and whether a unique match is found, can differ from a given
+COLMAP build.
+
+**Why.** Hash iteration order is unspecified and differs between standard libraries and
+Boost, so there is no single COLMAP behavior to match; CLAUDE.md asks for deterministic
+order here.
+
+**Evidence.** `database_test.cc`'s cases (ported in `CameraDatabaseTests`) match a single
+make and pass. Queries whose make matches one table make are unaffected.
+
+## 9. Bitmap.Rescale is a managed resampler, not OpenImageIO's resize
+
+**What differs.** COLMAP's `Bitmap::Rescale` calls `OIIO::ImageBufAlgo::resize` with a
+"triangle" (kBilinear) or "box" (kBox) filter. `ColmapSharp/Sensor/BitmapResize.cs`
+reimplements the model OIIO's output follows (filter widened by the downsampling ratio,
+clamp-to-edge samples, separable, round to nearest). Bilinear results are within one gray
+level of pycolmap's; box results agree except where a source pixel center lies exactly on
+the box edge at a non-integer ratio, where OIIO's inclusion rule is not reproduced and a
+destination pixel can average one source pixel more or fewer.
+
+**Why.** OpenImageIO is native (docs/LICENSE_AUDIT.md). Its resize accumulates in float
+with its own filter evaluation, so bit-exact output would need a port of OIIO's
+resampling code (Apache-2.0, allowed but not done).
+
+**Evidence.** `oracle/fixture_bitmap_rescale.py` records pycolmap 4.2.0's bilinear output on
+seeded grey and RGB images, up and down; `BitmapRescaleOracleTests` checks every pixel
+within one gray level. Impulse probes (a single lit pixel, 1-D and 2-D) match pycolmap
+exactly for both filters at ratios 4, 8, 3, 1.5, 5/3, 2/3 and 3/5. The box tie case: 23 -> 10
+pixels, destination pixel 5 (center 12.65) excludes source pixel 11 (center 11.5, distance
+1.15 = half the box) in pycolmap, and a half-open box fails other cases, so the rule is
+not simply half-open.
+
+## 10. ExifReader leaves rationals with a zero denominator unset
+
+**What differs.** An EXIF RATIONAL with denominator 0 (FocalLength, FocalPlaneXResolution,
+GPSLatitude/Longitude, GPSAltitude) is not stored in the Bitmap's metadata by
+`ColmapSharp/Sensor/ExifReader.cs`. OpenImageIO, through which COLMAP reads EXIF, most
+likely stores the float quotient (inf, or NaN for 0/0), which COLMAP's getters would see.
+
+**Why.** An inf/NaN focal length or GPS coordinate carries no information, and cameras
+write 0/0 to mean "unknown", so "absent" is the faithful reading. It is visible only
+through the getters: `ExifLatitude`/`ExifLongitude`/`ExifAltitude` return null here where
+COLMAP could return NaN or inf, and `ExifFocalLength` returns null (or a later fallback's
+value) where COLMAP could return inf or NaN from a zero-denominator FocalLength.
+
+**Evidence.** Not verified against OIIO: no oracle fixture carries a zero-denominator tag.
+The reader's behavior is stated in its file header.
