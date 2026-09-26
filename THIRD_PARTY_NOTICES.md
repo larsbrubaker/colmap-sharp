@@ -455,7 +455,6 @@ The LLVM Project is under the Apache License v2.0 with LLVM Exceptions:
     See the License for the specific language governing permissions and
     limitations under the License.
 
-
 ---- LLVM Exceptions to the Apache 2.0 License ----
 
 As an exception, if, as a result of your compiling your source code, portions
@@ -547,3 +546,11 @@ CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING 
 ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
 DAMAGE.
 ```
+
+## Jonathan Richard Shewchuk's robust geometric predicates (public domain)
+
+Source: J. R. Shewchuk, "Adaptive Precision Floating-Point Arithmetic and Fast Robust
+Geometric Predicates", Discrete & Computational Geometry 18:305-363, 1997, and its
+`predicates.c` (https://www.cs.cmu.edu/~quake/robust.html). The author placed that code in
+the public domain, so no license terms apply; `ColmapSharp/Geometry/Delaunay/RobustPredicates.cs`
+uses its floating-point filter formulas and error bounds and credits it here.
