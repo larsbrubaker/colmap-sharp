@@ -11,6 +11,10 @@
 // Translation notes:
 // - A class, because it owns a Track (a list); C++ copy-assignment becomes Clone(), which
 //   deep-copies the track. Equality is COLMAP's value equality via Equals and ==.
+// - The position lives in XyzParams, a 3-value array that stays the same object for the
+//   point's lifetime: bundle adjustment registers it as a parameter block, the way COLMAP
+//   registers point3D.xyz.data(), and the solver writes the result straight into it
+//   (Geometry/Rigid3dStorage.cs does the same for poses). Xyz is a view of that array.
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Util;
@@ -22,8 +26,23 @@ namespace ColmapSharp.Scene;
 /// </summary>
 public sealed class Point3D : IEquatable<Point3D>
 {
-	/// <summary>The 3D position of the point.</summary>
-	public Vector3d Xyz { get; set; }
+	/// <summary>The 3D position of the point, read from and written to <see cref="XyzParams"/>.</summary>
+	public Vector3d Xyz
+	{
+		get => new(XyzParams[0], XyzParams[1], XyzParams[2]);
+		set
+		{
+			XyzParams[0] = value.X;
+			XyzParams[1] = value.Y;
+			XyzParams[2] = value.Z;
+		}
+	}
+
+	/// <summary>
+	/// colmap::Point3D::xyz as [x, y, z]; an optimizer may register it as one parameter block
+	/// and write into it (see the file header).
+	/// </summary>
+	public double[] XyzParams { get; } = new double[3];
 
 	/// <summary>The mean reprojection error in pixels; -1 when not computed.</summary>
 	public double Error { get; set; } = -1.0;

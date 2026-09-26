@@ -190,7 +190,18 @@ public sealed class SolverOptions
 	public bool JacobiScaling { get; set; } = true;
 
 	/// <summary>Called after every iteration, in order, until one does not continue.</summary>
-	public List<IIterationCallback> Callbacks { get; } = [];
+	public List<IIterationCallback> Callbacks { get; private set; } = [];
+
+	/// <summary>
+	/// A copy (C++ copy construction of ceres::Solver::Options): the callback list is a new
+	/// list holding the same callback objects, as Ceres copies its vector of pointers.
+	/// </summary>
+	public SolverOptions Clone()
+	{
+		var copy = (SolverOptions)MemberwiseClone();
+		copy.Callbacks = [.. Callbacks];
+		return copy;
+	}
 
 	/// <summary>
 	/// The elimination ordering for the linear solver, or null to let the solver choose (the

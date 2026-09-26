@@ -1,0 +1,9 @@
+{
+  "pycolmap_version": "4.2.0",
+  "termination": "TerminationType.CONVERGENCE",
+  "initial_cost": 5102495.518914042,
+  "final_cost": 1060.6775342634244,
+  "num_iterations": 7,
+  "num_residuals_reduced": 9600,
+  "num_effective_parameters_reduced": 993
+}

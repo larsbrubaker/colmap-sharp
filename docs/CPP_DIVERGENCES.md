@@ -882,6 +882,28 @@ uses components of different sizes and compares sets.
 `PoseGraphTests.CSharpOnly_EqualSizeComponentsOrderedBySmallestFrameId` pins the tie order and
 that the largest component equals the first one.
 
+## 39. Bundle adjustment builds its problem in ascending id order
+
+**What differs.** COLMAP's `DefaultBundleAdjuster` (estimators/bundle_adjustment_ceres.cc)
+adds residuals by iterating the config's `FlatHashSet`s of images, variable points and
+constant points, and `FixGaugeWithThreePoints` picks the three gauge points by iterating a
+`FlatHashMap` of per-point observation counts. Abseil's hash containers iterate in an order
+that is seeded per process, so COLMAP's residual order, and which three points fix the gauge,
+can change from run to run. The port (`Estimators/BundleAdjustmentCeres.Default.cs`,
+`BundleAdjustmentCeres.Gauge.cs`) visits the config's images and points in ascending id order
+and the observation counts in first-seen order (the order residuals were added), so the
+problem layout is the same on every run. The containers COLMAP already orders (`std::set` of
+parameterized image and camera ids) are ordered the same way here.
+
+**Why.** CLAUDE.md requires reproducible results; the hash order carries no meaning. The
+residual order only changes floating-point summation order inside the solver (Tier C), and
+the choice of gauge points only changes which three points stay fixed, never how many.
+
+**Evidence.** `BundleAdjustmentCeresTests` (bundle_adjustment_ceres_test.cc) pass with
+COLMAP's exact parameter counts, e.g. `FixGaugeWithThreePoints` and `TwoViewRig` (97 variable
+points). `BundleAdjustmentOracleTests` matches pycolmap's final cost to 1e-6 relative and its
+poses and points to 1e-6 on a 16-image scene with the TWO_CAMS_FROM_WORLD gauge.
+
 ## 40. ExtractTopScaleFeatures keeps equal-scale keypoints in input order
 
 **What differs.** COLMAP's `ExtractTopScaleFeatures` (feature/utils.cc) selects the largest

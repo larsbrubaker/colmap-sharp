@@ -79,10 +79,16 @@ Cancellation is checked between iterations only (like COLMAP). Optional: Vector1
 `Jet` (IEEE-exact, no FMA) need a CLAUDE.md rule clarification first.
 
 ### Phase 8 — Bundle adjustment
-`estimators/bundle_adjustment*` (the non-GPU paths; `CreateLossFunction` lives on the option
-classes), `covariance`. Cost functions are done (`Estimators/CostFunctions/`); poses and
-sensor_from_rig are single 7-value blocks (`Rigid3dStorage.Params`, `Rig.SensorFromRigStorage`)
-with the EigenQuaternion × Euclidean<3> product manifold, as in COLMAP 4.2.
+Done: default Ceres bundle adjuster (`Estimators/BundleAdjustment*.cs`), cost functions, 7-value
+pose blocks. Open: `CreatePosePriorBundleAdjuster` / `PosePriorBundleAdjuster` (needs
+`estimators/alignment`'s `AlignReconstructionToPosePriors`) with PosePriorBundleAdjusterBackendTest.Nominal
+and the five PosePriorBundleAdjuster.* cases; BundleAdjusterBackendTest.Nominal,
+.NominalMultiCameraRigConstantSensorFromRig and DefaultBundleAdjuster.NominalMultiCameraRig (their
+`ReconstructionNear` matcher needs alignment); `covariance` (+ test).
+Skipped: CeresBundleAdjustmentOptions.FallsBackToCpuWithoutCudaDevice (CUDA), the CASPAR
+instantiations of the backend suites and `bundle_adjustment_caspar_test.cc` (GPU backend out of
+scope). Performance: ~2.6× slower than native Ceres on a 100-image synthetic scene (7.6 s vs
+2.9 s) — the Schur eliminator speedups in Phase 7 close most of this.
 
 ### Phase 9 — Features
 `feature/sift` covariant extractor (`CovariantSiftCPUFeatureExtractor`: affine shape, DSP-SIFT
