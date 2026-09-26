@@ -33,7 +33,6 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
   FEM system, solver, level set, trimmer + public API + `poisson_meshing_test.cc`).
 - `delaunay_meshing`: 3D Delaunay tetrahedralization written here (CGAL excluded), then
   COLMAP's graph-cut surface extraction.
-- `texture_mapping`: ported; review fixes pending.
 
 ### Phase 13 — Global and hierarchical mapping
 `sfm/global_mapper` and the `rotation_averaging` controller (ported; review fixes pending),

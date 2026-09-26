@@ -1717,6 +1717,82 @@ image, so there is no "false" return to mirror.
 **Evidence.** `FusionTests.CSharpOnly_UnreadableMaskThrows` (C#-only): a source whose `Exists`
 reports the mask and whose `Read` throws makes `Run` throw that exception.
 
+## 90. Texture mapping's occlusion test runs on a BVH instead of CGAL's AABB tree
+
+**What differs.** COLMAP's `OcclusionTester` (mvs/texture_mapping.cc) builds a CGAL
+`AABB_tree` over the mesh (float kernel) and asks `any_intersection` for the segment from
+the camera center to kEps short of a face corner. The port (`Mvs/TriangleBvh.cs`, used by
+`Mvs/TextureMapping.Views.cs`) is a binned-SAH bounding volume hierarchy with a
+Möller–Trumbore segment/triangle test in double precision. Differences:
+- **The face itself.** CGAL returns *an arbitrary* intersected primitive; if that happens to
+  be the face being tested, COLMAP answers "not occluded" even when another triangle also
+  blocks the segment. The port skips the face's own triangle and keeps looking, so a face
+  is occluded exactly when some *other* triangle blocks it. COLMAP's answer depends on
+  CGAL's traversal order; the port's does not.
+- **Edges and corners** count as hits (inclusive barycentric bounds). CGAL decides these
+  with float predicates, so for segments passing within rounding of a triangle edge the two
+  can disagree.
+- **Coplanar / parallel segments** never hit. CGAL reports a coplanar overlap as a segment,
+  which COLMAP ignores (it only uses point intersections), so the outcome is the same; the
+  port also treats a segment within a relative 1e-12 of parallel as a miss.
+- **Hit distance.** COLMAP compares the distance of CGAL's float intersection point with
+  `dist - kEps`. The port computes the point in double, rounds it to float, and measures its
+  distance in float the same way, so only the point's rounding can differ.
+- **Always on.** COLMAP skips occlusion entirely (with a warning) when built without CGAL.
+  The port always tests occlusion, i.e. it behaves like the CGAL-enabled build.
+
+**Why.** CGAL is GPL (docs/LICENSE_AUDIT.md) and was not read. Ignoring the face's own
+triangle is the evident intent of COLMAP's `hit_face == face_idx` check and makes the result
+independent of traversal order and thread count.
+
+**Evidence.** `TriangleBvhTests` (C#-only): hits, misses, excluded ids, the distance bound,
+edges, coplanar segments, an empty tree, coincident centroids, agreement with a brute-force
+OR over single-triangle trees on 3000 random triangles, occluded faces under a raised quad
+left untextured, and bit-identical results for one thread and all threads. The 15 ported
+texture_mapping_test.cc cases pass.
+
+## 91. Texture mapping breaks view-label and atlas-packing ties by index
+
+**What differs.** Two tie orders in mvs/texture_mapping.cc depend on unspecified orders:
+- `SelectViews`' smoothing counts neighbor labels in a `NodeHashMap` and takes a label whose
+  count strictly beats the best so far while iterating the map, so among equally common
+  labels the winner follows hash order. The port visits labels in ascending image index,
+  so the lowest index wins a tie.
+- `PackAtlas` sorts the patch rectangles by height with `std::sort`, which leaves equal
+  heights in an implementation-defined order; the port keeps them in region order.
+
+**Why.** Deterministic and independent of the standard library and hash seed (CLAUDE.md,
+translation rules; as entries 40, 57 and 64).
+
+**Evidence.** `MeshTextureMapping_NeighborSmoothing` (texture_mapping_test.cc 1:1) passes;
+`TriangleBvhTests.MeshTextureMapping_SameResultForAnyThreadCount` pins run-to-run and
+thread-count stability.
+
+## 92. Texture mapping keeps one bit per (face, image) instead of a dense score table
+
+**What differs.** COLMAP's `SelectViews` stores a double score for every (face, image) pair
+(800 MB for a million faces and a hundred images) and then reads it twice: for each face's
+best view (first strictly larger score in image order) and, during smoothing, whether a
+face's score in a neighbor's view is positive. The port computes the best view inside the
+scoring loop, with the same strict comparison in the same order, and keeps only a "score >
+0" bit per pair. Also, the color-correction system is factorized once and solved
+for all three channels (COLMAP rebuilds and refactorizes the identical matrix per channel),
+and the camera centers are computed once per image instead of per face. Scoring runs image
+by image (faces in parallel) instead of face by face, and COLMAP's per-corner occlusion
+query is answered from one query per (vertex, image): `TriangleBvh.CountHitsUpToTwo`
+returns clear, one blocker (with its face) or several, and a face is occluded at that corner
+exactly when some triangle other than itself blocks it, as in entry 90.
+
+**Why.** Memory and time at the scale MatterCAD needs; the selected views, UVs and atlas are
+the same as computing it COLMAP's way.
+
+**Evidence.** The 15 ported texture_mapping_test.cc cases, including
+`MeshTextureMapping_SingleFaceTwoViews` (best view) and `MeshTextureMapping_NeighborSmoothing`
+(positive-score gate), pass. `TriangleBvhTests.AnyHit_MatchesBruteForceOnRandomTriangles`
+checks that the counting query gives AnyHit's answer for any excluded id. On a 1M-face,
+100-image benchmark the views, UVs and atlas hash identically before and after the
+per-vertex sharing.
+
 ## 93. Scene and reconstruction clustering break sort ties deterministically
 
 **What differs.** Three `std::sort` calls leave equal keys in an unspecified order:
