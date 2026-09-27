@@ -2711,3 +2711,33 @@ with 139 (SIGSEGV) after PoissonRecon has written its 248-byte header-only `out.
 fixture's `EXACT_ONLY_CASES` run the empty input untrimmed only.
 `PoissonMeshingTests.PoissonMeshing_EmptyInputTrimmed_WritesEmptyMesh` pins the port's output:
 exactly those 248 bytes, and an empty in-memory mesh.
+
+## 134. AutomaticReconstructionController runs dense stereo and Delaunay meshing on the CPU, and has no vocabulary tree
+
+**What differs.** COLMAP's controller (automatic_reconstruction.cc) is shaped by its build flags;
+the port behaves like this:
+- `dense` defaults to true and PatchMatch stereo, fusion and meshing run. COLMAP defaults
+  `dense` to true only with CUDA and MVS, and without CUDA returns after image undistortion
+  ("Skipping patch match stereo because CUDA is not available").
+- Delaunay meshing runs (a CGAL-free port, `Mvs/DelaunayMeshing.cs`), as in a CGAL build.
+  Advancing-front meshing logs "Skipping advancing front meshing because CGAL is not available"
+  and returns, as in a build without CGAL.
+- `vocab_tree_path` does not exist: individual and internet data always match exhaustively
+  (COLMAP switches to vocabulary-tree matching at 200 images when a tree is given), and video
+  data matches sequentially with `loop_detection` off (COLMAP turns it on with its downloadable
+  tree). `use_gpu`, `gpu_index` and `ba_backend` do not exist either.
+- `image_path` / `mask_path` are host image sources, `database.db` is a `Database` (an
+  `InMemoryDatabase` unless the host passes one), `sparse/project.ini` is not written, and the
+  undistorted images stay in memory, so a model is undistorted again when its images are not in
+  the controller's store even though `dense/<i>` exists.
+
+**Why.** CUDA/GPU, CGAL, vocabulary-tree retrieval, SQLite files, OpenImageIO decoding and the
+CLI option registry are out of scope (`PORTING_PLAN.md`, `docs/LICENSE_AUDIT.md`), while the
+PatchMatch algorithm and Delaunay meshing are ported, so running them is what a COLMAP build with
+those features does. Sequential matching with loop detection throws here
+(`SequentialPairGenerator.cs`), so leaving COLMAP's `loop_detection = true` would make every video
+run fail.
+
+**Evidence.** `AutomaticReconstructionTests.ParameterizedAutomaticReconstructionTests_Nominal`
+(automatic_reconstruction_test.cc 1:1, dense off as in COLMAP's test) passes for the incremental
+and hierarchical mappers.

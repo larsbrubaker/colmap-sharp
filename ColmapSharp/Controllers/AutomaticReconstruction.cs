@@ -1,0 +1,366 @@
+// Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
+// Ported from COLMAP (BSD-3-Clause, see THIRD_PARTY_NOTICES.md).
+//
+// AutomaticReconstructionController: port of colmap/controllers/automatic_reconstruction.cc -
+// photos in, sparse models, fused dense points and a mesh out. It runs feature extraction
+// (FeatureExtraction.cs), matching (FeatureMatching.cs), sparse mapping (IncrementalPipeline,
+// HierarchicalPipeline or GlobalPipeline) and, per model, the dense stages in
+// AutomaticReconstruction.Dense.cs. The options and presets are in
+// AutomaticReconstructionOptions.cs. Tests: ColmapSharp.Tests/Controllers/
+// AutomaticReconstructionTests.cs (automatic_reconstruction_test.cc).
+//
+// Tier C (outcome): the result goes through RANSAC and bundle adjustment.
+//
+// Translation notes:
+// - The Thread becomes BaseController: Stop() is the host's CancellationToken, and Run() runs
+//   the stages synchronously. Like COLMAP, Run returns between stages once stopped; a stage
+//   stopped part-way throws OperationCanceledException, as the stage controllers here do.
+// - database.db is a Database (InMemoryDatabase unless the host passes one), so a re-run only
+//   skips extraction and matching when the host passes the same database back.
+// - COLMAP's LOG_HEADING1 lines become Progress reports whose Stage names the step; each
+//   stage's own progress is forwarded under the same Stage.
+// - option_manager_.Write(sparse/project.ini) has no counterpart (no ini registry), and the
+//   vocabulary-tree matcher is never chosen (docs/CPP_DIVERGENCES.md entry 134).
+
+using ColmapSharp.Estimators;
+using ColmapSharp.Feature;
+using ColmapSharp.Scene;
+using ColmapSharp.Sensor;
+using ColmapSharp.Util;
+
+namespace ColmapSharp.Controllers;
+
+/// <summary>Port of colmap::AutomaticReconstructionController.</summary>
+public sealed partial class AutomaticReconstructionController : BaseController
+{
+	/// <summary>The Stage of the progress reports of the sparse mappers.</summary>
+	public const string SparseStage = "Sparse reconstruction";
+
+	private readonly AutomaticReconstructionOptions options;
+	private readonly ReconstructionOptionSet optionManager = new();
+	private readonly ReconstructionManager reconstructionManager;
+	private readonly Database database;
+	private ImageReaderOptions? readerOptions;
+
+	/// <summary>
+	/// Prepares a reconstruction of <paramref name="options"/>' images into
+	/// <paramref name="reconstructionManager"/>. Features and matches go to
+	/// <paramref name="database"/> (a new InMemoryDatabase when null).
+	/// </summary>
+	public AutomaticReconstructionController(
+		AutomaticReconstructionOptions options,
+		ReconstructionManager reconstructionManager,
+		Database? database = null)
+	{
+		this.options = Check.NotNull(options);
+		Check.That(Directory.Exists(options.WorkspacePath), $"Directory {options.WorkspacePath} does not exist");
+		Check.NotNull(options.Images);
+		this.reconstructionManager = Check.NotNull(reconstructionManager);
+		this.database = database ?? new InMemoryDatabase();
+
+		optionManager.ImageReader.Images = options.Images!;
+		optionManager.ImageReader.ImageNames = [.. options.ImageNames];
+		optionManager.Mapper.ImageNames = [.. options.ImageNames];
+
+		switch (options.Data)
+		{
+			case AutomaticReconstructionOptions.DataType.Video:
+				optionManager.ModifyForVideoData();
+				// ResetOptions keeps the paths; the image source and names are paths in COLMAP.
+				optionManager.ImageReader.Images = options.Images!;
+				optionManager.ImageReader.ImageNames = [.. options.ImageNames];
+				optionManager.Mapper.ImageNames = [.. options.ImageNames];
+				break;
+			case AutomaticReconstructionOptions.DataType.Individual:
+				optionManager.ModifyForIndividualData();
+				break;
+			case AutomaticReconstructionOptions.DataType.Internet:
+				optionManager.ModifyForInternetData();
+				break;
+			default:
+				throw new InvalidOperationException("Data type not supported");
+		}
+
+		Check.That(CameraModels.ExistsCameraModelWithName(options.CameraModel));
+
+		// Set feature type first so quality modifiers can query EffMaxImageSize().
+		switch (options.Feature)
+		{
+			case AutomaticReconstructionOptions.FeatureType.Sift:
+				optionManager.FeatureExtraction.Type = FeatureExtractorType.Sift;
+				optionManager.FeatureMatching.Type = FeatureMatcherType.SiftBruteForce;
+				break;
+			case AutomaticReconstructionOptions.FeatureType.Aliked:
+				optionManager.FeatureExtraction.Type = FeatureExtractorType.AlikedN16Rot;
+				optionManager.FeatureMatching.Type = FeatureMatcherType.AlikedBruteForce;
+				break;
+			case AutomaticReconstructionOptions.FeatureType.Loma:
+				optionManager.FeatureExtraction.Type = FeatureExtractorType.LomaB;
+				optionManager.FeatureMatching.Type = FeatureMatcherType.LomaB;
+				break;
+			case AutomaticReconstructionOptions.FeatureType.Loma128:
+				optionManager.FeatureExtraction.Type = FeatureExtractorType.LomaB128;
+				optionManager.FeatureMatching.Type = FeatureMatcherType.LomaB128;
+				break;
+		}
+
+		// Apply quality preset (scales max_image_size relative to extractor default).
+		switch (options.Quality)
+		{
+			case AutomaticReconstructionOptions.QualityLevel.Low:
+				optionManager.ModifyForLowQuality();
+				break;
+			case AutomaticReconstructionOptions.QualityLevel.Medium:
+				optionManager.ModifyForMediumQuality();
+				break;
+			case AutomaticReconstructionOptions.QualityLevel.High:
+				optionManager.ModifyForHighQuality();
+				break;
+			case AutomaticReconstructionOptions.QualityLevel.Extreme:
+				optionManager.ModifyForExtremeQuality();
+				break;
+		}
+
+		// Feature-specific overrides that must come after quality.
+		if (options.Feature != AutomaticReconstructionOptions.FeatureType.Sift)
+		{
+			// Guided matching is not supported for ALIKED/LoMa
+			optionManager.FeatureMatching.GuidedMatching = false;
+		}
+
+		optionManager.FeatureExtraction.NumThreads = options.NumThreads;
+		optionManager.FeatureMatching.NumThreads = options.NumThreads;
+		// sequential_pairing / vocab_tree_pairing num_threads only feed the vocabulary tree,
+		// which is out of scope, so they have no counterpart.
+		optionManager.Mapper.NumThreads = options.NumThreads;
+		optionManager.PatchMatchStereo.NumThreads = options.NumThreads;
+		optionManager.PoissonMeshing.NumThreads = options.NumThreads;
+		optionManager.DelaunayMeshing.NumThreads = options.NumThreads;
+
+		// COLMAP turns on loop detection with its downloadable vocabulary tree; without
+		// vocabulary-tree support sequential matching runs without loop detection
+		// (docs/CPP_DIVERGENCES.md entry 134).
+		optionManager.SequentialPairing.LoopDetection = false;
+
+		// Apply mapper-appropriate two-view geometry defaults.
+		// Global uses stricter thresholds; Incremental/Hierarchical use standard.
+		TwoViewGeometryOptions twoViewGeometryOptions = optionManager.TwoViewGeometry;
+		twoViewGeometryOptions.RansacOptions.RandomSeed = options.RandomSeed;
+		if (options.Mapper == AutomaticReconstructionOptions.MapperType.Global)
+		{
+			twoViewGeometryOptions.RansacOptions.MaxError = 1.0;
+			twoViewGeometryOptions.MinNumInliers = 30;
+			twoViewGeometryOptions.MinInlierRatio = 0.25;
+			// Disable guided matching for global mapper to avoid regression issues.
+			// Currently the guided matching leads to significantly worse results of the
+			// global pipeline.
+			optionManager.FeatureMatching.GuidedMatching = false;
+		}
+
+		optionManager.Mapper.RandomSeed = options.RandomSeed;
+
+		if (options.Masks is not null)
+		{
+			optionManager.StereoFusion.MaskPath = MaskRoot;
+		}
+
+		// use_gpu / gpu_index / ba_backend: no GPU stages and only the Ceres-style backend
+		// exist here, so the mapper keeps its CPU defaults.
+	}
+
+	/// <summary>
+	/// Receives a report at the start of every step (Done = Total = 0, Stage = the step's
+	/// COLMAP heading) and the steps' own progress under the same Stage.
+	/// </summary>
+	public IProgress<ControllerProgress>? Progress { get; set; }
+
+	/// <summary>The database holding the features and matches.</summary>
+	public Database Database => database;
+
+	/// <summary>Whether any of the selected reconstruction stages requires OpenGL.</summary>
+	public bool RequiresOpenGL() =>
+		(options.Extraction && optionManager.FeatureExtraction.RequiresOpenGL())
+		|| (options.Matching && optionManager.FeatureMatching.RequiresOpenGL());
+
+	/// <summary>Port of AutomaticReconstructionController::Setup: prepares the image reader.</summary>
+	public void Setup()
+	{
+		if (options.Extraction)
+		{
+			ImageReaderOptions reader = optionManager.ImageReader;
+			reader.Masks = options.Masks;
+			reader.SingleCamera = options.SingleCamera;
+			reader.SingleCameraPerFolder = options.SingleCameraPerFolder;
+			reader.CameraModel = options.CameraModel;
+			reader.CameraParams = options.CameraParams;
+			reader.Images = options.Images!;
+			reader.AsRgb = optionManager.FeatureExtraction.RequiresRGB();
+			readerOptions = reader;
+		}
+	}
+
+	/// <inheritdoc/>
+	public override void Run()
+	{
+		if (CheckIfStopped())
+		{
+			return;
+		}
+
+		if (options.Extraction)
+		{
+			RunFeatureExtraction();
+		}
+
+		if (CheckIfStopped())
+		{
+			return;
+		}
+
+		if (options.Matching)
+		{
+			RunFeatureMatching();
+		}
+
+		if (CheckIfStopped())
+		{
+			return;
+		}
+
+		if (options.Sparse)
+		{
+			RunSparseMapper();
+		}
+
+		if (CheckIfStopped())
+		{
+			return;
+		}
+
+		if (options.Dense)
+		{
+			RunDenseMapper();
+		}
+	}
+
+	private void Heading(string stage) => Progress?.Report(new ControllerProgress(stage, 0, 0, ""));
+
+	private void RunFeatureExtraction()
+	{
+		Heading(FeatureExtraction.ExtractionStage);
+
+		// THROW_CHECK_NOTNULL(feature_extractor_): Setup must have run.
+		Check.NotNull(readerOptions);
+		FeatureExtraction.ExtractFeatures(
+			database, readerOptions!, optionManager.FeatureExtraction, Progress, CancellationToken);
+	}
+
+	private void RunFeatureMatching()
+	{
+		Heading(FeatureMatching.MatchingStage);
+
+		// Vocabulary-tree matching (vocab_tree_path, >= 200 images) is out of scope, so
+		// individual and internet data always match exhaustively.
+		if (options.Data == AutomaticReconstructionOptions.DataType.Video)
+		{
+			FeatureMatching.MatchSequential(database, optionManager.SequentialPairing,
+				optionManager.FeatureMatching, optionManager.TwoViewGeometry, Progress, CancellationToken);
+		}
+		else
+		{
+			FeatureMatching.MatchExhaustive(database, optionManager.ExhaustivePairing,
+				optionManager.FeatureMatching, optionManager.TwoViewGeometry, Progress, CancellationToken);
+		}
+	}
+
+	private void RunSparseMapper()
+	{
+		Heading(SparseStage);
+
+		string sparsePath = Path.Combine(options.WorkspacePath, "sparse");
+		if (Directory.Exists(sparsePath))
+		{
+			string[] dirList = Directory.GetDirectories(sparsePath);
+			Array.Sort(dirList, StringComparer.Ordinal);
+			if (dirList.Length > 0)
+			{
+				// Skipping sparse reconstruction because it is already computed.
+				foreach (string dir in dirList)
+				{
+					reconstructionManager.Read(dir);
+				}
+
+				return;
+			}
+		}
+
+		Func<string, Bitmap?> readImage = options.Images!.Read;
+		BaseController mapper;
+		switch (options.Mapper)
+		{
+			case AutomaticReconstructionOptions.MapperType.Incremental:
+			{
+				IncrementalPipelineOptions mapperOptions = optionManager.Mapper.Clone();
+				mapperOptions.ReadImage = readImage;
+				mapper = new IncrementalPipeline(mapperOptions, database, reconstructionManager)
+				{
+					Progress = Forward<IncrementalPipelineProgress>(
+						p => new ControllerProgress(SparseStage, p.NumRegImages, p.NumImages, p.Stage.ToString())),
+				};
+				break;
+			}
+
+			case AutomaticReconstructionOptions.MapperType.Hierarchical:
+			{
+				var mapperOptions = new HierarchicalPipelineOptions
+				{
+					ReadImage = readImage,
+					IncrementalOptions = optionManager.Mapper.Clone(),
+				};
+				mapper = new HierarchicalPipeline(mapperOptions, database, reconstructionManager)
+				{
+					Progress = Progress,
+				};
+				break;
+			}
+
+			case AutomaticReconstructionOptions.MapperType.Global:
+			{
+				var vgcOptions = new ViewGraphCalibrationOptions { RandomSeed = options.RandomSeed };
+				vgcOptions.SolverOptions.NumThreads = options.NumThreads;
+				ViewGraphCalibration.CalibrateViewGraph(vgcOptions, database);
+				var globalOptions = new GlobalPipelineOptions
+				{
+					ReadImage = readImage,
+					NumThreads = options.NumThreads,
+					RandomSeed = options.RandomSeed,
+				};
+				mapper = new GlobalPipeline(globalOptions, database, reconstructionManager)
+				{
+					Progress = Forward<GlobalPipelineProgress>(
+						p => new ControllerProgress(SparseStage, p.Component, p.NumComponents, p.Stage.ToString())),
+				};
+				break;
+			}
+
+			default:
+				throw new InvalidOperationException("Mapper not supported");
+		}
+
+		mapper.CancellationToken = CancellationToken;
+		mapper.SetCheckIfStoppedFunc(CheckIfStopped);
+		mapper.Run();
+
+		Directory.CreateDirectory(sparsePath);
+		reconstructionManager.Write(sparsePath);
+	}
+
+	// Maps a stage's own progress type onto Progress, synchronously on the reporting thread.
+	private IProgress<T>? Forward<T>(Func<T, ControllerProgress> map) =>
+		Progress is null ? null : new MappedProgress<T>(Progress, map);
+
+	private sealed class MappedProgress<T>(IProgress<ControllerProgress> target, Func<T, ControllerProgress> map) : IProgress<T>
+	{
+		public void Report(T value) => target.Report(map(value));
+	}
+}
