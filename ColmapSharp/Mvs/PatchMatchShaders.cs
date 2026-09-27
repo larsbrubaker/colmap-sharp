@@ -16,6 +16,14 @@
 //   depth propagation, viewing angles, the homography and pm_div; needs common, the
 //   PM_NUM_SRC_IMAGES constant and the pm_poses uniform (its header holds the table layout).
 // - patch_match_likelihood.wgsl: the selection-probability model; needs common and geometry.
+// - patch_match_dispatch.wgsl: the folded dispatch index; needs PM_GROUPS_X.
+// - patch_match_layout.wgsl: buffer layouts, uniform structs, frame sizes and the original-pixel
+//   map; needs likelihood and PM_REF_WIDTH / PM_REF_HEIGHT.
+// - patch_match_ncc.wgsl: the photo-consistency cost; needs layout, textures, geometry, the window
+//   constants and the pm_problem and pm_reference bindings.
+// - patch_match_geom_cost.wgsl: the geometric-consistency cost; needs textures and geometry.
+// - The kernel files (patch_match_init_random.wgsl, ...) declare their bindings and entry points;
+//   ColmapSharp/Mvs/PatchMatchGpuKernels.cs lists each kernel's parts, constants and bindings.
 //
 // WGSL file header convention (FileComplianceTests checks it): the file starts with a `//`
 // comment block whose first line is the copyright line, which says what the file is, and which
@@ -42,6 +50,18 @@ internal static class PatchMatchShaders
 
 	/// <summary>The selection-probability model (messages and priors).</summary>
 	public const string Likelihood = "patch_match_likelihood.wgsl";
+
+	/// <summary>The folded dispatch index.</summary>
+	public const string Dispatch = "patch_match_dispatch.wgsl";
+
+	/// <summary>Buffer layouts, uniform structs and index math shared by the kernels.</summary>
+	public const string Layout = "patch_match_layout.wgsl";
+
+	/// <summary>The photo-consistency (NCC) cost.</summary>
+	public const string Ncc = "patch_match_ncc.wgsl";
+
+	/// <summary>The geometric-consistency cost.</summary>
+	public const string GeomCost = "patch_match_geom_cost.wgsl";
 
 	// ColmapSharp.csproj gives every Mvs/Shaders/*.wgsl this prefix as its LogicalName.
 	private const string ResourcePrefix = "ColmapSharp.Mvs.Shaders.";

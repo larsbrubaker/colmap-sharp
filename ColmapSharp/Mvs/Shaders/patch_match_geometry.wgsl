@@ -9,7 +9,8 @@
 //   PerturbDepth, PerturbNormal, ComputePointAtDepth, PropagateDepth, ComputeViewingAngles,
 //   ComposeHomography, DotViewRay) in the same operation order, and the pose table layout of
 //   ColmapSharp/Mvs/PatchMatchTransforms.cs. ComputeGeomConsistencyCost needs the source depth
-//   sampling of patch_match_textures.wgsl and lives with the kernels; RotateNormalMap is a kernel.
+//   sampling of patch_match_textures.wgsl and is in patch_match_geom_cost.wgsl; RotateNormalMap
+//   is the rotate_normals kernel of patch_match_rotate.wgsl.
 // Ports: patch_match_cuda.cu's __device__ geometry helpers, as the CPU port models them
 //   (docs/CPP_DIVERGENCES.md, entries 86 and 96).
 // Composed by ColmapSharp/Mvs/PatchMatchShaders.cs after patch_match_common.wgsl (it uses the
@@ -30,8 +31,9 @@
 //                                K at +0 (4), R at +4 (9, row-major), T at +13 (3), C at +16 (3),
 //                                P at +19 (12, row-major 3x4), inverse P at +31 (12)
 // That is 32 + 172 S floats = 8 + 43 S vec4s (16 (8 + 43 S) bytes), with no padding: 172 S is a
-// multiple of four. The PM_POSE_* offsets below must equal PatchMatchTransforms' *Offset constants
-// (PatchMatchShadersTests pins them).
+// multiple of four. A uniform binding is limited to 64 KiB by default, so 16 (8 + 43 S) bytes caps S
+// at 95 source images (PatchMatchGpuPlan enforces it). The PM_POSE_* offsets below must equal
+// PatchMatchTransforms' *Offset constants (PatchMatchShaderGeometryTests pins them).
 //
 // Non-finite values. C# relies on IEEE infinities and NaNs in a few places; WGSL lets a compiler
 // assume they never occur and makes a division by zero indeterminate. So every division whose
