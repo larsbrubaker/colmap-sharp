@@ -17,7 +17,8 @@
 // Translation notes (docs/CPP_DIVERGENCES.md entry 134):
 // - COLMAP skips PatchMatch (and so everything after undistortion) without CUDA; the
 //   PatchMatch algorithm is ported to the CPU here, so it runs - on the host's compute device
-//   when Options.ComputeDevice is set and can be waited on synchronously (entry 136).
+//   when Options.ComputeDevice is set (entry 136): always under RunAsync, and under Run only
+//   when the device can be waited on synchronously.
 // - Delaunay meshing is a CGAL-free port here, so it runs like a COLMAP build with CGAL.
 //   Advancing-front meshing is CGAL code (out of scope) and is skipped with a warning like a
 //   build without CGAL.
@@ -55,7 +56,10 @@ public sealed partial class AutomaticReconstructionController
 
 	private readonly InMemoryBitmapStore undistortedImages = new();
 
-	private void RunDenseMapper()
+	// Port of RunDenseMapper. An iterator, so that the synchronous and asynchronous entries share
+	// it (see RunStages): it yields each model's PatchMatchController for the caller to run and
+	// goes on with that model's fusion when resumed. A yield break is COLMAP's return.
+	private IEnumerable<PatchMatchController> RunDenseMapper(bool deviceIsAwaited)
 	{
 		Heading(DenseStage);
 
@@ -65,7 +69,7 @@ public sealed partial class AutomaticReconstructionController
 		{
 			if (CheckIfStopped())
 			{
-				return;
+				yield break;
 			}
 
 			string densePath = Path.Combine(options.WorkspacePath, "dense", i.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -123,21 +127,32 @@ public sealed partial class AutomaticReconstructionController
 
 			if (CheckIfStopped())
 			{
-				return;
+				yield break;
 			}
 
 			IBitmapSource bitmaps = options.Masks is null
 				? undistortedImages
 				: new WorkspaceBitmapSource(undistortedImages, options.Masks);
 
-			if (!haveDense && !RunDenseStages(i, densePath, fusedPath, meshingPath, bitmaps))
+			if (!haveDense)
 			{
-				return;
+				// Patch match stereo (on the host's compute device or the CPU; COLMAP needs
+				// CUDA here), run by the caller.
+				yield return new PatchMatchController(
+					optionManager.PatchMatchStereo, densePath, "COLMAP", "", bitmaps)
+				{
+					ComputeDevice = deviceIsAwaited ? options.ComputeDevice : BlockingComputeDevice(),
+				};
+
+				if (!RunFusionAndMeshing(i, densePath, fusedPath, meshingPath, bitmaps))
+				{
+					yield break;
+				}
 			}
 
 			if (CheckIfStopped())
 			{
-				return;
+				yield break;
 			}
 
 			// No mesh here means Poisson reconstruction failed (it logged why); COLMAP goes on
@@ -149,20 +164,11 @@ public sealed partial class AutomaticReconstructionController
 		}
 	}
 
-	// PatchMatch, fusion and meshing of model i: the part of RunDenseMapper's loop after
-	// undistortion. Returns false where that loop returns (once stopped, and after the
-	// advancing-front warning).
-	private bool RunDenseStages(int i, string densePath, string fusedPath, string meshingPath, IBitmapSource bitmaps)
+	// Fusion and meshing of model i: the part of RunDenseMapper's loop after PatchMatch.
+	// Returns false where that loop returns (once stopped, and after the advancing-front
+	// warning).
+	private bool RunFusionAndMeshing(int i, string densePath, string fusedPath, string meshingPath, IBitmapSource bitmaps)
 	{
-		// Patch match stereo (on the host's compute device or the CPU; COLMAP needs CUDA here).
-
-		var patchMatchController = new PatchMatchController(
-			optionManager.PatchMatchStereo, densePath, "COLMAP", "", bitmaps)
-		{
-			ComputeDevice = BlockingComputeDevice(),
-		};
-		patchMatchController.Run(CancellationToken, Under(DenseStage));
-
 		if (CheckIfStopped())
 		{
 			return false;
@@ -225,9 +231,9 @@ public sealed partial class AutomaticReconstructionController
 		return true;
 	}
 
-	// The host's compute device if this synchronous controller can use it: one that cannot be
-	// waited on synchronously (the browser) would make PatchMatchController.Run throw, so
-	// PatchMatch runs on the CPU instead, with a warning, until an async dense entry exists.
+	// The host's compute device if the synchronous Run can use it: one that cannot be waited on
+	// synchronously (the browser) would make PatchMatchController.Run throw, so PatchMatch runs
+	// on the CPU instead, with a warning pointing the host at RunAsync.
 	private IComputeDevice? BlockingComputeDevice()
 	{
 		IComputeDevice? device = options.ComputeDevice;
@@ -236,7 +242,7 @@ public sealed partial class AutomaticReconstructionController
 			return device;
 		}
 
-		Log.Warning("The GPU cannot be used by the synchronous dense reconstruction; running PatchMatch stereo on the CPU.");
+		Log.Warning("The GPU cannot be used by the synchronous dense reconstruction (call RunAsync to use it); running PatchMatch stereo on the CPU.");
 		return null;
 	}
 

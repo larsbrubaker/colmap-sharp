@@ -16,6 +16,10 @@
 // - The Thread becomes BaseController: Stop() is the host's CancellationToken, and Run() runs
 //   the stages synchronously. Like COLMAP, Run returns between stages once stopped; a stage
 //   stopped part-way throws OperationCanceledException, as the stage controllers here do.
+// - RunAsync (C#-only) runs the same stages and awaits PatchMatch on the host's compute device,
+//   for a device that cannot be waited on synchronously (the browser). Both share RunStages,
+//   an iterator that yields each PatchMatchController for its caller to run blocking or
+//   awaited, so the two entries differ only in that step.
 // - database.db is a Database (InMemoryDatabase unless the host passes one), so a re-run only
 //   skips extraction and matching when the host passes the same database back.
 // - COLMAP's LOG_HEADING1 lines become Progress reports whose Stage names the step. Every
@@ -27,6 +31,7 @@
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Feature;
+using ColmapSharp.Mvs;
 using ColmapSharp.Scene;
 using ColmapSharp.Sensor;
 using ColmapSharp.Util;
@@ -212,12 +217,49 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		}
 	}
 
-	/// <inheritdoc/>
+	/// <summary>
+	/// Runs the selected stages synchronously on the calling thread (a UI host should call it
+	/// off its UI thread). PatchMatch uses <see cref="AutomaticReconstructionOptions.ComputeDevice"/>
+	/// only when it reports <see cref="Compute.IComputeDevice.SupportsBlockingWait"/>; any other
+	/// device (the browser's) is skipped with a warning and PatchMatch runs on the CPU. Hosts in
+	/// the browser must call <see cref="RunAsync"/> to use their GPU.
+	/// </summary>
 	public override void Run()
+	{
+		// PatchMatchController.Run is the one place this blocks on the device, and
+		// BlockingComputeDevice only hands it a device that allows that.
+		foreach (PatchMatchController patchMatch in RunStages(deviceIsAwaited: false))
+		{
+			patchMatch.Run(CancellationToken, Under(DenseStage));
+		}
+	}
+
+	/// <summary>
+	/// <see cref="Run"/>, awaiting PatchMatch on
+	/// <see cref="AutomaticReconstructionOptions.ComputeDevice"/> instead of blocking on it, so any
+	/// device works, including one that cannot be waited on synchronously: the entry point for a
+	/// host in the browser. The stages, their order, outputs, progress and stop semantics
+	/// (<see cref="BaseController.CancellationToken"/> and the stop function) are those of Run.
+	/// Every stage but PatchMatch on the device is CPU work that runs synchronously inside this
+	/// call, so a UI host should start it off its UI thread where it has one.
+	/// </summary>
+	public async Task RunAsync()
+	{
+		foreach (PatchMatchController patchMatch in RunStages(deviceIsAwaited: true))
+		{
+			await patchMatch.RunAsync(CancellationToken, Under(DenseStage)).ConfigureAwait(false);
+		}
+	}
+
+	// The body of COLMAP's Run, shared by Run and RunAsync: every stage runs here except
+	// PatchMatch, whose controller is yielded for the caller to run (blocking or awaiting)
+	// before the enumeration resumes with fusion. deviceIsAwaited says which the caller does,
+	// and so whether the host's device may be used when it cannot be waited on synchronously.
+	private IEnumerable<PatchMatchController> RunStages(bool deviceIsAwaited)
 	{
 		if (CheckIfStopped())
 		{
-			return;
+			yield break;
 		}
 
 		if (options.Extraction)
@@ -227,7 +269,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 
 		if (CheckIfStopped())
 		{
-			return;
+			yield break;
 		}
 
 		if (options.Matching)
@@ -237,7 +279,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 
 		if (CheckIfStopped())
 		{
-			return;
+			yield break;
 		}
 
 		if (options.Sparse)
@@ -247,12 +289,15 @@ public sealed partial class AutomaticReconstructionController : BaseController
 
 		if (CheckIfStopped())
 		{
-			return;
+			yield break;
 		}
 
 		if (options.Dense)
 		{
-			RunDenseMapper();
+			foreach (PatchMatchController patchMatch in RunDenseMapper(deviceIsAwaited))
+			{
+				yield return patchMatch;
+			}
 		}
 	}
 

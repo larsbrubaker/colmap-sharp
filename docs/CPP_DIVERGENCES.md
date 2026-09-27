@@ -2847,8 +2847,10 @@ the outside:
   GPU error during a run is not a fallback reason: it propagates. The device entry points are
   `PatchMatch.RunAsync` and `PatchMatchController.RunAsync` (`PatchMatch.Run` stays CPU-only).
   `PatchMatchController.Run` refuses a device that cannot be waited on synchronously (the
-  browser) with `InvalidOperationException`, pointing at `RunAsync`; the synchronous automatic
-  reconstruction instead warns and runs PatchMatch on the CPU.
+  browser) with `InvalidOperationException`, pointing at `RunAsync`. The automatic
+  reconstruction has both entries too: `AutomaticReconstructionController.RunAsync` runs the
+  same stages and awaits PatchMatch on any device, while its synchronous `Run` warns about a
+  non-blocking device and runs PatchMatch on the CPU. Hosts in the browser must call `RunAsync`.
 - **Random numbers.** The GPU draws the same counter-based random numbers as the CPU
   (`PatchMatchRandom`, entry 86), transliterated to 32-bit WGSL integer arithmetic; they are
   bit-exact by construction (`PatchMatchShaderRngTransliterationTests` pins the
@@ -2880,7 +2882,10 @@ reason), `RunAsync_WithDevice_CancelledMidProblemWritesNothingForIt` and
 `Run_WithNonBlockingDevice_ThrowsBeforeWritingAnything` pin the controller, and
 `AutomaticReconstructionTests.CSharpOnly_ComputeDeviceGivesTheSameDenseResults` pins that the
 automatic reconstruction writes the same depth maps, `fused.ply` and mesh with the twin as without,
-and ignores a non-blocking device with a warning.
+and that `Run` ignores a non-blocking device with a warning;
+`AutomaticReconstructionTests.CSharpOnly_RunAsyncGivesTheSameResultsAsRunOnAnyDevice` pins that
+`RunAsync` writes the same bytes as `Run` and uses a non-blocking twin with the same outputs and no
+warning, and `CSharpOnly_RunAsyncStopsMidDenseLikeRun` that both stop mid-dense alike.
 
 On a real GPU (Apple M5, Metal), MatterCAD's `Tests/ColmapGpuTests` (`PatchMatchRandomGpuTests`,
 `PatchMatchGpuKernelProbeTests`, `PatchMatchGpuRunTests`) measure:

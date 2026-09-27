@@ -185,11 +185,13 @@ public sealed class AutomaticReconstructionOptions
 	/// 136). A problem the device cannot hold runs on the CPU, with the reason logged as a
 	/// warning. Only when a device is set do the dense stage's PatchMatch progress messages gain
 	/// " (GPU)" or " (CPU)" after the image name, saying where each problem ran. The controller
-	/// runs synchronously on the calling thread (CPU stages included), so a UI host should run
-	/// it off its UI thread, and it uses the device only when
+	/// runs its CPU stages synchronously on the calling thread, so a UI host should run it off
+	/// its UI thread. <see cref="AutomaticReconstructionController.RunAsync"/> awaits the device
+	/// and so uses any device; the synchronous
+	/// <see cref="AutomaticReconstructionController.Run"/> uses it only when
 	/// <see cref="IComputeDevice.SupportsBlockingWait"/> is true (blocking is safe on any
-	/// thread); otherwise (the browser) it warns and runs PatchMatch on the CPU, since using
-	/// such a device needs an asynchronous dense entry point, which does not exist yet.
+	/// thread), and otherwise warns and runs PatchMatch on the CPU. Hosts in the browser must
+	/// call RunAsync.
 	/// </summary>
 	public IComputeDevice? ComputeDevice { get; set; }
 
