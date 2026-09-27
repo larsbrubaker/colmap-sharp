@@ -12,6 +12,10 @@
 // - patch_match_common.wgsl: self-contained helpers (RNG, exact u32 -> f32, CUDA min/max).
 // - patch_match_textures.wgsl: source image and depth sampling; needs common, the
 //   PM_SRC_MAX_WIDTH / PM_SRC_MAX_HEIGHT constants and the bindings its header lists.
+// - patch_match_geometry.wgsl: the pose table and frames, random and perturbed hypotheses,
+//   depth propagation, viewing angles, the homography and pm_div; needs common, the
+//   PM_NUM_SRC_IMAGES constant and the pm_poses uniform (its header holds the table layout).
+// - patch_match_likelihood.wgsl: the selection-probability model; needs common and geometry.
 //
 // WGSL file header convention (FileComplianceTests checks it): the file starts with a `//`
 // comment block whose first line is the copyright line, which says what the file is, and which
@@ -32,6 +36,12 @@ internal static class PatchMatchShaders
 
 	/// <summary>Source image and depth map sampling.</summary>
 	public const string Textures = "patch_match_textures.wgsl";
+
+	/// <summary>Pose table, frames, hypotheses, propagation, viewing angles and homography.</summary>
+	public const string Geometry = "patch_match_geometry.wgsl";
+
+	/// <summary>The selection-probability model (messages and priors).</summary>
+	public const string Likelihood = "patch_match_likelihood.wgsl";
 
 	// ColmapSharp.csproj gives every Mvs/Shaders/*.wgsl this prefix as its LogicalName.
 	private const string ResourcePrefix = "ColmapSharp.Mvs.Shaders.";

@@ -142,8 +142,17 @@ fn is_finite_f32(x: f32) -> bool {
 	return (bitcast<u32>(x) & 0x7FFFFFFFu) < 0x7F800000u;
 }
 
+// Both operands are +0 or -0, by their bits: a GPU that flushes subnormals compares a
+// subnormal equal to zero, so `==` cannot tell.
+fn both_zero_f32(x: f32, y: f32) -> bool {
+	return ((bitcast<u32>(x) | bitcast<u32>(y)) & 0x7FFFFFFFu) == 0u;
+}
+
 // CUDA's min(float, float), fminf: the smaller operand, or the other one when one is NaN.
-// Equal operands return the OR of their bits, so min(+0, -0) is -0 as C#'s MathF.Min gives.
+// Two zeros return the OR of their bits, so min(+0, -0) is -0 as C#'s MathF.Min gives. Other
+// operands that compare equal return x: they are the same float unless the GPU flushed
+// subnormals, and then x is still one of the operands (combining the bits of two different
+// subnormals would give neither).
 fn cuda_min(x: f32, y: f32) -> f32 {
 	if (is_nan_f32(x)) {
 		return y;
@@ -161,11 +170,16 @@ fn cuda_min(x: f32, y: f32) -> f32 {
 		return y;
 	}
 
-	return bitcast<f32>(bitcast<u32>(x) | bitcast<u32>(y));
+	if (both_zero_f32(x, y)) {
+		return bitcast<f32>(bitcast<u32>(x) | bitcast<u32>(y));
+	}
+
+	return x;
 }
 
-// CUDA's max(float, float), fmaxf: the larger operand, ignoring a NaN one. Equal operands
-// return the AND of their bits, so max(+0, -0) is +0 as C#'s MathF.Max gives.
+// CUDA's max(float, float), fmaxf: the larger operand, ignoring a NaN one. Two zeros return
+// the AND of their bits, so max(+0, -0) is +0 as C#'s MathF.Max gives; other equal operands
+// return x, as in cuda_min.
 fn cuda_max(x: f32, y: f32) -> f32 {
 	if (is_nan_f32(x)) {
 		return y;
@@ -183,5 +197,9 @@ fn cuda_max(x: f32, y: f32) -> f32 {
 		return y;
 	}
 
-	return bitcast<f32>(bitcast<u32>(x) & bitcast<u32>(y));
+	if (both_zero_f32(x, y)) {
+		return bitcast<f32>(bitcast<u32>(x) & bitcast<u32>(y));
+	}
+
+	return x;
 }
