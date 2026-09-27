@@ -66,6 +66,9 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
   `Vector128` rank-count median (~0.6 s; needs the lane-rule test, falls back to quickselect
   on ±0/NaN), and the structural fix, a speculative band-parallel traversal with in-order
   commit.
+- CPU PatchMatch dominates dense reconstruction: ~1m45s per image at LOW quality (1000 px),
+  ~12 s at 300 px, while sparse takes seconds. It is already column-parallel (divergence
+  122); profile the sweep before MatterCAD users run real photo sets through it.
 - Optional: Vector128 lanes in `Jet` (allowed under CLAUDE.md's lane rule).
 - Evaluate a faithful port of libc++ `std::sort` (sort3/4/5, insertion sort below 24, pdqsort
   above) so tie-sensitive sorts match COLMAP instead of carrying divergence entries.
