@@ -4,10 +4,12 @@
 // (PatchMatchGpuConformance.cs) found about a compute device - each check with its measured
 // value, threshold and outcome, the CPU and GPU timings, and a JSON form a host can log or send
 // back from a browser smoke run. Not a COLMAP port. The JSON is written with Utf8JsonWriter by
-// hand rather than JsonSerializer, so the library stays trim- and AOT-clean (no reflection).
+// hand rather than JsonSerializer, so the library stays trim- and AOT-clean (no reflection). The
+// relaxed encoder writes comparisons such as "<=" literally; the JSON is a log, never embedded in HTML.
 
 using System.Globalization;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace ColmapSharp.Mvs.Testing;
@@ -76,7 +78,7 @@ public sealed class PatchMatchGpuConformanceReport
 	public string ToJson()
 	{
 		using var stream = new MemoryStream();
-		using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+		using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }))
 		{
 			writer.WriteStartObject();
 			writer.WriteBoolean("allPassed", AllPassed);

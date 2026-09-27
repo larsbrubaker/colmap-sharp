@@ -6,7 +6,8 @@
 // agreement measures are perfect, since the twin computes through the CPU code; the two WGSL
 // probes the twin cannot compile report "not applicable". A device that corrupts the depth
 // plane of every state readback must fail exactly the depth checks, and a failure is a report
-// entry, not an exception.
+// entry, not an exception - even a device-raised cancellation, while the caller's own
+// cancellation propagates. A fourth full run forces several sweep bands per orientation.
 
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -33,7 +34,7 @@ public class PatchMatchGpuConformanceTests
 		await Assert.That(string.Join(",", notApplicable)).IsEqualTo("probe.random.differing_draws,probe.conversion.differing_values");
 
 		// The twin is bit-identical to the CPU, so the bounded measures are at their ideal.
-		foreach (string config in new[] { "photometric", "geometric", "filter" })
+		foreach (string config in new[] { "photometric", "geometric", "filter", "filter_banded" })
 		{
 			await Assert.That(Measured(report, $"run.{config}.cpu.depth_agreement")).IsEqualTo(1.0);
 			await Assert.That(Measured(report, $"run.{config}.cpu.median_normal_angle_degrees")).IsEqualTo(0.0);
@@ -43,14 +44,21 @@ public class PatchMatchGpuConformanceTests
 
 		await Assert.That(Measured(report, "kernel.init_random.depth_max_ulps")).IsEqualTo(0.0);
 		await Assert.That(Measured(report, "kernel.initial_cost.agreement")).IsEqualTo(1.0);
-		await Assert.That(report.Timings.Select(t => t.Config).ToArray()).IsEquivalentTo(new[] { "photometric", "geometric", "filter" });
+		await Assert.That(report.Timings.Select(t => t.Config).ToArray()).IsEquivalentTo(PatchMatchGpuConformance.Configs.ToArray());
+
+		// The banded run really ran several bands per sweep: 19 rows and 26 columns in 4-row bands.
+		await Assert.That(Measured(report, "run.filter_banded.bands.orientation_0")).IsEqualTo(5.0);
+		await Assert.That(Measured(report, "run.filter_banded.bands.orientation_1")).IsEqualTo(7.0);
 
 		// The JSON carries the same verdict and one entry per check; NaN measures become null.
 		using JsonDocument json = JsonDocument.Parse(report.ToJson());
 		await Assert.That(json.RootElement.GetProperty("allPassed").GetBoolean()).IsTrue();
 		await Assert.That(json.RootElement.GetProperty("checks").GetArrayLength()).IsEqualTo(report.Checks.Count);
 		await Assert.That(json.RootElement.GetProperty("checks")[0].GetProperty("measured").ValueKind).IsEqualTo(JsonValueKind.Null);
-		await Assert.That(json.RootElement.GetProperty("timings").GetArrayLength()).IsEqualTo(3);
+		await Assert.That(json.RootElement.GetProperty("timings").GetArrayLength()).IsEqualTo(4);
+
+		// Comparisons are written literally, not as \u003C escapes.
+		await Assert.That(report.ToJson()).Contains("\"comparison\": \"<=\"");
 	}
 
 	[Test]
@@ -74,6 +82,7 @@ public class PatchMatchGpuConformanceTests
 			"run.geometric.truth.depth_within_tolerance",
 			"run.geometric.cpu.depth_agreement",
 			"run.filter.cpu.depth_agreement",
+			"run.filter_banded.cpu.depth_agreement",
 		})).Because(report.ToString());
 		await Assert.That(report.Checks.First(c => c.Name == "probe.random.differing_draws").Detail).Contains("ArgumentException");
 
@@ -81,15 +90,40 @@ public class PatchMatchGpuConformanceTests
 		await Assert.That(json.RootElement.GetProperty("allPassed").GetBoolean()).IsFalse();
 	}
 
+	[Test]
+	public async Task DeviceRaisingCancellation_FailsTheRunsWithoutThrowing()
+	{
+		// The caller did not cancel, so a TaskCanceledException from the device is the device's
+		// failure: every full run (each flushes per sweep) is reported failed, and RunAsync returns.
+		PatchMatchGpuConformanceReport report = await PatchMatchGpuConformance.RunAsync(new CancelingFlushDevice(new ReferenceComputeDevice()));
+		string[] failed = report.Failures.Select(c => c.Name).ToArray();
+		await Assert.That(string.Join("\n", failed)).IsEqualTo(string.Join("\n", new[]
+		{
+			"probe.random.differing_draws",
+			"probe.conversion.differing_values",
+			"run.photometric.ran",
+			"run.geometric.ran",
+			"run.filter.ran",
+			"run.filter_banded.ran",
+		})).Because(report.ToString());
+		await Assert.That(report.Checks.First(c => c.Name == "run.photometric.ran").Detail).Contains("TaskCanceledException");
+	}
+
+	[Test]
+	public async Task CallerCancellation_Propagates()
+	{
+		using var cancellation = new CancellationTokenSource();
+		cancellation.Cancel();
+		await Assert.That(async () => await PatchMatchGpuConformance.RunAsync(new ReferenceComputeDevice(), cancellation.Token)).Throws<OperationCanceledException>();
+	}
+
 	private static double Measured(PatchMatchGpuConformanceReport report, string name) => report.Checks.Single(c => c.Name == name).Measured;
 
-	/// <summary>
-	/// Forwards to an inner device, but scales the depth plane (the first quarter) of every
-	/// readback of a buffer labeled as PatchMatch state by 1.05: a device whose arithmetic is
-	/// wrong in exactly one output.
-	/// </summary>
-	private sealed class DepthCorruptingDevice(IComputeDevice inner) : IComputeDevice
+	/// <summary>Forwards every call to an inner device; the subclasses break one of them.</summary>
+	private class ForwardingDevice(IComputeDevice inner) : IComputeDevice
 	{
+		protected IComputeDevice Inner => inner;
+
 		public ComputeDeviceLimits Limits => inner.Limits;
 
 		public bool SupportsBlockingWait => inner.SupportsBlockingWait;
@@ -107,11 +141,21 @@ public class PatchMatchGpuConformanceTests
 		public void Dispatch(IComputeKernel kernel, ReadOnlySpan<IComputeBindGroup> groups, uint x, uint y = 1, uint z = 1)
 			=> inner.Dispatch(kernel, groups, x, y, z);
 
-		public ValueTask FlushAsync(CancellationToken cancellationToken = default) => inner.FlushAsync(cancellationToken);
+		public virtual ValueTask FlushAsync(CancellationToken cancellationToken = default) => inner.FlushAsync(cancellationToken);
 
-		public async ValueTask ReadBufferAsync(IComputeBuffer buffer, long offset, Memory<byte> destination, CancellationToken cancellationToken = default)
+		public virtual ValueTask ReadBufferAsync(IComputeBuffer buffer, long offset, Memory<byte> destination, CancellationToken cancellationToken = default)
+			=> inner.ReadBufferAsync(buffer, offset, destination, cancellationToken);
+	}
+
+	/// <summary>
+	/// Scales the depth plane (the first quarter) of every readback of a buffer labeled as
+	/// PatchMatch state by 1.05: a device whose arithmetic is wrong in exactly one output.
+	/// </summary>
+	private sealed class DepthCorruptingDevice(IComputeDevice inner) : ForwardingDevice(inner)
+	{
+		public override async ValueTask ReadBufferAsync(IComputeBuffer buffer, long offset, Memory<byte> destination, CancellationToken cancellationToken = default)
 		{
-			await inner.ReadBufferAsync(buffer, offset, destination, cancellationToken);
+			await Inner.ReadBufferAsync(buffer, offset, destination, cancellationToken);
 			if (offset == 0 && buffer.Label is { } label && label.Contains("state", StringComparison.Ordinal))
 			{
 				Span<float> depths = MemoryMarshal.Cast<byte, float>(destination.Span);
@@ -122,5 +166,12 @@ public class PatchMatchGpuConformanceTests
 				}
 			}
 		}
+	}
+
+	/// <summary>Every flush fails with TaskCanceledException, as a device whose queue timed out might.</summary>
+	private sealed class CancelingFlushDevice(IComputeDevice inner) : ForwardingDevice(inner)
+	{
+		public override ValueTask FlushAsync(CancellationToken cancellationToken = default)
+			=> ValueTask.FromException(new TaskCanceledException("The device's queue gave up."));
 	}
 }

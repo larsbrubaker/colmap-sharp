@@ -15,6 +15,8 @@
 
 using System.Runtime.InteropServices;
 
+using static System.FormattableString;
+
 using ColmapSharp.Compute;
 
 namespace ColmapSharp.Mvs.Testing;
@@ -121,7 +123,7 @@ fn pm_conformance_conversion(@builtin(global_invocation_id) id : vec3<u32>)
 		{
 			gpu = await RunProbeAsync(device, "pm_conformance_random", RandomProbeKernel, keyWords, keys.Count * DrawsPerKey, keys.Count, ct).ConfigureAwait(false);
 		}
-		catch (Exception e) when (e is not OperationCanceledException)
+		catch (Exception e) when (IsReportable(e, ct))
 		{
 			checks.Add(StageFailed(Name, e));
 			return;
@@ -140,13 +142,13 @@ fn pm_conformance_conversion(@builtin(global_invocation_id) id : vec3<u32>)
 				{
 					if (mismatches++ == 0)
 					{
-						detail = $"first: key {keys[k]} draw {d}: device 0x{actual:X8}, CPU 0x{expected:X8}";
+						detail = Invariant($"first: key {keys[k]} draw {d}: device 0x{actual:X8}, CPU 0x{expected:X8}");
 					}
 				}
 			}
 		}
 
-		checks.Add(Compare(Name, mismatches, "==", 0, $"{keys.Count * DrawsPerKey} draws compared" + (detail.Length > 0 ? "; " + detail : "")));
+		checks.Add(Compare(Name, mismatches, "==", 0, Invariant($"{keys.Count * DrawsPerKey} draws compared") + (detail.Length > 0 ? "; " + detail : "")));
 	}
 
 	private static async Task ConversionProbeAsync(IComputeDevice device, bool isTwin, List<PatchMatchGpuConformanceCheck> checks, CancellationToken ct)
@@ -190,7 +192,7 @@ fn pm_conformance_conversion(@builtin(global_invocation_id) id : vec3<u32>)
 		{
 			gpu = await RunProbeAsync(device, "pm_conformance_conversion", ConversionProbeKernel, input, input.Length * 2, input.Length, ct).ConfigureAwait(false);
 		}
-		catch (Exception e) when (e is not OperationCanceledException)
+		catch (Exception e) when (IsReportable(e, ct))
 		{
 			checks.Add(StageFailed(Name, e));
 			return;
@@ -209,12 +211,12 @@ fn pm_conformance_conversion(@builtin(global_invocation_id) id : vec3<u32>)
 			{
 				if (mismatches++ == 0)
 				{
-					detail = $"first: 0x{bits:X8}: device (0x{gpu[i * 2]:X8}, 0x{gpu[i * 2 + 1]:X8}), C# (0x{converted:X8}, 0x{mapped:X8})";
+					detail = Invariant($"first: 0x{bits:X8}: device (0x{gpu[i * 2]:X8}, 0x{gpu[i * 2 + 1]:X8}), C# (0x{converted:X8}, 0x{mapped:X8})");
 				}
 			}
 		}
 
-		checks.Add(Compare(Name, mismatches, "==", 0, $"{input.Length} values compared" + (detail.Length > 0 ? "; " + detail : "")));
+		checks.Add(Compare(Name, mismatches, "==", 0, Invariant($"{input.Length} values compared") + (detail.Length > 0 ? "; " + detail : "")));
 	}
 
 	/// <summary>
@@ -255,7 +257,7 @@ fn pm_conformance_conversion(@builtin(global_invocation_id) id : vec3<u32>)
 			// The twin gets the device's limits so the plan, and so the kernel text and dispatch shapes, match.
 			(twinState, twinCosts) = await RunInitAsync(new ReferenceComputeDevice(device.Limits), ct).ConfigureAwait(false);
 		}
-		catch (Exception e) when (e is not OperationCanceledException)
+		catch (Exception e) when (IsReportable(e, ct))
 		{
 			checks.Add(StageFailed(DepthName, e));
 			checks.Add(StageFailed(CostName, e));
@@ -284,9 +286,9 @@ fn pm_conformance_conversion(@builtin(global_invocation_id) id : vec3<u32>)
 			costAgree += difference <= MaxInitialCostDifference ? 1 : 0;
 		}
 
-		checks.Add(Compare(DepthName, maxDepthUlps, "<=", MaxInitDepthUlps, $"max normal difference {maxNormalUlps} ULP (not bounded)"));
+		checks.Add(Compare(DepthName, maxDepthUlps, "<=", MaxInitDepthUlps, Invariant($"max normal difference {maxNormalUlps} ULP (not bounded)")));
 		checks.Add(Compare(CostName, costAgree / (double)deviceCosts.Length, ">=", MinInitialCostAgreement,
-			$"fraction of {deviceCosts.Length} costs within {MaxInitialCostDifference}; max difference {maxCostDifference:E3}"));
+			Invariant($"fraction of {deviceCosts.Length} costs within {MaxInitialCostDifference}; max difference {maxCostDifference:E3}")));
 	}
 
 	/// <summary>
