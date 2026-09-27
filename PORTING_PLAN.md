@@ -75,9 +75,12 @@ divergence 134), with a C#-only texturing step per dense model (divergence 135).
   `Vector128` rank-count median (~0.6 s; needs the lane-rule test, falls back to quickselect
   on ±0/NaN), and the structural fix, a speculative band-parallel traversal with in-order
   commit.
-- CPU PatchMatch dominates dense reconstruction: ~1m45s per image at LOW quality (1000 px),
-  ~12 s at 300 px, while sparse takes seconds. It is already column-parallel (divergence
-  122); profile the sweep before MatterCAD users run real photo sets through it.
+- PatchMatch (Release, LOW, 1000 px, one reference + 4 sources): ~27 s CPU single-threaded,
+  6-9 s wall on 10 cores; ~3.8 ns per window tap, ~3x off the per-core floor. 69% is
+  `ComputeFourLockstep` (gather-bound `Sample4`), 12% the scalar best-cost recompute. CPU
+  levers (~1.5-2x total, bit-identical): lockstep the 4-source recompute, halve `Sample4`'s
+  gathers (ushort texel pairs, hoisted `inside` test), index rotations instead of copying.
+  The big lever is a GPU port (below).
 - Optional: Vector128 lanes in `Jet` (allowed under CLAUDE.md's lane rule).
 - Evaluate a faithful port of libc++ `std::sort` (sort3/4/5, insertion sort below 24, pdqsort
   above) so tie-sensitive sorts match COLMAP instead of carrying divergence entries.
