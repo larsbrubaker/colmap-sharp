@@ -808,7 +808,10 @@ models with point counts 1, 2, 1, 2 and reads back sources 1, 3, 0, 2.
    `SchurEliminatorForOneFBlock<2, 3, 6>` when there is a single camera block); those use
    Eigen's fixed-size products and invert 3x3 E'E blocks with Eigen's cofactor `inverse()`,
    where the port uses Ceres' naive loop kernels (`SmallBlas.cs`) and a Cholesky solve of the
-   identity (Ceres' own dynamic-size path). Results agree to rounding, not bit for bit.
+   identity (Ceres' own dynamic-size path). Results agree to rounding, not bit for bit. The
+   BA shapes (2-row residual blocks, 3-dimensional E blocks) run through unrolled kernels
+   (`SmallBlasFixed.cs`) that keep the naive loops' summation order, so they round exactly as
+   the naive loops do (`SmallBlasFixedTests`, `SchurDeterminismTests`).
 3. SPARSE_SCHUR factors the lower triangle of the reduced camera matrix with
    `LinearAlgebra/SimplicialCholesky.cs` (AMD on the scalar pattern). Ceres with EIGEN_SPARSE
    first reorders the F blocks by AMD on the block pattern of the Schur complement

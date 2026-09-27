@@ -34,6 +34,25 @@ internal abstract class BlockRandomAccessMatrix
 	/// </summary>
 	public abstract bool TryGetCell(int rowBlockId, int colBlockId, out Span<double> cell, out int stride);
 
+	/// <summary>
+	/// Where <see cref="TryGetCell"/>'s cell starts in <see cref="Values"/>, or -1 if the
+	/// cell is not stored. The Schur eliminator resolves its cells once per structure with
+	/// this instead of looking each one up per solve.
+	/// </summary>
+	public int CellOffset(int rowBlockId, int colBlockId, out int stride)
+	{
+		if (!TryGetCell(rowBlockId, colBlockId, out Span<double> cell, out stride))
+		{
+			return -1;
+		}
+
+		Util.Check.That(Values.AsSpan().Overlaps(cell, out int offset), "A cell outside the matrix values.");
+		return offset;
+	}
+
+	/// <summary>Every stored value; the cells are views into it.</summary>
+	public abstract double[] Values { get; }
+
 	/// <summary>Zeroes every stored value.</summary>
 	public abstract void SetZero();
 }
@@ -62,7 +81,7 @@ internal sealed class BlockRandomAccessDenseMatrix : BlockRandomAccessMatrix
 	public override int NumRows { get; }
 
 	/// <summary>The row-major values.</summary>
-	public double[] Values { get; }
+	public override double[] Values { get; }
 
 	/// <inheritdoc/>
 	public override bool TryGetCell(int rowBlockId, int colBlockId, out Span<double> cell, out int stride)
@@ -117,7 +136,7 @@ internal sealed class BlockRandomAccessSparseMatrix : BlockRandomAccessMatrix
 	public override int NumRows { get; }
 
 	/// <summary>The cell values, each cell row-major.</summary>
-	public double[] Values { get; }
+	public override double[] Values { get; }
 
 	/// <inheritdoc/>
 	public override bool TryGetCell(int rowBlockId, int colBlockId, out Span<double> cell, out int stride)
@@ -237,7 +256,7 @@ internal sealed class BlockRandomAccessDiagonalMatrix : BlockRandomAccessMatrix
 	public override int NumRows { get; }
 
 	/// <summary>The diagonal blocks, each row-major.</summary>
-	public double[] Values { get; }
+	public override double[] Values { get; }
 
 	/// <inheritdoc/>
 	public override bool TryGetCell(int rowBlockId, int colBlockId, out Span<double> cell, out int stride)

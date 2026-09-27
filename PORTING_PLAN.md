@@ -41,11 +41,11 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
   synthetic scene triggers).
 
 ### Performance (keep results bit-identical and thread-count independent)
-- Schur eliminator (~88% of SPARSE_SCHUR, 0.32 s/solve at 200 cams/20k pts, Release; BA is
-  ~2.6× slower than native Ceres): fixed-size kernels for the 2/3/6 BA shapes, precomputed
-  cell offsets instead of Dictionary lookups, two-phase parallel elimination (per-chunk slots,
-  then per-camera block rows in chunk order), cached E'E inverses for back substitution,
-  parallel implicit products for ITERATIVE_SCHUR, blocked LLT for DENSE_SCHUR.
+- Schur solvers (fixed-size kernels, precomputed cell offsets and cached E'E inverses are in;
+  SchurDeterminismTests pins the output hash, which must not change): two-phase parallel
+  elimination (per-chunk E'F and inverse slots, then per-camera block rows replayed in chunk
+  order, in batches of chunks to bound memory), parallel implicit products for
+  ITERATIVE_SCHUR, blocked LLT for DENSE_SCHUR.
 - Fusion is single-threaded (divergence 87): per-image parallel precompute of per-pixel
   world points/normals first, then a speculative band-parallel traversal with in-order commit,
   which reproduces the one-thread result.
