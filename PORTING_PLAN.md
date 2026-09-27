@@ -24,9 +24,7 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
 
 ### Phase 11 — Pipeline controllers
 `AutomaticReconstructionController` is ported (`Controllers/AutomaticReconstruction*.cs`,
-divergence 134). Remaining:
-- A C#-only textured-mesh step after meshing (COLMAP's controller never calls
-  `MeshTextureMapping`): turn its result into a mesh carrying the photo colors as a texture.
+divergence 134), with a C#-only texturing step per dense model (divergence 135). Remaining:
 - A fast dense test with prebuilt depth/normal maps in `stereo/` (skipping PatchMatch) that
   covers fusion with real masks, the re-undistort-when-store-empty rule and the
   advancing-front early return; today only the ~13 s textured end-to-end test covers dense.
@@ -34,6 +32,8 @@ divergence 134). Remaining:
   trim 10 (small clouds trim to nothing, in pycolmap too); MatterCAD will need to choose trim
   for small photo sets.
 - Progress restarts once within the dense stage (undistortion, then PatchMatch).
+- Resume validates only a mesh's PLY header; a mesh or `fused.ply` cut off mid-body (crash
+  while writing) would still make texturing throw on the next run.
 
 ### Phase 12 — Dense reconstruction (MVS)
 - `poisson_meshing` (PoissonRecon port, `Mvs/PoissonRecon/`). Everything through the linear
