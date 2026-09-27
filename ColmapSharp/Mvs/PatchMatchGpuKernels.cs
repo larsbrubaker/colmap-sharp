@@ -126,8 +126,8 @@ internal static class PatchMatchGpuKernels
 
 	/// <summary>
 	/// Bytes of <c>var&lt;workgroup&gt;</c> memory the cooperative sweep_band declares
-	/// (patch_match_sweep_band.wgsl), every element 4 bytes: forward messages and sampling
-	/// priors (S each), per sample the drawn source and hypothesis 0's cost (N each), per
+	/// (patch_match_sweep_band.wgsl), every element 4 bytes: forward messages, sampling
+	/// priors and each source's first drawing sample (S each), per sample the drawn source and hypothesis 0's cost (N each), per
 	/// (sample, hypothesis) the NCC and geometric terms (N x NumCosts each), and the hypothesis
 	/// sums (NumCosts); and the shared reference window (patch_match_ncc.wgsl): its colors and
 	/// weights (the window count each while the window is cached, else one) and its weight sum. The
@@ -138,7 +138,7 @@ internal static class PatchMatchGpuKernels
 	{
 		int windowCount = PatchMatchPhotoConsistency.WindowCountFor(windowRadius, windowStep);
 		long windowSlots = windowCount <= WindowCacheLimit ? windowCount : 1;
-		return 4L * ((2L * numSrc) + (2L * numSamples) + (2L * numSamples * NumCosts) + NumCosts + (2L * windowSlots) + 1);
+		return 4L * ((3L * numSrc) + (2L * numSamples) + (2L * numSamples * NumCosts) + NumCosts + (2L * windowSlots) + 1);
 	}
 
 	/// <summary>The largest window kept in a cache (PM_WINDOW_CACHE_LIMIT in patch_match_ncc.wgsl).</summary>
