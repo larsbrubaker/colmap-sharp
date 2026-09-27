@@ -32,7 +32,7 @@ namespace ColmapSharp.Mvs.PoissonRecon;
 /// Matrix rows and prolongation constraints for one depth of Solve's system. Port of the matching
 /// members of PoissonRecon's <c>FEMTree&lt;3,float&gt;</c>.
 /// </summary>
-public sealed class PoissonSystem
+public sealed partial class PoissonSystem
 {
 	private const int Dim = 3;
 	private readonly FemTree tree;

@@ -5,7 +5,8 @@
 // (_addInterpolationConstraints), then the solver's per-depth matrix rows and prolongation
 // constraints (_getSliceMatrixAndProlongationConstraints, _getProlongedMatrixRowSize) and its
 // point-constraint transfers (_setPointValuesFromProlongedSolution,
-// _updateRestrictedInterpolationConstraints). Built and run by
+// _updateRestrictedInterpolationConstraints) and the sliced Gauss-Seidel relaxation
+// (_solveSystemGS). Built and run by
 // oracle/fixture_poisson_tree.py, which writes ColmapSharp.Tests/TestData/oracle/poisson_system.json
 // (read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests.System.cs). Not part of any
 // build. The shared set-up and output format are in oracle/poisson_harness.h; the stages up to
@@ -211,6 +212,28 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input) {
     for (size_t i = 0; i < solution.size(); i++) solution[i] = (Real)((long long)(i * 53 % 97) - 48) / (Real)32;
     for (int d = 1; d <= tree._maxDepth; d++) tree.template _updateRestrictedInterpolationConstraints<0>(bsData, d, (const Real*)&solution[0], &restricted[0], std::make_tuple(iInfo));
     PrintF(name + "/restrictedinterpolation", std::vector<double>(restricted.begin(), restricted.end()));
+
+    // _solveSystemGS (sliced) at each small depth from a zero solution, against the constraints
+    // above and the synthetic prolonged solution: Solve's prolongation-phase call (8 iterations,
+    // coarse to fine, one slice per block), and a restriction-direction call with two slices
+    // per block and 3 iterations, so the blocked nBegin/nEnd sub-ranges and the window walk in
+    // both directions are covered.
+    struct UnitSOR { Real operator[](node_index_type) const { return (Real)1; } };
+    auto gs = [&](const std::string& caseName, int iters, bool coarseToFine, unsigned int sliceBlockSize) {
+      std::vector<Real> x(tree._sNodesEnd(tree._maxDepth), (Real)0);
+      std::vector<double> out;
+      for (int d = 1; d <= tree._maxDepth; d++) {
+        node_index_type begin = tree._sNodesBegin(d), end = tree._sNodesEnd(d);
+        if ((size_t)(end - begin) > kSliceLimit) continue;
+        S.init(d);
+        typename FEMTree<Dim, Real>::_SolverStats stats;
+        tree._solveSystemGS(Sigs(), true, S, bsData, d, &x[0], (const Real*)&prolonged[0], (const Real*)constraints(), [](Real v, Real w) { return v * w; }, iters, coarseToFine, sliceBlockSize, UnitSOR(), stats, false, std::make_tuple(iInfo));
+        for (node_index_type i = begin; i < end; i++) out.push_back(x[i]);
+      }
+      PrintF(name + "/" + caseName, out);
+    };
+    gs("gsprolongation", 8, true, 1);
+    gs("gsblocked", 3, false, 2);
   }
 
   delete normalInfo;

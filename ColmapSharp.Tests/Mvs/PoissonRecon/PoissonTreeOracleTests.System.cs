@@ -48,15 +48,16 @@ public partial class PoissonTreeOracleTests
 		// Solve: addInterpolationConstraints( constraints , solveDepth , iInfo ).
 		PoissonFemConstraints.AddInterpolationConstraints(tree, sorted, p.Interpolation, constraints, depth);
 		produced.F("interpolationconstraints", constraints.Select(v => (double)v).ToList());
-		AddSliceCases(produced, tree, sorted, p, depth);
+		AddSliceCases(produced, tree, sorted, p, depth, constraints);
 		await Assert.That(CompareRun(cases, name, produced)).IsEqualTo(string.Empty);
 	}
 
 	// The harness's solver-assembly block: per depth of at most SliceLimit nodes, the matrix rows,
 	// prolongation constraints and inverse diagonals of
 	// _getSliceMatrixAndProlongationConstraints over a synthetic prolonged solution, and
-	// _getProlongedMatrixRowSize of every valid node; then the point-constraint transfers.
-	private static void AddSliceCases(Cases produced, FemTree tree, SortedTreeNodes sorted, Prepared p, int solveDepth)
+	// _getProlongedMatrixRowSize of every valid node; then the point-constraint transfers and the
+	// sliced Gauss-Seidel relaxation.
+	private static void AddSliceCases(Cases produced, FemTree tree, SortedTreeNodes sorted, Prepared p, int solveDepth, float[] systemConstraints)
 	{
 		const int SliceLimit = 12000;
 		var f = new FemSystemIntegrator(PoissonFemConstraints.TestSignature, 1, 0.0, 1.0);
@@ -158,6 +159,33 @@ public partial class PoissonTreeOracleTests
 		}
 
 		produced.F("restrictedinterpolation", restricted.Select(v => (double)v).ToList());
+
+		// The sliced Gauss-Seidel runs, from a zero solution.
+		List<double> Gs(int iters, bool coarseToFine, int sliceBlockSize)
+		{
+			var x = new float[PoissonMultigrid.End(tree, sorted, maxDepth)];
+			var result = new List<double>();
+			for (int d = 1; d <= maxDepth; d++)
+			{
+				int begin = PoissonMultigrid.Begin(tree, sorted, d), end = PoissonMultigrid.End(tree, sorted, d);
+				if (end - begin > SliceLimit)
+				{
+					continue;
+				}
+
+				f.Init(d);
+				system.SolveSystemGS(d, x, prolonged, systemConstraints, iters, coarseToFine, sliceBlockSize);
+				for (int i = begin; i < end; i++)
+				{
+					result.Add(x[i]);
+				}
+			}
+
+			return result;
+		}
+
+		produced.F("gsprolongation", Gs(8, coarseToFine: true, 1));
+		produced.F("gsblocked", Gs(3, coarseToFine: false, 2));
 	}
 
 	// The harness's Run up to and including finalizeForMultigrid, emitting its sorted slices.
