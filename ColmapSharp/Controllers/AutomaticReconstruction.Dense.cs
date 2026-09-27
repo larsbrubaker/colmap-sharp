@@ -16,7 +16,8 @@
 //
 // Translation notes (docs/CPP_DIVERGENCES.md entry 134):
 // - COLMAP skips PatchMatch (and so everything after undistortion) without CUDA; the
-//   PatchMatch algorithm is ported to the CPU here, so it runs.
+//   PatchMatch algorithm is ported to the CPU here, so it runs - on the host's compute device
+//   when Options.ComputeDevice is set and can be waited on synchronously (entry 136).
 // - Delaunay meshing is a CGAL-free port here, so it runs like a COLMAP build with CGAL.
 //   Advancing-front meshing is CGAL code (out of scope) and is skipped with a warning like a
 //   build without CGAL.
@@ -26,6 +27,7 @@
 // - Delaunay meshing reseeds the thread's PRNG first, so a resumed workspace re-meshes to the
 //   same bytes as the run that built it (docs/CPP_DIVERGENCES.md entry 137).
 
+using ColmapSharp.Compute;
 using ColmapSharp.ImageProcessing;
 using ColmapSharp.Mathematics;
 using ColmapSharp.Mvs;
@@ -152,10 +154,13 @@ public sealed partial class AutomaticReconstructionController
 	// advancing-front warning).
 	private bool RunDenseStages(int i, string densePath, string fusedPath, string meshingPath, IBitmapSource bitmaps)
 	{
-		// Patch match stereo (on the CPU; COLMAP needs CUDA here).
+		// Patch match stereo (on the host's compute device or the CPU; COLMAP needs CUDA here).
 
 		var patchMatchController = new PatchMatchController(
-			optionManager.PatchMatchStereo, densePath, "COLMAP", "", bitmaps);
+			optionManager.PatchMatchStereo, densePath, "COLMAP", "", bitmaps)
+		{
+			ComputeDevice = BlockingComputeDevice(),
+		};
 		patchMatchController.Run(CancellationToken, Under(DenseStage));
 
 		if (CheckIfStopped())
@@ -218,6 +223,21 @@ public sealed partial class AutomaticReconstructionController
 		}
 
 		return true;
+	}
+
+	// The host's compute device if this synchronous controller can use it: one that cannot be
+	// waited on synchronously (the browser) would make PatchMatchController.Run throw, so
+	// PatchMatch runs on the CPU instead, with a warning, until an async dense entry exists.
+	private IComputeDevice? BlockingComputeDevice()
+	{
+		IComputeDevice? device = options.ComputeDevice;
+		if (device == null || device.SupportsBlockingWait)
+		{
+			return device;
+		}
+
+		Log.Warning("The GPU cannot be used by the synchronous dense reconstruction; running PatchMatch stereo on the CPU.");
+		return null;
 	}
 
 	// Port of mvs::DenseDelaunayMeshing(options, dense_path, output_path): reads the

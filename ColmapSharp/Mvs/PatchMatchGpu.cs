@@ -28,7 +28,7 @@ namespace ColmapSharp.Mvs;
 /// PatchMatch on an <see cref="IComputeDevice"/>, with the getters of <see cref="PatchMatchCpu"/>.
 /// Internal: PatchMatch checks the problem (map sizes included) before constructing it.
 /// </summary>
-internal sealed partial class PatchMatchGpu
+internal sealed partial class PatchMatchGpu : IPatchMatchResult
 {
 	private readonly PatchMatchOptions options;
 	private readonly PatchMatch.Problem problem;
@@ -104,6 +104,27 @@ internal sealed partial class PatchMatchGpu
 
 	/// <summary>The sizes <see cref="PatchMatchGpuPlan"/> plans this problem for.</summary>
 	public PatchMatchGpuProblemShape ProblemShape => new(refWidth, refHeight, numSrc, srcImages.MaxWidth, srcImages.MaxHeight);
+
+	/// <summary>
+	/// <see cref="ProblemShape"/> of a (checked) problem without constructing the run - no
+	/// reference filtering, no source layers - so PatchMatch can decide GPU or CPU first. The
+	/// source layer size is the largest source width and height, as PatchMatchSourceImages
+	/// computes it; PatchMatchBackendTests pins the two against each other.
+	/// </summary>
+	public static PatchMatchGpuProblemShape ShapeOf(PatchMatch.Problem problem)
+	{
+		List<Image> images = Util.Check.NotNull(problem.Images);
+		int maxWidth = 0;
+		int maxHeight = 0;
+		foreach (int imageIdx in problem.SrcImageIdxs)
+		{
+			maxWidth = Math.Max(maxWidth, images[imageIdx].GetWidth());
+			maxHeight = Math.Max(maxHeight, images[imageIdx].GetHeight());
+		}
+
+		Image refImage = images[problem.RefImageIdx];
+		return new(refImage.GetWidth(), refImage.GetHeight(), problem.SrcImageIdxs.Count, maxWidth, maxHeight);
+	}
 
 	/// <summary>The per-problem values baked into the kernels' text.</summary>
 	public PatchMatchGpuShaderShape ShaderShape => new(

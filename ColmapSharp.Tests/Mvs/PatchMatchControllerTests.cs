@@ -23,7 +23,7 @@ using TUnit.Core;
 
 namespace ColmapSharp.Tests.Mvs;
 
-public class PatchMatchControllerTests
+public partial class PatchMatchControllerTests
 {
 	private const int CameraWidth = 20;
 	private const int CameraHeight = 10;

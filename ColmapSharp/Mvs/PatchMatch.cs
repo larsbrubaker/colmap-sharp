@@ -5,20 +5,52 @@
 // (a reference image, its source images, and the inputs they index), its validation, and
 // the run that estimates the reference image's depth and normal maps. PatchMatchController.cs
 // builds the problems; PatchMatchOptions.cs holds the settings; PatchMatchCpu.cs is the CPU
-// port of patch_match_cuda.cu that Run delegates to. Tests:
-// ColmapSharp.Tests/Mvs/PatchMatchTests.cs and PatchMatchRunTests.cs (C#-only; COLMAP has no
-// patch_match_test.cc).
+// port of patch_match_cuda.cu that Run delegates to. RunAsync with a host-provided compute
+// device runs PatchMatchGpu.cs (the WGSL kernels) instead when PatchMatchGpuPlan.cs says the
+// device can hold the problem, and falls back to PatchMatchCpu otherwise, recording which
+// backend ran and why (docs/CPP_DIVERGENCES.md, entry 136). Tests:
+// ColmapSharp.Tests/Mvs/PatchMatchTests.cs, PatchMatchRunTests.cs and PatchMatchBackendTests.cs
+// (C#-only; COLMAP has no patch_match_test.cc).
 //
 // Translation notes:
 // - Problem holds the image, depth map and normal map lists by reference, like COLMAP's
 //   pointers: the controller fills them per problem.
-// - Check drops COLMAP's gpu_index checks (no GPU here; docs/CPP_DIVERGENCES.md, entry 86).
-// - Run takes a CancellationToken and an IProgress<double> (the fraction of sweeps done).
+// - Check drops COLMAP's gpu_index checks (docs/CPP_DIVERGENCES.md, entry 86): the GPU, when
+//   there is one, is the IComputeDevice the host passes to RunAsync, not an index.
+// - Run and RunAsync take a CancellationToken and an IProgress<double> (the fraction of sweeps
+//   done).
+// - A GPU error is not a reason to fall back: it propagates, so a broken device is noticed
+//   rather than silently costing a CPU run's time.
 // - Problem::Print is not ported (it is a LOG(INFO) listing).
 
-using ColmapSharp.Util;
+using ColmapSharp.Compute;
 
 namespace ColmapSharp.Mvs;
+
+/// <summary>Where a <see cref="PatchMatch"/> run computed its maps.</summary>
+public enum PatchMatchBackend
+{
+	/// <summary>On the CPU (PatchMatchCpu).</summary>
+	Cpu,
+
+	/// <summary>On the host's compute device (PatchMatchGpu).</summary>
+	Gpu,
+}
+
+/// <summary>
+/// The results of a finished run, whichever backend computed them: the getters PatchMatchCpu
+/// and PatchMatchGpu share, so PatchMatch reads either the same way.
+/// </summary>
+internal interface IPatchMatchResult
+{
+	DepthMap GetDepthMap();
+
+	NormalMap GetNormalMap();
+
+	Mat<float> GetSelProbMap();
+
+	List<int> GetConsistentImageIdxs();
+}
 
 /// <summary>
 /// Port of colmap::mvs::PatchMatch: estimates the depth and normal map of a reference image
@@ -28,7 +60,7 @@ public sealed class PatchMatch
 {
 	private readonly PatchMatchOptions options;
 	private readonly Problem problem;
-	private PatchMatchCpu? patchMatchCpu;
+	private IPatchMatchResult? result;
 
 	/// <summary>Port of PatchMatch::Problem: one reference image and its source images.</summary>
 	public sealed class Problem
@@ -136,19 +168,102 @@ public sealed class PatchMatch
 	}
 
 	/// <summary>
-	/// Checks the problem and runs PatchMatch on it: num_iterations x 4 sweeps, with
+	/// Where the last completed run computed its maps (<see cref="PatchMatchBackend.Cpu"/>
+	/// before any run).
+	/// </summary>
+	public PatchMatchBackend Backend { get; private set; }
+
+	/// <summary>
+	/// Why the last run used the CPU although a compute device was given: a sentence for the
+	/// user ending "Using the CPU." (e.g. the image needs more GPU memory than one buffer can
+	/// hold). Null when the GPU ran or no device was given.
+	/// </summary>
+	public string? FallbackReason { get; private set; }
+
+	/// <summary>
+	/// Checks the problem and runs PatchMatch on it on the CPU: num_iterations x 4 sweeps, with
 	/// geometric consistency and filtering as the options ask. Port of PatchMatch::Run.
 	/// </summary>
 	public void Run(CancellationToken cancellationToken = default, IProgress<double>? progress = null)
 	{
-		Check();
-		patchMatchCpu = null;
+		BeginRun();
+		RunCpu(cancellationToken, progress);
+	}
 
-		// Results become readable only after a complete run; a cancelled or failed one
-		// leaves none.
+	/// <summary>
+	/// <see cref="RunAsync"/>, blocking until it finishes. Blocking is only safe on a device
+	/// whose flushes can be waited for on this thread, so a <paramref name="device"/> without
+	/// <see cref="IComputeDevice.SupportsBlockingWait"/> (the browser) throws
+	/// <see cref="InvalidOperationException"/>; use <see cref="RunAsync"/> there. A null device
+	/// runs on the CPU, like <see cref="Run(CancellationToken, IProgress{double})"/>.
+	/// </summary>
+	public void Run(IComputeDevice? device, CancellationToken cancellationToken = default, IProgress<double>? progress = null)
+	{
+		ThrowIfCannotBlock(device);
+
+		// The device promised that waiting on its flushes from this thread completes, and the
+		// GPU path awaits with ConfigureAwait(false), so no context is needed to finish.
+		// GetResult rethrows the run's own exception rather than an AggregateException.
+		RunAsync(device, cancellationToken, progress).GetAwaiter().GetResult();
+	}
+
+	/// <summary>
+	/// Checks the problem and runs PatchMatch on it: on <paramref name="device"/> when one is
+	/// given and it can hold the problem (<see cref="Backend"/> becomes
+	/// <see cref="PatchMatchBackend.Gpu"/>), else on the CPU, with the reason in
+	/// <see cref="FallbackReason"/>. A CPU run happens synchronously inside this call. A
+	/// device failure during a GPU run faults the task; it does not fall back to the CPU.
+	/// </summary>
+	public async Task RunAsync(IComputeDevice? device, CancellationToken cancellationToken = default, IProgress<double>? progress = null)
+	{
+		BeginRun();
+		if (device != null)
+		{
+			// Planned from the problem's sizes alone, so a fallback costs no GPU-side setup.
+			PatchMatchGpuProblemShape shape = PatchMatchGpu.ShapeOf(problem);
+			if (PatchMatchGpuPlan.TryCreate(shape, options, device.Limits, null, out _, out string? reason))
+			{
+				var gpu = new PatchMatchGpu(options, problem);
+				await gpu.RunAsync(device, cancellationToken, progress).ConfigureAwait(false);
+				result = gpu;
+				Backend = PatchMatchBackend.Gpu;
+				return;
+			}
+
+			FallbackReason = reason;
+		}
+
+		RunCpu(cancellationToken, progress);
+	}
+
+	/// <summary>
+	/// Throws <see cref="InvalidOperationException"/> when a synchronous run on
+	/// <paramref name="device"/> would have to block on a device that cannot be blocked on.
+	/// </summary>
+	internal static void ThrowIfCannotBlock(IComputeDevice? device)
+	{
+		if (device != null && !device.SupportsBlockingWait)
+		{
+			throw new InvalidOperationException(
+				"This compute device cannot be waited on synchronously (e.g. in the browser); use RunAsync instead of Run.");
+		}
+	}
+
+	// Checks the problem and clears the last run's results: results become readable only
+	// after a complete run; a cancelled or failed one leaves none.
+	private void BeginRun()
+	{
+		Check();
+		result = null;
+		Backend = PatchMatchBackend.Cpu;
+		FallbackReason = null;
+	}
+
+	private void RunCpu(CancellationToken cancellationToken, IProgress<double>? progress)
+	{
 		var run = new PatchMatchCpu(options, problem);
 		run.Run(cancellationToken, progress);
-		patchMatchCpu = run;
+		result = run;
 	}
 
 	/// <summary>The estimated depth map (0 where filtered). Port of PatchMatch::GetDepthMap.</summary>
@@ -174,6 +289,6 @@ public sealed class PatchMatch
 	}
 
 	// COLMAP dereferences a null patch_match_cuda_ before Run; here that is a clear error.
-	private PatchMatchCpu RunResult =>
-		patchMatchCpu ?? throw new InvalidOperationException("PatchMatch.Run must be called before reading its results.");
+	private IPatchMatchResult RunResult =>
+		result ?? throw new InvalidOperationException("PatchMatch.Run must be called before reading its results.");
 }

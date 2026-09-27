@@ -24,22 +24,27 @@
 // - SetUpProblem collects the used images in a FlatHashSet in COLMAP, whose iteration order
 //   becomes the order of the source images; here it is the reference image, then the
 //   problem's source images in their configured order (entry 85).
-// - There are no GPUs: COLMAP's gpu_index and ReadGpuIndices are not ported (entry 86).
+// - COLMAP's gpu_index and ReadGpuIndices are not ported (entry 86): the host may instead
+//   supply one IComputeDevice (ComputeDevice), which every problem runs on when it fits,
+//   falling back to the CPU per problem (entry 136).
 // - Bitmaps come from the host through an IBitmapSource (IBitmapSource.cs); "does the image
 //   exist" asks the source, as Workspace.HasBitmap does.
 // - LOG(WARNING)/LOG(ERROR) go to Util/Log.cs; the LOG(INFO) lines and timers are not
 //   ported, and progress is reported per problem through IProgress<ControllerProgress>.
-// - COLMAP runs one problem per GPU in parallel; here problems run one after another and
-//   each PatchMatch run is itself parallel (NumThreads), which gives the same outputs
-//   (docs/CPP_DIVERGENCES.md, entry 122).
+// - COLMAP runs one problem per GPU in parallel; here problems run one after another, each
+//   PatchMatch run itself parallel (NumThreads on the CPU, or on the one device), which
+//   gives the same outputs (docs/CPP_DIVERGENCES.md, entry 122).
+// - Run blocks; RunAsync awaits the compute device, for a host (the browser) whose device
+//   cannot be waited on synchronously.
 // - Cancellation is COLMAP's CheckIfStopped, checked before each problem; as in COLMAP a
 //   stop is not an error, so Run returns normally. Unlike COLMAP, which finishes the
-//   problem in flight, the token also reaches PatchMatch.Run, so a stop aborts the running
+//   problem in flight, the token also reaches PatchMatch.RunAsync, so a stop aborts the running
 //   problem and it writes nothing (entry 122).
 // - A Model already in memory can stand in for <workspace>/sparse (as for Workspace).
 
 using System.Globalization;
 
+using ColmapSharp.Compute;
 using ColmapSharp.Controllers;
 using ColmapSharp.Mathematics;
 using ColmapSharp.Util;
@@ -110,8 +115,34 @@ public sealed class PatchMatchController
 	/// consistency_graphs)/&lt;image name&gt;.{photometric,geometric}.bin. Problems whose
 	/// outputs already exist are skipped. Cancelling <paramref name="cancellationToken"/>
 	/// stops after writing the finished problems. Port of PatchMatchController::Run.
+	/// With a <see cref="ComputeDevice"/> that cannot be waited on synchronously (the browser)
+	/// this throws <see cref="InvalidOperationException"/>; use <see cref="RunAsync"/> there.
 	/// </summary>
 	public void Run(CancellationToken cancellationToken = default, IProgress<ControllerProgress>? progress = null)
+	{
+		PatchMatch.ThrowIfCannotBlock(ComputeDevice);
+
+		// Without a device every await in RunAsync completes synchronously; with one, the device
+		// promised that a blocking wait completes, and the awaits use ConfigureAwait(false).
+		// GetResult rethrows the run's own exception rather than an AggregateException.
+		RunAsync(cancellationToken, progress).GetAwaiter().GetResult();
+	}
+
+	/// <summary>
+	/// The host's compute device to run each problem's PatchMatch on, or null for the CPU. A
+	/// problem the device cannot hold runs on the CPU (with a warning giving the reason); a
+	/// device error fails the run. With a device, each progress report's Message is the
+	/// reference image's name followed by " (GPU)" or " (CPU)", where that problem ran.
+	/// </summary>
+	public IComputeDevice? ComputeDevice { get; init; }
+
+	/// <summary>
+	/// <see cref="Run"/>, awaiting the <see cref="ComputeDevice"/>'s work instead of blocking
+	/// on it: the entry point for a device that cannot be waited on synchronously. Problems
+	/// still run one at a time (docs/CPP_DIVERGENCES.md, entry 122); a problem on the CPU runs
+	/// synchronously inside this call.
+	/// </summary>
+	public async Task RunAsync(CancellationToken cancellationToken = default, IProgress<ControllerProgress>? progress = null)
 	{
 		ReadWorkspace();
 		ReadProblems();
@@ -129,37 +160,43 @@ public sealed class PatchMatchController
 
 			for (int problemIdx = 0; problemIdx < Problems.Count; ++problemIdx)
 			{
-				if (!ProcessProblem(photometricOptions, problemIdx, cancellationToken))
+				(bool finished, PatchMatchBackend? backend) =
+					await ProcessProblemAsync(photometricOptions, problemIdx, cancellationToken).ConfigureAwait(false);
+				if (!finished)
 				{
 					return;
 				}
 
-				progress?.Report(new ControllerProgress("PatchMatch photometric", ++done, total, RefImageName(problemIdx)));
+				progress?.Report(new ControllerProgress("PatchMatch photometric", ++done, total, ProblemMessage(problemIdx, backend)));
 			}
 		}
 
 		for (int problemIdx = 0; problemIdx < Problems.Count; ++problemIdx)
 		{
-			if (!ProcessProblem(options, problemIdx, cancellationToken))
+			(bool finished, PatchMatchBackend? backend) =
+				await ProcessProblemAsync(options, problemIdx, cancellationToken).ConfigureAwait(false);
+			if (!finished)
 			{
 				return;
 			}
 
 			string stage = options.GeomConsistency ? "PatchMatch geometric" : "PatchMatch photometric";
-			progress?.Report(new ControllerProgress(stage, ++done, total, RefImageName(problemIdx)));
+			progress?.Report(new ControllerProgress(stage, ++done, total, ProblemMessage(problemIdx, backend)));
 		}
 	}
 
 	/// <summary>
 	/// Processes problem <paramref name="problemIdx"/> under <paramref name="problemOptions"/>
-	/// (unless its outputs exist); false when stopped by <paramref name="cancellationToken"/>.
-	/// Port of PatchMatchController::ProcessProblem.
+	/// (unless its outputs exist). Finished is false when stopped by
+	/// <paramref name="cancellationToken"/>; Backend is where PatchMatch ran, null when the
+	/// problem was skipped or stopped. Port of PatchMatchController::ProcessProblem.
 	/// </summary>
-	internal bool ProcessProblem(PatchMatchOptions problemOptions, int problemIdx, CancellationToken cancellationToken)
+	internal async Task<(bool Finished, PatchMatchBackend? Backend)> ProcessProblemAsync(
+		PatchMatchOptions problemOptions, int problemIdx, CancellationToken cancellationToken)
 	{
 		if (cancellationToken.IsCancellationRequested)
 		{
-			return false;
+			return (false, null);
 		}
 
 		string stereoFolder = Workspace.GetOptions().StereoFolder;
@@ -172,7 +209,7 @@ public sealed class PatchMatchController
 		if (File.Exists(depthMapPath) && File.Exists(normalMapPath)
 			&& (!problemOptions.WriteConsistencyGraph || File.Exists(consistencyGraphPath)))
 		{
-			return true;
+			return (true, null);
 		}
 
 		(PatchMatchOptions patchMatchOptions, PatchMatch.Problem problem) = SetUpProblem(problemOptions, problemIdx);
@@ -181,11 +218,16 @@ public sealed class PatchMatchController
 		ProblemRunning?.Invoke(problemIdx);
 		try
 		{
-			patchMatch.Run(cancellationToken);
+			await patchMatch.RunAsync(ComputeDevice, cancellationToken).ConfigureAwait(false);
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 		{
-			return false;
+			return (false, null);
+		}
+
+		if (patchMatch.FallbackReason != null)
+		{
+			Log.Warning($"PatchMatch {outputType} {RefImageName(problemIdx)}: {patchMatch.FallbackReason}");
 		}
 
 		patchMatch.GetDepthMap().Write(depthMapPath);
@@ -195,7 +237,17 @@ public sealed class PatchMatchController
 			patchMatch.GetConsistencyGraph().Write(consistencyGraphPath);
 		}
 
-		return true;
+		return (true, patchMatch.Backend);
+	}
+
+	// The reference image's name, and with a compute device where its problem ran (nothing
+	// for a skipped problem, whose maps came from an earlier run).
+	private string ProblemMessage(int problemIdx, PatchMatchBackend? backend)
+	{
+		string name = RefImageName(problemIdx);
+		return ComputeDevice == null || backend == null
+			? name
+			: name + (backend == PatchMatchBackend.Gpu ? " (GPU)" : " (CPU)");
 	}
 
 	/// <summary>

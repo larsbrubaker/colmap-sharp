@@ -32,7 +32,7 @@ namespace ColmapSharp.Mvs;
 /// Port of colmap::mvs::PatchMatchCuda on the CPU. Internal: PatchMatch.Run checks the
 /// problem (map sizes included) before constructing it.
 /// </summary>
-internal sealed partial class PatchMatchCpu
+internal sealed partial class PatchMatchCpu : IPatchMatchResult
 {
 	private readonly PatchMatchOptions options;
 	private readonly PatchMatch.Problem problem;

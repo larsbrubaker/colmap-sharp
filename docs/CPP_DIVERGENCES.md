@@ -1778,11 +1778,13 @@ patch-match.cfg expects.
 **What differs.** COLMAP's PatchMatch stereo runs only on CUDA: `PatchMatchOptions` has a
 `gpu_index` string ("-1" for all devices), `PatchMatch::Check` requires exactly one index
 >= -1, and `PatchMatchController` runs one problem per GPU (`ReadGpuIndices`). The port has
-no GPU: `gpu_index` and `ReadGpuIndices` are not ported, and `PatchMatch.Check` skips the
-index checks. `num_threads` bounds the CPU parallelism instead.
+no CUDA and no device index: `gpu_index` and `ReadGpuIndices` are not ported, and
+`PatchMatch.Check` skips the index checks. PatchMatch runs on the CPU, where `num_threads`
+bounds the parallelism, unless the host passes a WebGPU compute device (entry 136).
 
 **Why.** The library is pure managed code (CLAUDE.md, contract 1); the CUDA kernel
-(`patch_match_cuda.cu`) is ported to CPU code, where a device index has no meaning.
+(`patch_match_cuda.cu`) is ported to CPU code, and the optional GPU path runs on the one
+device the host supplies, so a device index has no meaning.
 
 **Evidence.** `PatchMatchTests` (C#-only) pins every other `PatchMatchOptions::Check` bound
 and `PatchMatch::Check` condition.
@@ -2533,15 +2535,17 @@ projection-center bound (5.2e-4) in the full suite.
 a thread pool and checks `CheckIfStopped()` only at the start of `ProcessProblem`, so a stop
 lets every in-flight problem finish and write its maps. The port
 (`Mvs/PatchMatchController.cs`) runs the problems one after another, each PatchMatch run
-parallel over columns on the CPU, and passes the CancellationToken into `PatchMatch.Run`:
-a stop aborts the running problem, which writes no maps, and `Run` returns normally. The
-problems already finished keep their maps; a later run redoes the aborted one (its outputs
-do not exist, so it is not skipped).
+parallel over columns on the CPU or over pixels on the host's compute device (entry 136),
+and passes the CancellationToken into `PatchMatch.RunAsync`: a stop aborts the running
+problem, which writes no maps, and `Run`/`RunAsync` return normally. The problems already
+finished keep their maps; a later run redoes the aborted one (its outputs do not exist, so
+it is not skipped).
 
-**Why.** There are no GPUs to spread problems over (entry 86), and one CPU PatchMatch run
-already uses every core. On the CPU a single 2 MP problem takes minutes, and a user who
-cancels should not have to wait for it; skipping its outputs keeps the workspace free of
-half-computed maps.
+**Why.** There is at most one device to run problems on (entries 86 and 136): one CPU
+PatchMatch run already uses every core, and the host's GPU is not safe to share between
+concurrent runs (`IComputeDevice` is not thread-safe). On the CPU a single 2 MP problem
+takes minutes, and a user who cancels should not have to wait for it; skipping its outputs
+keeps the workspace free of half-computed maps.
 
 **Evidence.** `PatchMatchControllerTests.Run_CancelledMidProblemWritesNothingForIt` and
 `Run_StopsWithoutErrorWhenCancelled` (C#-only).
@@ -2718,7 +2722,10 @@ exactly those 248 bytes, and an empty in-memory mesh.
 the port behaves like this:
 - `dense` defaults to true and PatchMatch stereo, fusion and meshing run. COLMAP defaults
   `dense` to true only with CUDA and MVS, and without CUDA returns after image undistortion
-  ("Skipping patch match stereo because CUDA is not available").
+  ("Skipping patch match stereo because CUDA is not available"). PatchMatch runs on the CPU,
+  or on the host's `ComputeDevice` when one is set and supports blocking waits (entry 136);
+  a device that does not (the browser) is not used by this synchronous controller, which
+  warns and runs PatchMatch on the CPU.
 - Delaunay meshing runs (a CGAL-free port, `Mvs/DelaunayMeshing.cs`), as in a CGAL build.
   Advancing-front meshing logs "Skipping advancing front meshing because CGAL is not available"
   and returns, as in a build without CGAL.
@@ -2807,6 +2814,71 @@ stage and textures the model; with `Texture` off it reports nothing past the den
 textures nothing; over a zero-byte mesh it re-meshes from the untouched `fused.ply` and
 textures; cancelling during Poisson meshing leaves no `meshed-poisson.ply`; and a Poisson run
 whose trim empties the mesh still ends texturing progress at 1000 of 1000.
+
+## 136. PatchMatch can run on a host-provided WebGPU device
+
+**What differs.** COLMAP's PatchMatch runs on CUDA devices chosen by `gpu_index`
+(`patch_match_cuda.cu`). The port adds an optional GPU path that looks nothing like it from
+the outside:
+- **Host-supplied seam.** The library never references a graphics API. The host passes an
+  `IComputeDevice` (`Compute/IComputeDevice.cs`, a small WebGPU-shaped slice: buffers, WGSL
+  kernels, bind groups, recorded dispatches, async flush and readback) to
+  `PatchMatch.RunAsync`, to `PatchMatchController.ComputeDevice` or to
+  `AutomaticReconstructionOptions.ComputeDevice`. Without one, PatchMatch runs on the CPU as
+  before (entry 86).
+- **WGSL port of the CUDA kernel structure.** `Mvs/Shaders/*.wgsl` follow
+  `patch_match_cuda.cu`'s kernels, with the entry points `init_random`, `initial_cost`,
+  `backward_messages`, `sweep_band`, `filter_pixels`, `rotate_planes` and `rotate_normals`,
+  recorded by `Mvs/PatchMatchGpu*.cs` in `PatchMatchCpu.Run`'s schedule and flushed once per
+  sweep.
+- **Filter as a separate pass.** COLMAP filters inside the last sweep; the port runs the
+  filter (`filter_pixels`) after the last sweep's bands, and the CPU does the same, which was
+  proved bit-identical to the fused sweep before the split (`PatchMatchSweepBandTests`' golden
+  hashes).
+- **Banded sweeps.** A column sweep is a `backward_messages` pass followed by row bands of
+  `sweep_band`, so one dispatch stays within the device's limits; `PatchMatchGpuPlan` picks
+  the band height. The CPU runs the same banded schedule, again pinned by
+  `PatchMatchSweepBandTests`.
+- **CPU fallback with a reason.** Before creating any buffer, `PatchMatchGpuPlan.TryCreate`
+  checks every buffer, binding and dispatch against the device's limits. When one does not
+  fit, PatchMatch runs on the CPU and says why in a sentence ending "Using the CPU."
+  (`PatchMatch.FallbackReason`, a warning from the controller, and " (CPU)" instead of
+  " (GPU)" in the controller's progress messages); `PatchMatch.Backend` records which ran. A
+  GPU error during a run is not a fallback reason: it propagates. The synchronous `Run`
+  overloads refuse a device that cannot be waited on synchronously (the browser) with
+  `InvalidOperationException`, pointing at `RunAsync`; the synchronous automatic
+  reconstruction instead warns and runs PatchMatch on the CPU.
+- **Random numbers.** The GPU draws the same counter-based random numbers as the CPU
+  (`PatchMatchRandom`, entry 86), transliterated to 32-bit WGSL integer arithmetic; they are
+  bit-exact by construction (`PatchMatchShaderRngTransliterationTests` pins the
+  transliteration).
+- **Everything else is Tier C on a real GPU.** WGSL's `exp`, `sin`, `cos` and `sqrt` f32
+  builtins need not be correctly rounded, a GPU compiler may contract `a*b + c` into a fused
+  multiply-add, and a GPU may flush subnormals; the kernels guard the NaN, infinity and
+  subnormal cases whose outcome would otherwise change control flow (`patch_match_common.wgsl`),
+  but depth and normal values can differ from the CPU's in the last bits and, through the
+  sweeps, beyond.
+
+**Why.** CUDA is native code and not available in the browser; WebGPU is what MatterCAD can
+reach on every platform, including browser-wasm, and keeping the device behind a host-provided
+seam keeps the library pure managed code (CLAUDE.md, contract 1). CPU PatchMatch takes minutes
+per megapixel image, so a GPU path is what makes dense reconstruction usable. Mirroring the
+CPU schedule exactly, rather than COLMAP's fused sweep, is what lets the GPU pipeline be
+proved against the CPU on a CPU twin, and the fallback keeps a device that is too small from
+failing a reconstruction.
+
+**Evidence.** `ReferenceComputeDevice` (`Mvs/Testing/`) runs every WGSL kernel's CPU twin over
+the GPU's buffers. `PatchMatchGpuTwinTests` pins the GPU pipeline on it bit-identical to
+`PatchMatchCpu` (photometric, geometric and filtered runs, with one and with several bands).
+`PatchMatchBackendTests` pins the public entry point: `RunAsync` on the twin reports `Gpu` and
+gives the CPU's maps bit for bit; a device whose limits cannot hold the problem reports `Cpu`
+with the planner's reason and records no device call; the synchronous `Run` throws for a
+non-blocking device. `PatchMatchControllerTests.RunAsync_WithTwinDevice_WritesTheSameMapsAsTheCpu`
+and `RunAsync_DeviceTooSmall_FallsBackToCpuAndSaysSo` pin the controller, and
+`AutomaticReconstructionTests.CSharpOnly_ComputeDeviceGivesTheSameDenseResults` pins that the
+automatic reconstruction writes the same depth maps and `fused.ply` with the twin as without,
+and ignores a non-blocking device with a warning. Conformance on real GPUs (the Tier C bound
+and the RNG probe) is pending in MatterCAD's `ColmapGpuTests`.
 
 ## 137. AutomaticReconstructionController reseeds the PRNG before Delaunay meshing
 

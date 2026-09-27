@@ -14,13 +14,16 @@
 //   (docs/CPP_DIVERGENCES.md entry 82); workspace_path stays a folder on disk because the
 //   sparse models, depth maps, fused points and meshes are written there as COLMAP does.
 // - vocab_tree_path, use_gpu, gpu_index and ba_backend are not options here: vocabulary-tree
-//   matching, GPU stages and the Caspar backend are out of scope (docs/CPP_DIVERGENCES.md
+//   matching, CUDA stages and the Caspar backend are out of scope (docs/CPP_DIVERGENCES.md
 //   entry 134).
 // - Texture / TextureSink and the MeshTextureMapping option set are C#-only: they add COLMAP's
 //   separate mesh_texturer step to the dense stages (docs/CPP_DIVERGENCES.md entry 135).
+// - ComputeDevice is C#-only: the host's GPU for PatchMatch stereo (docs/CPP_DIVERGENCES.md
+//   entry 136), in place of use_gpu / gpu_index.
 // - `int /= 1.5` in ModifyForMediumQuality converts to double and truncates back, as C++
 //   does; the casts below reproduce that.
 
+using ColmapSharp.Compute;
 using ColmapSharp.Estimators;
 using ColmapSharp.Feature;
 using ColmapSharp.Mvs;
@@ -175,6 +178,17 @@ public sealed class AutomaticReconstructionOptions
 	/// its own. An empty atlas (no face seen by any view) is not passed to the sink.
 	/// </summary>
 	public IBitmapSink? TextureSink { get; set; }
+
+	/// <summary>
+	/// The host's GPU compute device for PatchMatch stereo in the dense stages, or null to run
+	/// it on the CPU. C#-only (COLMAP's dense stereo is CUDA; docs/CPP_DIVERGENCES.md entry
+	/// 136). A problem the device cannot hold runs on the CPU with a warning, and the dense
+	/// progress messages say which ran. The controller runs synchronously, so it uses the device
+	/// only when <see cref="IComputeDevice.SupportsBlockingWait"/> is true; otherwise (in the
+	/// browser) it warns and runs PatchMatch on the CPU, since using such a device needs an
+	/// asynchronous dense entry point, which does not exist yet.
+	/// </summary>
+	public IComputeDevice? ComputeDevice { get; set; }
 
 	/// <summary>The number of threads to use in all stages.</summary>
 	public int NumThreads { get; set; } = -1;
