@@ -23,8 +23,17 @@ only if exhaustive/sequential/spatial matching proves too slow for MatterCAD pho
 Each step ends with its ported tests green. Test names follow COLMAP's.
 
 ### Phase 11 — Pipeline controllers
-`automatic_reconstruction` (minus CGAL/GPU branches), including the step that turns
-`MeshTextureMapping`'s result into a textured mesh. Unblocked: `PoissonMeshing.Run` exists.
+`AutomaticReconstructionController` is ported (`Controllers/AutomaticReconstruction*.cs`,
+divergence 134). Remaining:
+- A C#-only textured-mesh step after meshing (COLMAP's controller never calls
+  `MeshTextureMapping`): turn its result into a mesh carrying the photo colors as a texture.
+- A fast dense test with prebuilt depth/normal maps in `stereo/` (skipping PatchMatch) that
+  covers fusion with real masks, the re-undistort-when-store-empty rule and the
+  advancing-front early return; today only the ~13 s textured end-to-end test covers dense.
+- Poisson meshing inside the controller on a cloud dense enough to survive COLMAP's default
+  trim 10 (small clouds trim to nothing, in pycolmap too); MatterCAD will need to choose trim
+  for small photo sets.
+- Progress restarts once within the dense stage (undistortion, then PatchMatch).
 
 ### Phase 12 — Dense reconstruction (MVS)
 - `poisson_meshing` (PoissonRecon port, `Mvs/PoissonRecon/`). Everything through the linear
