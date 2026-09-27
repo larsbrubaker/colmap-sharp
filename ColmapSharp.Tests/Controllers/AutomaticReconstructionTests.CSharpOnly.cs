@@ -17,6 +17,13 @@
 // COLMAP's behavior, not a port bug: on the 4000-point fused.ply of 240x180 views of this
 // scene, the port and pycolmap 4.2.0's poisson_meshing both give an empty mesh at trim 10,
 // while pycolmap keeps 26325 faces at trim 0. Delaunay meshing has no density trim.
+//
+// The same run pins the progress contract: a host grouping reports by Stage sees only the
+// controller's own stage headings, whatever the sub-stages call themselves.
+//
+// CSharpOnly_MaskSourceRoutesByReservedKey pins the dense stages' image/mask routing without
+// a reconstruction: a workspace whose relative path starts with "masks" must still read its
+// undistorted images, not the host's masks.
 
 using ColmapSharp.Controllers;
 using ColmapSharp.Scene;
@@ -56,7 +63,11 @@ public partial class AutomaticReconstructionTests
 		};
 
 		var reconstructionManager = new ReconstructionManager();
-		var controller = new AutomaticReconstructionController(options, reconstructionManager);
+		var stages = new StageCollector();
+		var controller = new AutomaticReconstructionController(options, reconstructionManager)
+		{
+			Progress = stages,
+		};
 		controller.Setup();
 		controller.Run();
 
@@ -81,6 +92,62 @@ public partial class AutomaticReconstructionTests
 		await Assert.That(numRegImages).IsEqualTo(NumViews);
 		await Assert.That(numFusedPoints).IsGreaterThan(1000);
 		await Assert.That(numMeshFaces).IsGreaterThan(0);
+		await Assert.That(string.Join(" | ", stages.Stages())).IsEqualTo(string.Join(" | ", new[]
+		{
+			FeatureExtraction.ExtractionStage,
+			FeatureMatching.MatchingStage,
+			AutomaticReconstructionController.SparseStage,
+			AutomaticReconstructionController.DenseStage,
+			AutomaticReconstructionController.FusionStage,
+			AutomaticReconstructionController.MeshingStage,
+		}));
+	}
+
+	[Test]
+	public async Task CSharpOnly_MaskSourceRoutesByReservedKey()
+	{
+		// The undistorter's key for image a.png of a workspace at the relative path masks/ws.
+		string imageKey = Path.Combine("masks", "ws", "dense", "0", "images", "a.png");
+		var images = new InMemoryBitmapStore();
+		images.Write(imageKey, new Bitmap(4, 3, asRgb: true));
+		var masks = new InMemoryImageSource();
+		masks.Add("a.png.png", new Bitmap(2, 2, asRgb: false));
+		var source = new AutomaticReconstructionController.WorkspaceBitmapSource(images, masks);
+
+		// The fusion's key for a.png's mask (StereoFusion.InitFusedPixelMask).
+		string maskKey = Path.Combine(AutomaticReconstructionController.MaskRoot, "a.png.png");
+
+		await Assert.That(source.Exists(imageKey)).IsTrue();
+		await Assert.That(source.Read(imageKey, asRgb: true).Width).IsEqualTo(4);
+		await Assert.That(source.Exists(maskKey)).IsTrue();
+		await Assert.That(source.Read(maskKey, asRgb: false).Width).IsEqualTo(2);
+		await Assert.That(source.Exists(Path.Combine("masks", "a.png.png"))).IsFalse();
+	}
+
+	// Records the distinct Stage names in first-report order. Synchronous and locked: the
+	// stages report from worker threads.
+	private sealed class StageCollector : IProgress<ControllerProgress>
+	{
+		private readonly List<string> stages = [];
+
+		public void Report(ControllerProgress value)
+		{
+			lock (stages)
+			{
+				if (!stages.Contains(value.Stage))
+				{
+					stages.Add(value.Stage);
+				}
+			}
+		}
+
+		public List<string> Stages()
+		{
+			lock (stages)
+			{
+				return [.. stages];
+			}
+		}
 	}
 
 	// Ray-traces view viewIdx of numViews: cameras 4 units from the origin on an arc about the

@@ -38,7 +38,9 @@ public sealed partial class AutomaticReconstructionController
 	public const string MeshingStage = "Surface meshing";
 
 	// The key prefix under which the fusion reads the host's masks (StereoFusionOptions.MaskPath).
-	private const string MaskRoot = "masks";
+	// It starts with a NUL, which no file path on any OS can contain, so no workspace key (a
+	// relative WorkspacePath "masks/ws" included) can ever be routed to the masks.
+	internal const string MaskRoot = "\0masks";
 
 	private readonly InMemoryBitmapStore undistortedImages = new();
 
@@ -87,7 +89,7 @@ public sealed partial class AutomaticReconstructionController
 				var undistorter = new ColmapUndistorter(undistorterOptions, undistortionOptions,
 					reconstructionManager.Get(i), options.Images!, densePath, undistortedImages)
 				{
-					Progress = Progress,
+					Progress = Under(DenseStage),
 					CancellationToken = CancellationToken,
 				};
 				undistorter.SetCheckIfStoppedFunc(CheckIfStopped);
@@ -107,7 +109,7 @@ public sealed partial class AutomaticReconstructionController
 
 			var patchMatchController = new PatchMatchController(
 				optionManager.PatchMatchStereo, densePath, "COLMAP", "", bitmaps);
-			patchMatchController.Run(CancellationToken, Progress);
+			patchMatchController.Run(CancellationToken, Under(DenseStage));
 
 			if (CheckIfStopped())
 			{
@@ -172,7 +174,8 @@ public sealed partial class AutomaticReconstructionController
 	}
 
 	// The undistorted images, plus the host's masks under MaskRoot/<name> for the fusion.
-	private sealed class WorkspaceBitmapSource(InMemoryBitmapStore images, IImageSource masks) : IBitmapSource
+	// Internal for AutomaticReconstructionTests.CSharpOnly_MaskSourceRoutesByReservedKey.
+	internal sealed class WorkspaceBitmapSource(InMemoryBitmapStore images, IImageSource masks) : IBitmapSource
 	{
 		private static readonly string Prefix = MaskRoot + Path.DirectorySeparatorChar;
 

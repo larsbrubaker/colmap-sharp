@@ -17,8 +17,10 @@
 //   stopped part-way throws OperationCanceledException, as the stage controllers here do.
 // - database.db is a Database (InMemoryDatabase unless the host passes one), so a re-run only
 //   skips extraction and matching when the host passes the same database back.
-// - COLMAP's LOG_HEADING1 lines become Progress reports whose Stage names the step; each
-//   stage's own progress is forwarded under the same Stage.
+// - COLMAP's LOG_HEADING1 lines become Progress reports whose Stage names the step. Every
+//   sub-stage's progress is re-labelled with the controller's own stage (the sub-stage's name,
+//   e.g. "PatchMatch geometric", moves into Message), so a host grouping by Stage sees only
+//   the stages listed on Progress.
 // - option_manager_.Write(sparse/project.ini) has no counterpart (no ini registry), and the
 //   vocabulary-tree matcher is never chosen (docs/CPP_DIVERGENCES.md entry 134).
 
@@ -66,7 +68,10 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		{
 			case AutomaticReconstructionOptions.DataType.Video:
 				optionManager.ModifyForVideoData();
-				// ResetOptions keeps the paths; the image source and names are paths in COLMAP.
+				// COLMAP's ResetOptions(false) restores only project/database/image *paths*, so
+				// there the image_names set above is cleared and video data processes every
+				// image. The port keeps the host's selection instead (docs/CPP_DIVERGENCES.md
+				// entry 134). The image source is restored because it is image_path in COLMAP.
 				optionManager.ImageReader.Images = options.Images!;
 				optionManager.ImageReader.ImageNames = [.. options.ImageNames];
 				optionManager.Mapper.ImageNames = [.. options.ImageNames];
@@ -170,7 +175,11 @@ public sealed partial class AutomaticReconstructionController : BaseController
 
 	/// <summary>
 	/// Receives a report at the start of every step (Done = Total = 0, Stage = the step's
-	/// COLMAP heading) and the steps' own progress under the same Stage.
+	/// COLMAP heading) and the steps' own progress. Stage is always one of
+	/// FeatureExtraction.ExtractionStage, FeatureMatching.MatchingStage, SparseStage,
+	/// DenseStage (undistortion and PatchMatch), FusionStage or MeshingStage; a sub-stage's
+	/// own name (e.g. "Geometric verification", "Image undistortion") is prefixed to Message.
+	/// Done/Total count the units of the sub-stage reporting, so they restart when it changes.
 	/// </summary>
 	public IProgress<ControllerProgress>? Progress { get; set; }
 
@@ -252,7 +261,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		// THROW_CHECK_NOTNULL(feature_extractor_): Setup must have run.
 		Check.NotNull(readerOptions);
 		FeatureExtraction.ExtractFeatures(
-			database, readerOptions!, optionManager.FeatureExtraction, Progress, CancellationToken);
+			database, readerOptions!, optionManager.FeatureExtraction, Under(FeatureExtraction.ExtractionStage), CancellationToken);
 	}
 
 	private void RunFeatureMatching()
@@ -264,12 +273,12 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		if (options.Data == AutomaticReconstructionOptions.DataType.Video)
 		{
 			FeatureMatching.MatchSequential(database, optionManager.SequentialPairing,
-				optionManager.FeatureMatching, optionManager.TwoViewGeometry, Progress, CancellationToken);
+				optionManager.FeatureMatching, optionManager.TwoViewGeometry, Under(FeatureMatching.MatchingStage), CancellationToken);
 		}
 		else
 		{
 			FeatureMatching.MatchExhaustive(database, optionManager.ExhaustivePairing,
-				optionManager.FeatureMatching, optionManager.TwoViewGeometry, Progress, CancellationToken);
+				optionManager.FeatureMatching, optionManager.TwoViewGeometry, Under(FeatureMatching.MatchingStage), CancellationToken);
 		}
 	}
 
@@ -319,7 +328,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 				};
 				mapper = new HierarchicalPipeline(mapperOptions, database, reconstructionManager)
 				{
-					Progress = Progress,
+					Progress = Under(SparseStage),
 				};
 				break;
 			}
@@ -358,6 +367,15 @@ public sealed partial class AutomaticReconstructionController : BaseController
 	// Maps a stage's own progress type onto Progress, synchronously on the reporting thread.
 	private IProgress<T>? Forward<T>(Func<T, ControllerProgress> map) =>
 		Progress is null ? null : new MappedProgress<T>(Progress, map);
+
+	// Re-labels a sub-stage's ControllerProgress with the controller's stage, keeping the
+	// sub-stage's own name as the start of Message so the detail is not lost.
+	private IProgress<ControllerProgress>? Under(string stage) =>
+		Forward<ControllerProgress>(p => p.Stage == stage ? p : p with
+		{
+			Stage = stage,
+			Message = p.Message.Length == 0 ? p.Stage : p.Stage + ": " + p.Message,
+		});
 
 	private sealed class MappedProgress<T>(IProgress<ControllerProgress> target, Func<T, ControllerProgress> map) : IProgress<T>
 	{
