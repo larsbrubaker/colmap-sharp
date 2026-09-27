@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // PatchMatchBackendTests: C#-only tests of PatchMatch's public GPU entry point
-// (ColmapSharp/Mvs/PatchMatch.cs: RunAsync and Run with an IComputeDevice, Backend,
+// (ColmapSharp/Mvs/PatchMatch.cs: RunAsync with an IComputeDevice, Backend,
 // FallbackReason; docs/CPP_DIVERGENCES.md entry 136). COLMAP has no counterpart: its PatchMatch
 // is CUDA-only and has no fallback. The device is ReferenceComputeDevice
 // (ColmapSharp/Mvs/Testing/), the CPU twin that runs the WGSL kernels through the production
@@ -82,43 +82,18 @@ public class PatchMatchBackendTests
 	}
 
 	[Test]
-	public async Task Run_WithBlockingDevice_RunsOnGpu()
+	public async Task RunAsync_OnNonBlockingDevice_RunsOnGpu()
 	{
+		// A browser-like device: every flush and read completes asynchronously.
 		(PatchMatchOptions options, PatchMatch.Problem problem) = Setup();
 		var cpu = new PatchMatch(options, problem);
 		cpu.Run();
 
 		var gpu = new PatchMatch(options, problem);
-		gpu.Run(new ReferenceComputeDevice { SupportsBlockingWait = true });
+		await gpu.RunAsync(new ReferenceComputeDevice { SupportsBlockingWait = false });
 
 		await Assert.That(gpu.Backend).IsEqualTo(PatchMatchBackend.Gpu);
 		await AssertSameResults(gpu, cpu);
-	}
-
-	[Test]
-	public async Task Run_WithNonBlockingDevice_ThrowsAndRunsNothing()
-	{
-		(PatchMatchOptions options, PatchMatch.Problem problem) = Setup();
-		var patchMatch = new PatchMatch(options, problem);
-		var device = new ReferenceComputeDevice { SupportsBlockingWait = false };
-
-		InvalidOperationException? error = null;
-		try
-		{
-			patchMatch.Run(device);
-		}
-		catch (InvalidOperationException e)
-		{
-			error = e;
-		}
-
-		await Assert.That(error).IsNotNull();
-		await Assert.That(error!.Message.Contains("RunAsync", StringComparison.Ordinal)).IsTrue();
-		await Assert.That(device.Commands.Count).IsEqualTo(0);
-
-		// The same device works through RunAsync.
-		await patchMatch.RunAsync(device);
-		await Assert.That(patchMatch.Backend).IsEqualTo(PatchMatchBackend.Gpu);
 	}
 
 	[Test]

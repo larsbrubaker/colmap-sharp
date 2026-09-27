@@ -97,8 +97,11 @@ public interface IComputeDevice
 
 	/// <summary>
 	/// True when a caller may block a thread until <see cref="FlushAsync"/> or
-	/// <see cref="ReadBufferAsync"/> completes (a desktop device). False in the browser, where
-	/// blocking would deadlock; the host decides.
+	/// <see cref="ReadBufferAsync"/> completes (a desktop device), on ANY thread - including a
+	/// thread the host marshals device calls to, since a synchronous caller may be running on
+	/// it. A host that marshals device calls to a thread it may block (a UI or render thread
+	/// whose loop must run for the work to complete) must report false, as must the browser,
+	/// where blocking would deadlock. False sends callers to their async entry points.
 	/// </summary>
 	bool SupportsBlockingWait { get; }
 

@@ -13,6 +13,7 @@ using ColmapSharp.Controllers;
 using ColmapSharp.Mvs;
 using ColmapSharp.Mvs.Testing;
 using ColmapSharp.Sensor;
+using ColmapSharp.Util;
 
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
@@ -54,6 +55,7 @@ public partial class PatchMatchControllerTests
 	}
 
 	[Test]
+	[NotInParallel(nameof(Log))]
 	public async Task RunAsync_DeviceTooSmall_FallsBackToCpuAndSaysSo()
 	{
 		var fixture = PatternedFixture();
@@ -68,14 +70,75 @@ public partial class PatchMatchControllerTests
 		{
 			ComputeDevice = device,
 		};
-		await controller.RunAsync(progress: new SynchronousProgress<ControllerProgress>(reports));
+
+		var messages = new List<(LogLevel Level, string Message)>();
+		Action<LogLevel, string>? previousSink = Log.Sink;
+		Log.Sink = (level, message) =>
+		{
+			lock (messages)
+			{
+				messages.Add((level, message));
+			}
+		};
+		try
+		{
+			await controller.RunAsync(progress: new SynchronousProgress<ControllerProgress>(reports));
+		}
+		finally
+		{
+			Log.Sink = previousSink;
+		}
+
 		Dictionary<string, byte[]> fallbackMaps = TakeMaps(fixture);
 
+		// The warning names the problem and carries the planner's reason, which ends the
+		// sentence a user reads.
+		string prefix = "PatchMatch photometric " + fixture.Names[0] + ": ";
+		await Assert.That(messages).Contains(m => m.Level == LogLevel.Warning
+			&& m.Message.StartsWith(prefix, StringComparison.Ordinal)
+			&& m.Message.EndsWith(" Using the CPU.", StringComparison.Ordinal));
 		await Assert.That(device.Commands.Count).IsEqualTo(0);
 		await Assert.That(reports.Count).IsEqualTo(1);
 		await Assert.That(reports[0].Message).IsEqualTo(fixture.Names[0] + " (CPU)");
 		await Assert.That(fallbackMaps.Count).IsEqualTo(2);
 		await Assert.That(fallbackMaps.Keys.All(k => cpuMaps[k].AsSpan().SequenceEqual(fallbackMaps[k]))).IsTrue();
+	}
+
+	[Test]
+	public async Task RunAsync_WithDevice_CancelledMidProblemWritesNothingForIt()
+	{
+		// As Run_CancelledMidProblemWritesNothingForIt, on the device (divergence 122): the
+		// token reaches the GPU run, which stops before submitting any work for the aborted
+		// problem; no exception escapes and the finished problem's maps stay.
+		var fixture = PatternedFixture();
+		fixture.WriteConfig(fixture.Names[0], "__all__", fixture.Names[1], "__all__");
+		using var cancellation = new CancellationTokenSource();
+		var device = new ReferenceComputeDevice();
+		var controller = new PatchMatchController(RunOptions(false), fixture.TempDir, "COLMAP", "", fixture.Bitmaps)
+		{
+			ComputeDevice = device,
+		};
+		int started = 0;
+		int dispatchesBeforeSecond = -1;
+		controller.ProblemRunning = problemIdx =>
+		{
+			started++;
+			if (problemIdx == 1)
+			{
+				dispatchesBeforeSecond = device.ExecutedDispatchCount;
+				cancellation.Cancel();
+			}
+		};
+
+		await controller.RunAsync(cancellation.Token);
+
+		await Assert.That(started).IsEqualTo(2);
+		await Assert.That(dispatchesBeforeSecond).IsGreaterThan(0);
+		await Assert.That(device.ExecutedDispatchCount).IsEqualTo(dispatchesBeforeSecond);
+		await Assert.That(File.Exists(MapPath(fixture, "depth_maps", 0, "photometric"))).IsTrue();
+		await Assert.That(File.Exists(MapPath(fixture, "normal_maps", 0, "photometric"))).IsTrue();
+		await Assert.That(File.Exists(MapPath(fixture, "depth_maps", 1, "photometric"))).IsFalse();
+		await Assert.That(File.Exists(MapPath(fixture, "normal_maps", 1, "photometric"))).IsFalse();
 	}
 
 	[Test]

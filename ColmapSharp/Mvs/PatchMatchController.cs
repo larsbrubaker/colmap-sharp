@@ -115,12 +115,19 @@ public sealed class PatchMatchController
 	/// consistency_graphs)/&lt;image name&gt;.{photometric,geometric}.bin. Problems whose
 	/// outputs already exist are skipped. Cancelling <paramref name="cancellationToken"/>
 	/// stops after writing the finished problems. Port of PatchMatchController::Run.
-	/// With a <see cref="ComputeDevice"/> that cannot be waited on synchronously (the browser)
-	/// this throws <see cref="InvalidOperationException"/>; use <see cref="RunAsync"/> there.
+	/// This blocks on the <see cref="ComputeDevice"/>'s work, so the device must report
+	/// <see cref="IComputeDevice.SupportsBlockingWait"/>: blocking must be safe on any thread,
+	/// including one the host marshals device calls to. With a device that reports false (the
+	/// browser, or a host marshalling to a thread it may block) this throws
+	/// <see cref="InvalidOperationException"/>; use <see cref="RunAsync"/> there.
 	/// </summary>
 	public void Run(CancellationToken cancellationToken = default, IProgress<ControllerProgress>? progress = null)
 	{
-		PatchMatch.ThrowIfCannotBlock(ComputeDevice);
+		if (ComputeDevice != null && !ComputeDevice.SupportsBlockingWait)
+		{
+			throw new InvalidOperationException(
+				"This compute device cannot be waited on synchronously (e.g. in the browser); use RunAsync instead of Run.");
+		}
 
 		// Without a device every await in RunAsync completes synchronously; with one, the device
 		// promised that a blocking wait completes, and the awaits use ConfigureAwait(false).
@@ -130,9 +137,10 @@ public sealed class PatchMatchController
 
 	/// <summary>
 	/// The host's compute device to run each problem's PatchMatch on, or null for the CPU. A
-	/// problem the device cannot hold runs on the CPU (with a warning giving the reason); a
-	/// device error fails the run. With a device, each progress report's Message is the
-	/// reference image's name followed by " (GPU)" or " (CPU)", where that problem ran.
+	/// problem the device cannot hold runs on the CPU, with the reason (PatchMatch's
+	/// FallbackReason) logged as a warning; a device error fails the run. Only when a device is
+	/// set does each progress report's Message gain " (GPU)" or " (CPU)" after the reference
+	/// image's name, saying where that problem ran.
 	/// </summary>
 	public IComputeDevice? ComputeDevice { get; init; }
 
@@ -140,7 +148,8 @@ public sealed class PatchMatchController
 	/// <see cref="Run"/>, awaiting the <see cref="ComputeDevice"/>'s work instead of blocking
 	/// on it: the entry point for a device that cannot be waited on synchronously. Problems
 	/// still run one at a time (docs/CPP_DIVERGENCES.md, entry 122); a problem on the CPU runs
-	/// synchronously inside this call.
+	/// synchronously on the calling thread inside this call, so a UI host should start it off
+	/// its UI thread.
 	/// </summary>
 	public async Task RunAsync(CancellationToken cancellationToken = default, IProgress<ControllerProgress>? progress = null)
 	{

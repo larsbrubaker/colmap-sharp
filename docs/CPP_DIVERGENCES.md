@@ -2844,9 +2844,10 @@ the outside:
   fit, PatchMatch runs on the CPU and says why in a sentence ending "Using the CPU."
   (`PatchMatch.FallbackReason`, a warning from the controller, and " (CPU)" instead of
   " (GPU)" in the controller's progress messages); `PatchMatch.Backend` records which ran. A
-  GPU error during a run is not a fallback reason: it propagates. The synchronous `Run`
-  overloads refuse a device that cannot be waited on synchronously (the browser) with
-  `InvalidOperationException`, pointing at `RunAsync`; the synchronous automatic
+  GPU error during a run is not a fallback reason: it propagates. The device entry points are
+  `PatchMatch.RunAsync` and `PatchMatchController.RunAsync` (`PatchMatch.Run` stays CPU-only).
+  `PatchMatchController.Run` refuses a device that cannot be waited on synchronously (the
+  browser) with `InvalidOperationException`, pointing at `RunAsync`; the synchronous automatic
   reconstruction instead warns and runs PatchMatch on the CPU.
 - **Random numbers.** The GPU draws the same counter-based random numbers as the CPU
   (`PatchMatchRandom`, entry 86), transliterated to 32-bit WGSL integer arithmetic; they are
@@ -2872,13 +2873,27 @@ the GPU's buffers. `PatchMatchGpuTwinTests` pins the GPU pipeline on it bit-iden
 `PatchMatchCpu` (photometric, geometric and filtered runs, with one and with several bands).
 `PatchMatchBackendTests` pins the public entry point: `RunAsync` on the twin reports `Gpu` and
 gives the CPU's maps bit for bit; a device whose limits cannot hold the problem reports `Cpu`
-with the planner's reason and records no device call; the synchronous `Run` throws for a
-non-blocking device. `PatchMatchControllerTests.RunAsync_WithTwinDevice_WritesTheSameMapsAsTheCpu`
-and `RunAsync_DeviceTooSmall_FallsBackToCpuAndSaysSo` pin the controller, and
+with the planner's reason and records no device call; a non-blocking device runs through
+`RunAsync`. `PatchMatchControllerTests.RunAsync_WithTwinDevice_WritesTheSameMapsAsTheCpu`,
+`RunAsync_DeviceTooSmall_FallsBackToCpuAndSaysSo` (maps, " (CPU)" message and the logged
+reason), `RunAsync_WithDevice_CancelledMidProblemWritesNothingForIt` and
+`Run_WithNonBlockingDevice_ThrowsBeforeWritingAnything` pin the controller, and
 `AutomaticReconstructionTests.CSharpOnly_ComputeDeviceGivesTheSameDenseResults` pins that the
 automatic reconstruction writes the same depth maps and `fused.ply` with the twin as without,
-and ignores a non-blocking device with a warning. Conformance on real GPUs (the Tier C bound
-and the RNG probe) is pending in MatterCAD's `ColmapGpuTests`.
+and ignores a non-blocking device with a warning.
+
+On a real GPU (Apple M5, Metal), MatterCAD's `Tests/ColmapGpuTests` (`PatchMatchRandomGpuTests`,
+`PatchMatchGpuKernelProbeTests`, `PatchMatchGpuRunTests`) measure:
+- RNG: 4800 draws and 10,085 u32 -> f32 conversions bit-exact against `PatchMatchRandom`.
+- `init_random`: depth within 1 ULP of the twin.
+- `initial_cost`: within 1e-4 on 100% of entries (largest difference 3.77e-5).
+- Full runs pass the same truth checks as the CPU runs (`PatchMatchRunTests`).
+- The Tier C bounds of a GPU run against the CPU run: at least 95% of the pixels valid in both
+  within 1% relative depth; median normal angle below 2 degrees; valid-pixel counts within 2%;
+  consistency-graph membership agreement (Jaccard) at least 95%; and a repeated GPU run
+  bit-identical to the first. Measured: 100% of pixels, 0 degrees and identical counts and
+  graphs at 48x36, 40x30 and 26x19; at 320x240, 99.81% of pixels within the depth bound, a
+  0.06% valid-count difference and 99.84% graph agreement.
 
 ## 137. AutomaticReconstructionController reseeds the PRNG before Delaunay meshing
 

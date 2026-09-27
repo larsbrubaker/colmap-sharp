@@ -168,15 +168,17 @@ public sealed class PatchMatch
 	}
 
 	/// <summary>
-	/// Where the last completed run computed its maps (<see cref="PatchMatchBackend.Cpu"/>
-	/// before any run).
+	/// Where the last run computed its maps. Meaningful only after a run completed: it is reset
+	/// when a run starts, and a failed or cancelled run leaves it undefined.
 	/// </summary>
 	public PatchMatchBackend Backend { get; private set; }
 
 	/// <summary>
 	/// Why the last run used the CPU although a compute device was given: a sentence for the
 	/// user ending "Using the CPU." (e.g. the image needs more GPU memory than one buffer can
-	/// hold). Null when the GPU ran or no device was given.
+	/// hold). Null when the GPU ran or no device was given. Meaningful only after a run
+	/// completed: it is reset when a run starts, and a failed or cancelled run leaves it
+	/// undefined.
 	/// </summary>
 	public string? FallbackReason { get; private set; }
 
@@ -191,28 +193,17 @@ public sealed class PatchMatch
 	}
 
 	/// <summary>
-	/// <see cref="RunAsync"/>, blocking until it finishes. Blocking is only safe on a device
-	/// whose flushes can be waited for on this thread, so a <paramref name="device"/> without
-	/// <see cref="IComputeDevice.SupportsBlockingWait"/> (the browser) throws
-	/// <see cref="InvalidOperationException"/>; use <see cref="RunAsync"/> there. A null device
-	/// runs on the CPU, like <see cref="Run(CancellationToken, IProgress{double})"/>.
-	/// </summary>
-	public void Run(IComputeDevice? device, CancellationToken cancellationToken = default, IProgress<double>? progress = null)
-	{
-		ThrowIfCannotBlock(device);
-
-		// The device promised that waiting on its flushes from this thread completes, and the
-		// GPU path awaits with ConfigureAwait(false), so no context is needed to finish.
-		// GetResult rethrows the run's own exception rather than an AggregateException.
-		RunAsync(device, cancellationToken, progress).GetAwaiter().GetResult();
-	}
-
-	/// <summary>
 	/// Checks the problem and runs PatchMatch on it: on <paramref name="device"/> when one is
 	/// given and it can hold the problem (<see cref="Backend"/> becomes
 	/// <see cref="PatchMatchBackend.Gpu"/>), else on the CPU, with the reason in
-	/// <see cref="FallbackReason"/>. A CPU run happens synchronously inside this call. A
-	/// device failure during a GPU run faults the task; it does not fall back to the CPU.
+	/// <see cref="FallbackReason"/>. A device failure during a GPU run faults the task; it
+	/// does not fall back to the CPU.
+	/// <para>
+	/// For hosts: a CPU run (no device, or a fallback) runs synchronously on the calling
+	/// thread before the returned task completes, so a UI host should start this call off its
+	/// UI thread. The GPU path awaits the device and never blocks on it, so this is the entry
+	/// point for any device, including one that cannot be waited on synchronously.
+	/// </para>
 	/// </summary>
 	public async Task RunAsync(IComputeDevice? device, CancellationToken cancellationToken = default, IProgress<double>? progress = null)
 	{
@@ -234,19 +225,6 @@ public sealed class PatchMatch
 		}
 
 		RunCpu(cancellationToken, progress);
-	}
-
-	/// <summary>
-	/// Throws <see cref="InvalidOperationException"/> when a synchronous run on
-	/// <paramref name="device"/> would have to block on a device that cannot be blocked on.
-	/// </summary>
-	internal static void ThrowIfCannotBlock(IComputeDevice? device)
-	{
-		if (device != null && !device.SupportsBlockingWait)
-		{
-			throw new InvalidOperationException(
-				"This compute device cannot be waited on synchronously (e.g. in the browser); use RunAsync instead of Run.");
-		}
 	}
 
 	// Checks the problem and clears the last run's results: results become readable only

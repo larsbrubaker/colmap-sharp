@@ -182,11 +182,14 @@ public sealed class AutomaticReconstructionOptions
 	/// <summary>
 	/// The host's GPU compute device for PatchMatch stereo in the dense stages, or null to run
 	/// it on the CPU. C#-only (COLMAP's dense stereo is CUDA; docs/CPP_DIVERGENCES.md entry
-	/// 136). A problem the device cannot hold runs on the CPU with a warning, and the dense
-	/// progress messages say which ran. The controller runs synchronously, so it uses the device
-	/// only when <see cref="IComputeDevice.SupportsBlockingWait"/> is true; otherwise (in the
-	/// browser) it warns and runs PatchMatch on the CPU, since using such a device needs an
-	/// asynchronous dense entry point, which does not exist yet.
+	/// 136). A problem the device cannot hold runs on the CPU, with the reason logged as a
+	/// warning. Only when a device is set do the dense stage's PatchMatch progress messages gain
+	/// " (GPU)" or " (CPU)" after the image name, saying where each problem ran. The controller
+	/// runs synchronously on the calling thread (CPU stages included), so a UI host should run
+	/// it off its UI thread, and it uses the device only when
+	/// <see cref="IComputeDevice.SupportsBlockingWait"/> is true (blocking is safe on any
+	/// thread); otherwise (the browser) it warns and runs PatchMatch on the CPU, since using
+	/// such a device needs an asynchronous dense entry point, which does not exist yet.
 	/// </summary>
 	public IComputeDevice? ComputeDevice { get; set; }
 
