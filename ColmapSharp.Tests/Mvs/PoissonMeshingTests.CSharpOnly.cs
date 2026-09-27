@@ -7,7 +7,8 @@
 // properties rather than options.Color, a PLY without normals failing as PoissonRecon does, an
 // unwritable output path throwing as THROW_CHECK_PATH_OPEN does, and cancellation and
 // progress. (A PLY with color properties and no points is PoissonMeshingOracleTests.Exact.cs's
-// "empty" case, byte-exact against upstream.)
+// "empty" case, byte-exact against upstream; trimming it is entry 132 of
+// docs/CPP_DIVERGENCES.md, where upstream crashes, pinned here.)
 
 using ColmapSharp.Mvs;
 using ColmapSharp.Mvs.PoissonRecon;
@@ -109,6 +110,32 @@ public partial class PoissonMeshingTests
 		var options = new PoissonMeshingOptions { Depth = 3, Trim = 0 };
 		await Assert.That(() => PoissonMeshing.Run(options, inputPath, directoryOutput)).Throws<ArgumentException>();
 		await Assert.That(() => PoissonMeshing.Run(options, inputPath, Path.Combine(testDir, "missing", "mesh.ply"))).Throws<ArgumentException>();
+	}
+
+	[Test]
+	public async Task PoissonMeshing_EmptyInputTrimmed_WritesEmptyMesh()
+	{
+		// docs/CPP_DIVERGENCES.md, entry 132: upstream's SurfaceTrimmer crashes on the empty mesh
+		// PoissonRecon makes from no points; the port writes the file PoissonRecon wrote (the
+		// density value and the input's colors declared, no vertices or faces).
+		string testDir = MvsTestUtils.CreateTestDir();
+		string inputPath = Path.Combine(testDir, "empty.ply");
+		string outputPath = Path.Combine(testDir, "mesh.ply");
+		Ply.WriteBinaryPlyPoints(inputPath, new List<PlyPoint>(), writeNormal: true, writeRgb: true);
+		var options = new PoissonMeshingOptions { Depth = 5, Trim = 3.5 };
+		await Assert.That(PoissonMeshing.Run(options, inputPath, outputPath)).IsTrue();
+
+		const string expected = "ply\nformat binary_little_endian 1.0\nelement vertex 0\n"
+			+ "property float x\nproperty float y\nproperty float z\nproperty float value\n"
+			+ "property uchar red\nproperty uchar green\nproperty uchar blue\n"
+			+ "element face 0\nproperty list int int vertex_indices\nend_header\n";
+		byte[] written = File.ReadAllBytes(outputPath);
+		await Assert.That(written.Length).IsEqualTo(248);
+		await Assert.That(written.SequenceEqual(System.Text.Encoding.ASCII.GetBytes(expected))).IsTrue();
+
+		PoissonMeshOutput mesh = PoissonMeshing.Run(options, ReadOnlySpan<float>.Empty, ReadOnlySpan<float>.Empty);
+		await Assert.That(mesh.VertexCount).IsEqualTo(0);
+		await Assert.That(mesh.Triangles.Length).IsEqualTo(0);
 	}
 
 	[Test]

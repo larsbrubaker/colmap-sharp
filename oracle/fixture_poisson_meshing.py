@@ -60,7 +60,8 @@ CASES = [
 ]
 
 # (name, depth, point_weight, trim) on the empty input, harness only. Not trimmed: upstream's
-# SurfaceTrimmer crashes on an empty mesh.
+# SurfaceTrimmer crashes on an empty mesh (it reads vertices[0] of an empty vector); the port
+# does not, which is docs/CPP_DIVERGENCES.md entry 132, pinned by a C#-only test instead.
 EXACT_ONLY_CASES = [
     ("empty", 5, 1.0, 0.0),
 ]

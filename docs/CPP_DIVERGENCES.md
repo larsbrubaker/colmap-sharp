@@ -2689,3 +2689,25 @@ second output; the same second call in a fresh process did not. Likewise depth 6
 after the depth 4 call gave 2736 vertices, and 4062 in a fresh process (the port gives 4065;
 the difference is the trim-boundary noise PoissonMeshingOracleTests allows).
 `oracle/fixture_poisson_meshing.py` therefore runs each case in its own process.
+
+## 132. PoissonMeshing trims an empty mesh to an empty mesh instead of crashing
+
+**What differs.** With trim > 0 and an input that yields no surface (a PLY with no points),
+upstream's `RunSurfaceTrimmer` crashes the process. The port's `PoissonSurfaceTrimmer.Trim`
+returns an empty mesh, so `PoissonMeshing.Run(options, inputPath, outputPath)` returns true and
+writes the header-only PLY PoissonRecon itself wrote (x, y, z, value, and red, green, blue when
+the input has them; `element vertex 0`, `element face 0`), and the in-memory `Run` returns a
+mesh with no vertices and no triangles.
+
+**Why.** An upstream bug. SurfaceTrimmer.cpp's `Execute` seeds the value range it prints under
+`--verbose` with `min = max = vertices[0].template get<1>();` before checking the vertex count;
+on an empty `std::vector` that reads through its null data pointer. The range feeds only that
+log line, so the port does not compute it, and an empty mesh passes through the trim steps
+unchanged. Crashing the host application on an empty point cloud is never the intended result.
+
+**Evidence.** `oracle/poisson_meshing_harness.cc` built as `oracle/fixture_poisson_meshing.py`
+builds it, run as `harness 5 1.0 3.5 empty.ply out.ply` on a colored PLY with no points, exits
+with 139 (SIGSEGV) after PoissonRecon has written its 248-byte header-only `out.ply`, so the
+fixture's `EXACT_ONLY_CASES` run the empty input untrimmed only.
+`PoissonMeshingTests.PoissonMeshing_EmptyInputTrimmed_WritesEmptyMesh` pins the port's output:
+exactly those 248 bytes, and an empty in-memory mesh.

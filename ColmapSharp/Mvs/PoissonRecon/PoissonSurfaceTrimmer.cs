@@ -50,6 +50,10 @@ public static partial class PoissonSurfaceTrimmer
 			throw new ArgumentException("The mesh has no density values to trim by (extract it with a density estimator).", nameof(mesh));
 		}
 
+		// Upstream first seeds a --verbose-only value range with vertices[0], which on a mesh with
+		// no vertices reads through the empty vector's null data pointer and crashes. The range is
+		// not ported (it only feeds a log line), so an empty mesh trims to an empty mesh here
+		// (docs/CPP_DIVERGENCES.md, entry 132).
 		var vertices = new TrimVertices(mesh);
 		var ltPolygons = new List<int[]>();
 		var gtPolygons = new List<int[]>();
