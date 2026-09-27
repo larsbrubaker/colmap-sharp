@@ -38,9 +38,6 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
   first chance to reach the structure-based → structure-less registration fallback, which no
   synthetic scene triggers).
 - Rotation averaging pycolmap oracle.
-- Test isolation: COLMAP's gtest_main seeds the PRNG with 0 before every test; ours is
-  `[ThreadStatic]`, so tests that draw without seeding depend on which tests ran before them
-  on the same thread. Seed per test in one place.
 
 ### Performance (keep results bit-identical and thread-count independent)
 - Schur eliminator (~88% of SPARSE_SCHUR, 0.32 s/solve at 200 cams/20k pts, Release; BA is
