@@ -14,7 +14,8 @@
 // uses. Each read_write buffer appears in exactly one binding of a kernel.
 //
 // Every kernel runs @workgroup_size(64) over a folded 2-D dispatch (patch_match_dispatch.wgsl);
-// its PM_GROUPS_X constant is the dispatch's x size, so it is part of the kernel text.
+// its PM_GROUPS_X constant is the dispatch's x size, so it is part of the kernel text. The
+// cooperative sweep_band is the exception to one element per invocation: a workgroup per column.
 
 using ColmapSharp.Compute;
 
@@ -55,6 +56,11 @@ internal enum PatchMatchGpuKernel
 /// <param name="WindowStep">PatchMatchOptions.WindowStep.</param>
 /// <param name="NumSamples">PatchMatchOptions.NumSamples.</param>
 /// <param name="GeomConsistency">PatchMatchOptions.GeomConsistency: the sweep's geometric term.</param>
+/// <param name="CooperativeSweep">
+/// sweep_band's scheme: true runs one workgroup per column whose lanes split each row's work
+/// (the default, many times faster); false runs one invocation per column as COLMAP does, kept
+/// so a GPU test can pin the two to the same floats.
+/// </param>
 internal readonly record struct PatchMatchGpuShaderShape(
 	int RefWidth,
 	int RefHeight,
@@ -64,7 +70,8 @@ internal readonly record struct PatchMatchGpuShaderShape(
 	int WindowRadius,
 	int WindowStep,
 	int NumSamples,
-	bool GeomConsistency);
+	bool GeomConsistency,
+	bool CooperativeSweep = true);
 
 /// <summary>Parts, constants, bindings and descriptors of the GPU PatchMatch kernels.</summary>
 internal static class PatchMatchGpuKernels
@@ -107,6 +114,12 @@ internal static class PatchMatchGpuKernels
 
 	/// <summary>Group 2: the band uniform.</summary>
 	public const int BandGroup = 2;
+
+	/// <summary>
+	/// Invocations sweep_band runs per column: a whole workgroup under the cooperative scheme,
+	/// one invocation otherwise.
+	/// </summary>
+	public static int SweepInvocationsPerColumn(bool cooperative) => cooperative ? WorkgroupSize : 1;
 
 	/// <summary>Every kernel.</summary>
 	public static IReadOnlyList<PatchMatchGpuKernel> All { get; } = Enum.GetValues<PatchMatchGpuKernel>();
@@ -190,6 +203,7 @@ internal static class PatchMatchGpuKernels
 		{
 			names.Add("PM_NUM_SAMPLES");
 			names.Add("PM_GEOM_CONSISTENCY");
+			names.Add("PM_SWEEP_COOPERATIVE");
 		}
 
 		return [.. names];
@@ -221,6 +235,7 @@ internal static class PatchMatchGpuKernels
 				"PM_WINDOW_STEP" => constants.Add(name, shape.WindowStep),
 				"PM_NUM_SAMPLES" => constants.Add(name, shape.NumSamples),
 				"PM_GEOM_CONSISTENCY" => constants.Add(name, shape.GeomConsistency),
+				"PM_SWEEP_COOPERATIVE" => constants.Add(name, shape.CooperativeSweep),
 				_ => throw new InvalidOperationException($"No value for the WGSL constant {name}."),
 			};
 		}

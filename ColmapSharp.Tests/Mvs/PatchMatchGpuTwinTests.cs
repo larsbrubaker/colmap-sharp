@@ -30,20 +30,24 @@ public class PatchMatchGpuTwinTests
 	private const int Width = 26;
 	private const int Height = 19;
 
-	public static IEnumerable<(string Config, int BandRows)> Cases()
+	public static IEnumerable<(string Config, int BandRows, bool Cooperative)> Cases()
 	{
 		foreach (string config in new[] { "photometric", "geometric", "filter" })
 		{
 			// 0: the plan's bands (one per sweep at this size); 4: five bands across the
-			// 19 rows, seven across the 26.
-			yield return (config, 0);
-			yield return (config, 4);
+			// 19 rows, seven across the 26. Both sweep_band schemes (a workgroup or an
+			// invocation per column) dispatch differently and must reach every column.
+			foreach (bool cooperative in new[] { true, false })
+			{
+				yield return (config, 0, cooperative);
+				yield return (config, 4, cooperative);
+			}
 		}
 	}
 
 	[Test]
 	[MethodDataSource(nameof(Cases))]
-	public async Task GpuRunOnTwin_IsBitIdenticalToCpuRun(string config, int bandRows)
+	public async Task GpuRunOnTwin_IsBitIdenticalToCpuRun(string config, int bandRows, bool cooperative)
 	{
 		(PatchMatchOptions options, PatchMatch.Problem problem) = Setup(config);
 		const ulong Seed = 0x5EED_1234_ABCDUL;
@@ -51,9 +55,9 @@ public class PatchMatchGpuTwinTests
 		var cpu = new PatchMatchCpu(options, problem, Seed);
 		cpu.Run();
 
-		var gpu = new PatchMatchGpu(options, problem, Seed) { SweepBandRows = bandRows };
+		var gpu = new PatchMatchGpu(options, problem, Seed) { SweepBandRows = bandRows, CooperativeSweep = cooperative };
 		var device = new ReferenceComputeDevice();
-		PatchMatchGpuPlan.TryCreate(gpu.ProblemShape, options, device.Limits, null, out PatchMatchGpuPlan? plan, out _, bandRows);
+		PatchMatchGpuPlan.TryCreate(gpu.ProblemShape, options, device.Limits, null, out PatchMatchGpuPlan? plan, out _, bandRows, cooperative);
 		int[] expectedBands = bandRows == 0 ? [1, 1] : [5, 7];
 		await Assert.That(plan!.BandCount(0)).IsEqualTo(expectedBands[0]);
 		await Assert.That(plan.BandCount(1)).IsEqualTo(expectedBands[1]);

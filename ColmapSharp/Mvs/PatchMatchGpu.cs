@@ -102,6 +102,13 @@ internal sealed partial class PatchMatchGpu : IPatchMatchResult
 	/// </summary>
 	internal int SweepBandRows { get; init; }
 
+	/// <summary>
+	/// Whether sweep_band runs cooperatively (a workgroup per column; the default) or one
+	/// invocation per column (COLMAP's scheme). Only tests turn it off, to pin the two schemes to
+	/// the same result on a real GPU.
+	/// </summary>
+	internal bool CooperativeSweep { get; init; } = true;
+
 	/// <summary>The sizes <see cref="PatchMatchGpuPlan"/> plans this problem for.</summary>
 	public PatchMatchGpuProblemShape ProblemShape => new(refWidth, refHeight, numSrc, srcImages.MaxWidth, srcImages.MaxHeight);
 
@@ -129,7 +136,7 @@ internal sealed partial class PatchMatchGpu : IPatchMatchResult
 	/// <summary>The per-problem values baked into the kernels' text.</summary>
 	public PatchMatchGpuShaderShape ShaderShape => new(
 		refWidth, refHeight, numSrc, srcImages.MaxWidth, srcImages.MaxHeight,
-		options.WindowRadius, options.WindowStep, options.NumSamples, options.GeomConsistency);
+		options.WindowRadius, options.WindowStep, options.NumSamples, options.GeomConsistency, CooperativeSweep);
 
 	/// <summary>The estimated depth map (0 where filtered). Mirrors PatchMatchCpu.GetDepthMap.</summary>
 	public DepthMap GetDepthMap() => new(CopyOf(Result(depthMap)), (float)options.DepthMin, (float)options.DepthMax);

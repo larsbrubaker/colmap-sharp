@@ -37,9 +37,10 @@ public class PatchMatchGpuPlanTests
 	private static PatchMatchOptions Options(bool geometric) => new() { GeomConsistency = geometric, Filter = true };
 
 	private static (bool Fits, PatchMatchGpuPlan? Plan, string? Reason) Plan(
-		PatchMatchGpuProblemShape shape, bool geometric, ComputeDeviceLimits limits, long? budget = null)
+		PatchMatchGpuProblemShape shape, bool geometric, ComputeDeviceLimits limits, long? budget = null, bool cooperativeSweep = true)
 	{
-		bool fits = PatchMatchGpuPlan.TryCreate(shape, Options(geometric), limits, budget, out PatchMatchGpuPlan? plan, out string? reason);
+		bool fits = PatchMatchGpuPlan.TryCreate(
+			shape, Options(geometric), limits, budget, out PatchMatchGpuPlan? plan, out string? reason, cooperativeSweep: cooperativeSweep);
 		return (fits, plan, reason);
 	}
 
@@ -222,28 +223,38 @@ public class PatchMatchGpuPlanTests
 			await Assert.That((long)d.X * d.Y * PatchMatchGpuPlan.WorkgroupSize).IsGreaterThanOrEqualTo(d.Elements);
 		}
 
+		// The cooperative sweep runs a workgroup per column (2400); the serial one an invocation
+		// per column (38 workgroups).
 		PatchMatchGpuDispatch sweep = plan.Dispatches.Single(d => d.Kernel == "sweep_band");
-		await Assert.That((sweep.X, sweep.Y)).IsEqualTo((38u, 1u));
+		await Assert.That((sweep.X, sweep.Y)).IsEqualTo((2400u, 1u));
+		var (_, serial, _) = Plan(Shape(2400, 1800, 20), true, M5Limits, cooperativeSweep: false);
+		PatchMatchGpuDispatch serialSweep = serial!.Dispatches.Single(d => d.Kernel == "sweep_band");
+		await Assert.That((serialSweep.X, serialSweep.Y)).IsEqualTo((38u, 1u));
 	}
 
 	[Test]
 	public async Task DispatchElementCounts()
 	{
 		// Photometric with filtering, 1000 x 750, S = 4: backward_messages runs per (column,
-		// source) of the wider orientation, rotate_planes copies a whole source map.
+		// source) of the wider orientation, the cooperative sweep_band a workgroup of 64 per
+		// column, rotate_planes copies a whole source map.
 		var (_, plan, _) = Plan(Shape(1000, 750, 4), false, ComputeDeviceLimits.Defaults);
 		(string, long)[] expected =
 		[
 			("init_random", 750_000),
 			("initial_cost", 3_000_000),
 			("backward_messages", 4_000),
-			("sweep_band", 1_000),
+			("sweep_band", 64_000),
 			("filter_pixels", 750_000),
 			("rotate_planes", 3_000_000),
 			("rotate_normals", 750_000),
 		];
 		await Assert.That(plan!.Dispatches.Select(d => (d.Kernel, d.Elements)).ToArray())
 			.IsEquivalentTo(expected, CollectionOrdering.Matching);
+
+		// The serial sweep runs one invocation per column instead of a workgroup.
+		var (_, serial, _) = Plan(Shape(1000, 750, 4), false, ComputeDeviceLimits.Defaults, cooperativeSweep: false);
+		await Assert.That(serial!.Dispatches.Single(d => d.Kernel == "sweep_band").Elements).IsEqualTo(1_000L);
 
 		// With fewer than 3 sources the three reference planes are the widest copy.
 		var (_, twoSources, _) = Plan(Shape(100, 80, 2), false, ComputeDeviceLimits.Defaults);

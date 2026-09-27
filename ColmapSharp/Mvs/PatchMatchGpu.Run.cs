@@ -45,7 +45,7 @@ internal sealed partial class PatchMatchGpu
 	public async Task RunAsync(IComputeDevice device, CancellationToken cancellationToken = default, IProgress<double>? progress = null)
 	{
 		ArgumentNullException.ThrowIfNull(device);
-		if (!PatchMatchGpuPlan.TryCreate(ProblemShape, options, device.Limits, null, out PatchMatchGpuPlan? plan, out string? reason, SweepBandRows))
+		if (!PatchMatchGpuPlan.TryCreate(ProblemShape, options, device.Limits, null, out PatchMatchGpuPlan? plan, out string? reason, SweepBandRows, CooperativeSweep))
 		{
 			// The planner's reason ends "Using the CPU.", which is the caller's decision, not ours.
 			throw new InvalidOperationException("The GPU cannot run this problem: " + PatchMatchGpuPlan.ReasonWithoutFallback(reason!));
@@ -220,7 +220,7 @@ internal sealed partial class PatchMatchGpu
 			Dispatch(PatchMatchGpuKernel.BackwardMessages, (long)width * pm.numSrc, backwardGroup[p], sweepGroup);
 			foreach (IComputeBindGroup band in bandGroups[p])
 			{
-				Dispatch(PatchMatchGpuKernel.SweepBand, width, sweepBandGroup[p], sweepGroup, band);
+				Dispatch(PatchMatchGpuKernel.SweepBand, width * PatchMatchGpuKernels.SweepInvocationsPerColumn(pm.CooperativeSweep), sweepBandGroup[p], sweepGroup, band);
 			}
 
 			if (lastSweep && plan.Filter)

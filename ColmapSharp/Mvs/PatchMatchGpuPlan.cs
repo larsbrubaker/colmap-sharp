@@ -272,6 +272,8 @@ internal sealed class PatchMatchGpuPlan
 	/// <paramref name="bandRows"/>, when positive, replaces the planned rows per sweep_band
 	/// dispatch (clamped to each orientation's rows); only tests set it, to force several bands
 	/// per sweep on a small problem (PatchMatchGpuTwinTests).
+	/// <paramref name="cooperativeSweep"/> selects sweep_band's scheme
+	/// (PatchMatchGpuShaderShape.CooperativeSweep): a workgroup per column, or one invocation.
 	/// </summary>
 	public static bool TryCreate(
 		PatchMatchGpuProblemShape shape,
@@ -280,7 +282,8 @@ internal sealed class PatchMatchGpuPlan
 		long? memoryBudget,
 		out PatchMatchGpuPlan? plan,
 		out string? fallbackReason,
-		int bandRows = 0)
+		int bandRows = 0,
+		bool cooperativeSweep = true)
 	{
 		// A malformed problem is a caller bug, not a reason to fall back.
 		Util.Check.That(shape.RefWidth > 0 && shape.RefHeight > 0);
@@ -289,7 +292,7 @@ internal sealed class PatchMatchGpuPlan
 		Util.Check.That(options.WindowRadius > 0 && options.WindowStep > 0);
 		Util.Check.That(options.NumSamples > 0 && options.NumIterations > 0);
 
-		plan = Build(shape, options, limits.MaxComputeWorkgroupsPerDimension, bandRows);
+		plan = Build(shape, options, limits.MaxComputeWorkgroupsPerDimension, bandRows, cooperativeSweep);
 		fallbackReason = FirstFailure(plan, limits, memoryBudget);
 		if (fallbackReason != null)
 		{
@@ -313,7 +316,7 @@ internal sealed class PatchMatchGpuPlan
 		return fallbackReason[..^(FallbackSentence.Length + 1)];
 	}
 
-	private static PatchMatchGpuPlan Build(PatchMatchGpuProblemShape shape, PatchMatchOptions options, uint maxWorkgroupsPerDimension, int bandRowsOverride)
+	private static PatchMatchGpuPlan Build(PatchMatchGpuProblemShape shape, PatchMatchOptions options, uint maxWorkgroupsPerDimension, int bandRowsOverride, bool cooperativeSweep)
 	{
 		long w = shape.RefWidth;
 		long h = shape.RefHeight;
@@ -358,7 +361,7 @@ internal sealed class PatchMatchGpuPlan
 
 		dispatches.Add(Dispatch("initial_cost", p * s, maxGroups));
 		dispatches.Add(Dispatch("backward_messages", columns * s, maxGroups));
-		dispatches.Add(Dispatch("sweep_band", columns, maxGroups));
+		dispatches.Add(Dispatch("sweep_band", columns * PatchMatchGpuKernels.SweepInvocationsPerColumn(cooperativeSweep), maxGroups));
 		if (filter)
 		{
 			dispatches.Add(Dispatch("filter_pixels", p, maxGroups));

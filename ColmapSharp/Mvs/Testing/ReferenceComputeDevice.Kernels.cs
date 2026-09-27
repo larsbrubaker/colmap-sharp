@@ -194,9 +194,13 @@ public sealed partial class ReferenceComputeDevice
 
 			Span<float> state = this.StateWithColumns(width);
 			float[] rowScratch = new float[PatchMatchCpu.RowScratchSize(this.NumSrc, pcc.WindowCount)];
+
+			// A column is one invocation (serial) or one workgroup (cooperative); either way the
+			// column's rows run as SweepRows runs them, and element col * perColumn is its first.
+			int perColumn = PatchMatchGpuKernels.SweepInvocationsPerColumn(this.twin.Int("PM_SWEEP_COOPERATIVE") != 0);
 			for (int col = 0; col < width; ++col)
 			{
-				if (this.coverage.Covers(col))
+				if (this.coverage.Covers((long)col * perColumn))
 				{
 					cpu.SweepRows(col, rowStart, rowEnd, options, pcc, this.ColumnState(state, col), rowScratch);
 				}
