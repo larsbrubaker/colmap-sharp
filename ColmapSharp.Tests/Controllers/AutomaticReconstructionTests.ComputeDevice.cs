@@ -6,7 +6,8 @@
 // times over one sparse model: on the CPU, on ReferenceComputeDevice (the CPU twin of the WGSL
 // kernels, so bit-identical to the CPU), and on a twin that cannot be waited on synchronously,
 // which the synchronous controller must not use. All three must write the same depth maps,
-// normal maps and fused.ply, and the progress must say where PatchMatch ran.
+// normal maps, fused.ply and Delaunay mesh (deterministic on a resume since divergence 137),
+// and the progress must say where PatchMatch ran.
 
 using ColmapSharp.Controllers;
 using ColmapSharp.Mvs.Testing;
@@ -64,12 +65,8 @@ public partial class AutomaticReconstructionTests
 			controller.Setup();
 			controller.Run();
 
-			// The mesh is deleted but not compared: it is downstream of fused.ply, which the
-			// device cannot affect once fused.ply matches, and a resumed CPU-only run already
-			// writes different meshed-delaunay.ply bytes than the first run did.
-			File.Delete(Path.Combine(densePath, "meshed-delaunay.ply"));
 			var outputs = new Dictionary<string, byte[]>(StringComparer.Ordinal);
-			var files = new List<string> { Path.Combine(densePath, "fused.ply") };
+			var files = new List<string> { Path.Combine(densePath, "fused.ply"), Path.Combine(densePath, "meshed-delaunay.ply") };
 			foreach (string kind in new[] { "depth_maps", "normal_maps" })
 			{
 				string folder = Path.Combine(densePath, "stereo", kind);
@@ -124,6 +121,7 @@ public partial class AutomaticReconstructionTests
 
 		// Guard against a vacuous pass: the CPU run produced a fused cloud and depth maps.
 		await Assert.That(cpu.ContainsKey("fused.ply")).IsTrue();
+		await Assert.That(cpu.ContainsKey("meshed-delaunay.ply")).IsTrue();
 		// Low quality turns geometric consistency off: one photometric map per view.
 		await Assert.That(cpu.Keys.Count(k => k.Contains("depth_maps", StringComparison.Ordinal))).IsEqualTo(NumViews);
 		await Assert.That(cpuMessages.Count).IsEqualTo(NumViews);

@@ -2879,7 +2879,7 @@ with the planner's reason and records no device call; a non-blocking device runs
 reason), `RunAsync_WithDevice_CancelledMidProblemWritesNothingForIt` and
 `Run_WithNonBlockingDevice_ThrowsBeforeWritingAnything` pin the controller, and
 `AutomaticReconstructionTests.CSharpOnly_ComputeDeviceGivesTheSameDenseResults` pins that the
-automatic reconstruction writes the same depth maps and `fused.ply` with the twin as without,
+automatic reconstruction writes the same depth maps, `fused.ply` and mesh with the twin as without,
 and ignores a non-blocking device with a warning.
 
 On a real GPU (Apple M5, Metal), MatterCAD's `Tests/ColmapGpuTests` (`PatchMatchRandomGpuTests`,
