@@ -14,7 +14,10 @@
 // poisson_harness.h's KeepFull on "/mesh/", the others as checksums). A crafted grid mesh
 // (Crafted, printed in full as "crafted/input") adds the island merges the extracted meshes
 // never reach: a small component with two neighbors, where libc++'s hash-container order
-// decides the output triangle order. Built and run by
+// decides the output triangle order. A second crafted mesh (Hubs, "hubs/input") has small
+// components with 4 to 9 neighbors, so the order of every hash container the component graph
+// is built from (componentHalfEdges and componentBoundaryHalfEdges, not only componentEdges)
+// reaches the output. Built and run by
 // oracle/fixture_poisson_tree.py, which writes ColmapSharp.Tests/TestData/oracle/poisson_trim.json
 // (read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests.Trim.cs). Not part of any
 // build.
@@ -220,6 +223,55 @@ Mesh Crafted() {
   return mesh;
 }
 
+// A crafted mesh of hubs: side-by-side grid patches with density 7, except along a few full
+// rows and columns ("#" and "+" patterns reaching the patch edges) whose vertices are just
+// below 5. Trimmed at 5, each patch's lines are one below-trim hub that splits the patch into
+// 4 to 9 kept blocks, and the grid cells beside the lines are so narrow that the hub is far
+// below the island area threshold while every block is above it. So each hub merges with
+// all of its many neighbors: the first becomes the merged node and the others' polygons
+// follow in neighbor order, which fixes the output triangle order. The hubs' long boundaries
+// give componentHalfEdges and componentBoundaryHalfEdges hundreds of entries each, so
+// libc++'s iteration order of both (not only componentEdges') reaches the output. Printed in
+// full as its input.
+Mesh Hubs() {
+  const int n = 14;
+  struct Patch {
+    std::vector<int> cols, rows;
+  };
+  const std::vector<Patch> patches = {{{4, 9}, {5, 10}}, {{3, 7, 11}, {6}}, {{6}, {3, 8, 11}}, {{3, 10}, {7}}, {{7}, {7}}};
+  Mesh mesh;
+  double xOffset = 0;
+  for (size_t p = 0; p < patches.size(); p++) {
+    const Patch& patch = patches[p];
+    auto onLine = [](const std::vector<int>& lines, int i) { return std::find(lines.begin(), lines.end(), i) != lines.end(); };
+    // A cell is narrow when either end is on a line, so the below-trim part stays thin.
+    const double narrow = 0.002 + 0.0003 * p;
+    auto coords = [&](const std::vector<int>& lines) {
+      std::vector<double> c(n, 0.0);
+      for (int i = 1; i < n; i++) c[i] = c[i - 1] + (onLine(lines, i - 1) || onLine(lines, i) ? narrow : 1.0);
+      return c;
+    };
+    const std::vector<double> xs = coords(patch.cols), ys = coords(patch.rows);
+    const int base = (int)mesh.values.size();
+    for (int y = 0; y < n; y++)
+      for (int x = 0; x < n; x++) {
+        mesh.positions.push_back((float)(xOffset + xs[x]));
+        mesh.positions.push_back((float)ys[y]);
+        mesh.positions.push_back((float)(0.2 * sin(0.5 * x + p) * cos(0.3 * y)));
+        const bool low = onLine(patch.cols, x) || onLine(patch.rows, y);
+        mesh.values.push_back(low ? (float)(4.5 + 0.01 * ((x * 7 + y * 3 + (int)p) % 11)) : (float)(7 + 0.01 * ((x + 2 * y) % 5)));
+        mesh.colors.push_back((unsigned char)(x * 15)), mesh.colors.push_back((unsigned char)(y * 15)), mesh.colors.push_back((unsigned char)(p * 50));
+      }
+    for (int y = 0; y + 1 < n; y++)
+      for (int x = 0; x + 1 < n; x++) {
+        int a = base + y * n + x, b = a + 1, c = a + n, d = c + 1;
+        mesh.triangles.insert(mesh.triangles.end(), {a, b, d, a, d, c});
+      }
+    xOffset += xs[n - 1] + 2.0;
+  }
+  return mesh;
+}
+
 void Run(const std::string& name, Mesh mesh, const std::vector<double>& trims) {
   float lo = mesh.values[0], hi = mesh.values[0];
   for (float v : mesh.values) lo = std::min(lo, v), hi = std::max(hi, v);
@@ -259,5 +311,8 @@ int main() {
   Mesh crafted = Crafted();
   PrintMesh("crafted/input", crafted);
   Run("crafted", crafted, {5.0, 5.2, 6.0});
+  Mesh hubs = Hubs();
+  PrintMesh("hubs/input", hubs);
+  Run("hubs", hubs, {5.0});
   return 0;
 }

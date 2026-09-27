@@ -10,7 +10,9 @@
 // here, and values inside the range that split polygons and merge islands) the kept vertex
 // and triangle counts, positions, density values, color bytes and triangles. Tier A,
 // identical integers and bit-identical floats. Also pins the trimmer's cancellation and
-// progress and its refusal of a mesh without density values.
+// progress and its refusal of a mesh without density values. Two crafted meshes add island
+// merges the extracted meshes never reach: "crafted" (small components between two
+// neighbors) and "hubs" (small components with 4 to 9 neighbors).
 
 using System.Text.Json;
 
@@ -43,24 +45,32 @@ public partial class PoissonTreeOracleTests
 	}
 
 	[Test]
-	public async Task SurfaceTrimmer_Crafted_MatchesHarness()
+	[Arguments("crafted", 3)]
+	[Arguments("hubs", 1)]
+	public async Task SurfaceTrimmer_Crafted_MatchesHarness(string name, int trimCount)
 	{
-		// The harness's crafted wavy grid with a noisy density: trimming it leaves many small
-		// components, some between several neighbors, so the libc++ neighbor order decides
-		// where they merge. The input is read from the fixture (and echoed back).
+		// The harness's crafted meshes, read from the fixture (and echoed back). "crafted", a
+		// wavy grid with a noisy density: trimming it leaves many small components, some
+		// between two neighbors, so the libc++ neighbor order decides where they merge. "hubs":
+		// each below-trim hub touches 4 to 9 kept blocks and merges with all of them, so the
+		// output triangle order follows the whole neighbor order, which libc++'s iteration of
+		// componentHalfEdges and componentBoundaryHalfEdges (through their insertion into the
+		// next container) feeds as much as componentEdges'. Walking either of the first two in
+		// insertion order, or reversed, changes the "hubs" triangles; "crafted" misses that.
 		JsonElement cases = OracleFixture.Load(TrimFixture).GetProperty("cases");
-		var produced = new Cases("crafted");
-		float[] Floats(string key) => cases.GetProperty("crafted/input/" + key).EnumerateArray().Select(e => (float)e.GetDouble()).ToArray();
+		var produced = new Cases(name);
+		float[] Floats(string key) => cases.GetProperty(name + "/input/" + key).EnumerateArray().Select(e => (float)e.GetDouble()).ToArray();
 		float[] positions = Floats("positions");
 		float[] values = Floats("values");
-		byte[] colors = cases.GetProperty("crafted/input/colors").EnumerateArray().Select(e => (byte)e.GetInt32()).ToArray();
-		int[] triangles = cases.GetProperty("crafted/input/triangles").EnumerateArray().Select(e => e.GetInt32()).ToArray();
+		byte[] colors = cases.GetProperty(name + "/input/colors").EnumerateArray().Select(e => (byte)e.GetInt32()).ToArray();
+		int[] triangles = cases.GetProperty(name + "/input/triangles").EnumerateArray().Select(e => e.GetInt32()).ToArray();
 		var mesh = new PoissonMeshOutput(values.Length, 3, positions, values, colors, triangles);
 		AddTrimmedMesh(produced, "input/", mesh);
 		produced.F("mesh/valuerange", [values.Min(), values.Max()]);
-		AddTrims(produced, cases, "crafted", mesh);
-		await Assert.That(CompareRun(cases, "crafted", produced)).IsEqualTo(string.Empty);
-		await Assert.That(produced.Count).IsEqualTo(6 + 2 + (6 * 3));
+		int trims = AddTrims(produced, cases, name, mesh);
+		await Assert.That(CompareRun(cases, name, produced)).IsEqualTo(string.Empty);
+		await Assert.That(trims).IsEqualTo(trimCount);
+		await Assert.That(produced.Count).IsEqualTo(6 + 2 + (6 * trimCount));
 	}
 
 	[Test]
