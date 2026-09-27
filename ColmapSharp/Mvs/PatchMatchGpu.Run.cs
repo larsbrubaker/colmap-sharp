@@ -43,7 +43,7 @@ internal sealed partial class PatchMatchGpu
 	public async Task RunAsync(IComputeDevice device, CancellationToken cancellationToken = default, IProgress<double>? progress = null)
 	{
 		ArgumentNullException.ThrowIfNull(device);
-		if (!PatchMatchGpuPlan.TryCreate(ProblemShape, options, device.Limits, null, out PatchMatchGpuPlan? plan, out string? reason))
+		if (!PatchMatchGpuPlan.TryCreate(ProblemShape, options, device.Limits, null, out PatchMatchGpuPlan? plan, out string? reason, SweepBandRows))
 		{
 			throw new InvalidOperationException(reason);
 		}

@@ -272,6 +272,9 @@ internal sealed class PatchMatchGpuPlan
 	/// <paramref name="fallbackReason"/> (ending in "Using the CPU.") when the device cannot
 	/// run it: the first failing check, in a fixed order, so the reason is deterministic.
 	/// <paramref name="memoryBudget"/>, when given, caps the bytes all buffers may take.
+	/// <paramref name="bandRows"/>, when positive, replaces the planned rows per sweep_band
+	/// dispatch (clamped to each orientation's rows); only tests set it, to force several bands
+	/// per sweep on a small problem (PatchMatchGpuTwinTests).
 	/// </summary>
 	public static bool TryCreate(
 		PatchMatchGpuProblemShape shape,
@@ -279,7 +282,8 @@ internal sealed class PatchMatchGpuPlan
 		ComputeDeviceLimits limits,
 		long? memoryBudget,
 		out PatchMatchGpuPlan? plan,
-		out string? fallbackReason)
+		out string? fallbackReason,
+		int bandRows = 0)
 	{
 		// A malformed problem is a caller bug, not a reason to fall back.
 		Util.Check.That(shape.RefWidth > 0 && shape.RefHeight > 0);
@@ -288,7 +292,7 @@ internal sealed class PatchMatchGpuPlan
 		Util.Check.That(options.WindowRadius > 0 && options.WindowStep > 0);
 		Util.Check.That(options.NumSamples > 0 && options.NumIterations > 0);
 
-		plan = Build(shape, options, limits.MaxComputeWorkgroupsPerDimension);
+		plan = Build(shape, options, limits.MaxComputeWorkgroupsPerDimension, bandRows);
 		fallbackReason = FirstFailure(plan, limits, memoryBudget);
 		if (fallbackReason != null)
 		{
@@ -299,7 +303,7 @@ internal sealed class PatchMatchGpuPlan
 		return true;
 	}
 
-	private static PatchMatchGpuPlan Build(PatchMatchGpuProblemShape shape, PatchMatchOptions options, uint maxWorkgroupsPerDimension)
+	private static PatchMatchGpuPlan Build(PatchMatchGpuProblemShape shape, PatchMatchOptions options, uint maxWorkgroupsPerDimension, int bandRowsOverride)
 	{
 		long w = shape.RefWidth;
 		long h = shape.RefHeight;
@@ -314,7 +318,9 @@ internal sealed class PatchMatchGpuPlan
 		long samplesPerPixel = windowCount * (NewHypotheses * (long)options.NumSamples + s);
 
 		// Orientation 0 sweeps w columns down h rows; orientation 1, h columns down w rows.
-		int[] bandRows = [RowsPerBand(w, h, samplesPerPixel), RowsPerBand(h, w, samplesPerPixel)];
+		int[] bandRows = bandRowsOverride > 0
+			? [(int)Math.Min(bandRowsOverride, h), (int)Math.Min(bandRowsOverride, w)]
+			: [RowsPerBand(w, h, samplesPerPixel), RowsPerBand(h, w, samplesPerPixel)];
 		int[] bandCounts = [(int)CeilDiv(h, bandRows[0]), (int)CeilDiv(w, bandRows[1])];
 		int sweeps = 4 * options.NumIterations;
 

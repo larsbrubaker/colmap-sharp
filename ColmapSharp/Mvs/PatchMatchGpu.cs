@@ -95,6 +95,13 @@ internal sealed partial class PatchMatchGpu
 		}
 	}
 
+	/// <summary>
+	/// Rows per sweep_band dispatch when positive, in place of the plan's (the GPU side of
+	/// PatchMatchCpu.SweepBandHeight). Only tests set it, to run several bands per sweep on a
+	/// small problem (PatchMatchGpuTwinTests).
+	/// </summary>
+	internal int SweepBandRows { get; init; }
+
 	/// <summary>The sizes <see cref="PatchMatchGpuPlan"/> plans this problem for.</summary>
 	public PatchMatchGpuProblemShape ProblemShape => new(refWidth, refHeight, numSrc, srcImages.MaxWidth, srcImages.MaxHeight);
 
