@@ -9,7 +9,7 @@
 // same arithmetic, so any difference is a packing, schedule or buffer-role bug in the
 // orchestrator or the twin). PatchMatchGpuTests pins the recorded schedule;
 // ReferenceComputeDeviceTests pins each kernel twin on its own; this pins the two together.
-// The scene and options are PatchMatchSweepBandTests' (PatchMatchRunTests.Scene(26, 19), two
+// The scene and options are PatchMatchSweepBandTests' (PatchMatchSyntheticScene.Scene(26, 19), two
 // iterations), run with the planned bands and with a forced 4-row band so every sweep of both
 // orientations runs several sweep_band dispatches.
 
@@ -85,14 +85,14 @@ public class PatchMatchGpuTwinTests
 
 	private static (PatchMatchOptions Options, PatchMatch.Problem Problem) Setup(string config)
 	{
-		(List<Image> images, List<DepthMap> truth, List<NormalMap> normals) = PatchMatchRunTests.Scene(Width, Height);
+		(List<Image> images, List<DepthMap> truth, List<NormalMap> normals) = PatchMatchSyntheticScene.Scene(Width, Height);
 		return config switch
 		{
-			"photometric" => (PatchMatchRunTests.Options(2, geomConsistency: false, filter: false), PatchMatchRunTests.Problem(images)),
+			"photometric" => (PatchMatchSyntheticScene.Options(2, geomConsistency: false, filter: false), PatchMatchSyntheticScene.Problem(images)),
 
 			// Filtering on, so the last sweep also runs the geometric consistency filter.
-			"geometric" => (PatchMatchRunTests.Options(2, geomConsistency: true, filter: true), PatchMatchRunTests.Problem(images, truth, normals)),
-			_ => (PatchMatchRunTests.Options(2, geomConsistency: false, filter: true), PatchMatchRunTests.Problem(images)),
+			"geometric" => (PatchMatchSyntheticScene.Options(2, geomConsistency: true, filter: true), PatchMatchSyntheticScene.Problem(images, truth, normals)),
+			_ => (PatchMatchSyntheticScene.Options(2, geomConsistency: false, filter: true), PatchMatchSyntheticScene.Problem(images)),
 		};
 	}
 

@@ -7,12 +7,13 @@
 // pin that the banded schedule gives exactly the output the whole-column sweep gave. The
 // golden hashes were recorded from the unbanded sweep before it was split: a SHA-256 over the
 // depth map, normal map, selection probability map (float bits) and the consistent image
-// list, on the synthetic scene of PatchMatchRunTests. Any change to PatchMatch arithmetic
+// list, on the synthetic scene (Mvs/Testing/PatchMatchSyntheticScene.cs). Any change to PatchMatch arithmetic
 // changes these hashes; re-record them only for a deliberate, reviewed change of results.
 
 using System.Security.Cryptography;
 
 using ColmapSharp.Mvs;
+using ColmapSharp.Mvs.Testing;
 
 using Image = ColmapSharp.Mvs.Image;
 
@@ -64,23 +65,23 @@ public class PatchMatchSweepBandTests
 
 	private static string RunHash(string config, int bandHeight, int numThreads)
 	{
-		(List<Image> images, List<DepthMap> truth, List<NormalMap> normals) = PatchMatchRunTests.Scene(Width, Height);
+		(List<Image> images, List<DepthMap> truth, List<NormalMap> normals) = PatchMatchSyntheticScene.Scene(Width, Height);
 		PatchMatchOptions options;
 		PatchMatch.Problem problem;
 		switch (config)
 		{
 			case "photometric":
-				options = PatchMatchRunTests.Options(2, geomConsistency: false, filter: false, numThreads);
-				problem = PatchMatchRunTests.Problem(images);
+				options = PatchMatchSyntheticScene.Options(2, geomConsistency: false, filter: false, numThreads);
+				problem = PatchMatchSyntheticScene.Problem(images);
 				break;
 			case "geometric":
 				// Filtering on, so the last sweep also runs the geometric consistency filter.
-				options = PatchMatchRunTests.Options(2, geomConsistency: true, filter: true, numThreads);
-				problem = PatchMatchRunTests.Problem(images, truth, normals);
+				options = PatchMatchSyntheticScene.Options(2, geomConsistency: true, filter: true, numThreads);
+				problem = PatchMatchSyntheticScene.Problem(images, truth, normals);
 				break;
 			default:
-				options = PatchMatchRunTests.Options(2, geomConsistency: false, filter: true, numThreads);
-				problem = PatchMatchRunTests.Problem(images);
+				options = PatchMatchSyntheticScene.Options(2, geomConsistency: false, filter: true, numThreads);
+				problem = PatchMatchSyntheticScene.Problem(images);
 				break;
 		}
 

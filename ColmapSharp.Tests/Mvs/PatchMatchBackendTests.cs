@@ -7,7 +7,7 @@
 // (ColmapSharp/Mvs/Testing/), the CPU twin that runs the WGSL kernels through the production
 // CPU code, so a GPU run is bit-identical to the CPU run (Tier A for this pairing;
 // PatchMatchGpuTwinTests pins the orchestrator itself). The scene and options are
-// PatchMatchGpuTwinTests': PatchMatchRunTests.Scene(26, 19), two iterations, with filtering.
+// PatchMatchGpuTwinTests': PatchMatchSyntheticScene.Scene(26, 19), two iterations, with filtering.
 
 using ColmapSharp.Compute;
 using ColmapSharp.Mvs;
@@ -100,11 +100,11 @@ public class PatchMatchBackendTests
 	public async Task ShapeOf_MatchesTheConstructedRunsShape()
 	{
 		// Source images of different sizes, so the layer size is a maximum over sources.
-		(List<Image> images, _, _) = PatchMatchRunTests.Scene(Width, Height);
-		(List<Image> small, _, _) = PatchMatchRunTests.Scene(Width - 5, Height + 3);
+		(List<Image> images, _, _) = PatchMatchSyntheticScene.Scene(Width, Height);
+		(List<Image> small, _, _) = PatchMatchSyntheticScene.Scene(Width - 5, Height + 3);
 		images[1] = small[1];
-		PatchMatch.Problem problem = PatchMatchRunTests.Problem(images);
-		PatchMatchOptions options = PatchMatchRunTests.Options(1, geomConsistency: false, filter: false);
+		PatchMatch.Problem problem = PatchMatchSyntheticScene.Problem(images);
+		PatchMatchOptions options = PatchMatchSyntheticScene.Options(1, geomConsistency: false, filter: false);
 
 		PatchMatchGpuProblemShape shape = PatchMatchGpu.ShapeOf(problem);
 		await Assert.That(shape).IsEqualTo(new PatchMatchGpu(options, problem).ProblemShape);
@@ -113,8 +113,8 @@ public class PatchMatchBackendTests
 
 	private static (PatchMatchOptions Options, PatchMatch.Problem Problem) Setup()
 	{
-		(List<Image> images, _, _) = PatchMatchRunTests.Scene(Width, Height);
-		return (PatchMatchRunTests.Options(2, geomConsistency: false, filter: true), PatchMatchRunTests.Problem(images));
+		(List<Image> images, _, _) = PatchMatchSyntheticScene.Scene(Width, Height);
+		return (PatchMatchSyntheticScene.Options(2, geomConsistency: false, filter: true), PatchMatchSyntheticScene.Problem(images));
 	}
 
 	private static async Task AssertSameResults(PatchMatch actual, PatchMatch expected)

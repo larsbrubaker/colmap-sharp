@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // ReferenceComputeDeviceFixture: C#-only test support for ReferenceComputeDeviceTests. Packs a
-// small PatchMatch problem (PatchMatchRunTests' synthetic scene) into the GPU buffers the
+// small PatchMatch problem (PatchMatchSyntheticScene, Mvs/Testing) into the GPU buffers the
 // kernels read - pose table, problem uniform, reference planes, source layers - following the
 // layouts of Mvs/Shaders/patch_match_layout.wgsl and patch_match_geometry.wgsl, and builds the
 // same problem's CPU structures so a test can compare a kernel twin against a direct CPU call.
@@ -25,9 +25,9 @@ internal sealed class ReferenceComputeDeviceFixture
 
 	public ReferenceComputeDeviceFixture()
 	{
-		(List<Image> images, _, _) = PatchMatchRunTests.Scene(Width, Height);
-		Options = PatchMatchRunTests.Options(1, geomConsistency: false, filter: true, numThreads: 1);
-		Problem = PatchMatchRunTests.Problem(images);
+		(List<Image> images, _, _) = PatchMatchSyntheticScene.Scene(Width, Height);
+		Options = PatchMatchSyntheticScene.Options(1, geomConsistency: false, filter: true, numThreads: 1);
+		Problem = PatchMatchSyntheticScene.Problem(images);
 		Transforms = new PatchMatchTransforms(images, 0, Problem.SrcImageIdxs);
 		RefImage = new PatchMatchRefImage(Width, Height);
 		RefImage.Filter(images[0].GetBitmap().RowMajorData, Options.WindowRadius, Options.WindowStep, (float)Options.SigmaSpatial, (float)Options.SigmaColor, 1);

@@ -17,6 +17,7 @@ using System.Runtime.InteropServices;
 using ColmapSharp.Compute;
 using ColmapSharp.Compute.Testing;
 using ColmapSharp.Mvs;
+using ColmapSharp.Mvs.Testing;
 
 using Image = ColmapSharp.Mvs.Image;
 
@@ -34,13 +35,13 @@ public class PatchMatchGpuTests
 	private static (PatchMatchGpu Gpu, PatchMatchOptions Options, PatchMatch.Problem Problem) Setup(
 		string config, int width = Width, int height = Height, int numIterations = 2, int numSamples = 15, ulong seed = PatchMatchRandom.DefaultSeed)
 	{
-		(List<Image> images, List<DepthMap> truth, List<NormalMap> normals) = PatchMatchRunTests.Scene(width, height);
+		(List<Image> images, List<DepthMap> truth, List<NormalMap> normals) = PatchMatchSyntheticScene.Scene(width, height);
 		bool geometric = config == "geometric";
-		PatchMatchOptions options = PatchMatchRunTests.Options(numIterations, geomConsistency: geometric, filter: config != "photometric");
+		PatchMatchOptions options = PatchMatchSyntheticScene.Options(numIterations, geomConsistency: geometric, filter: config != "photometric");
 		options.NumSamples = numSamples;
 		PatchMatch.Problem problem = geometric
-			? PatchMatchRunTests.Problem(images, truth, normals)
-			: PatchMatchRunTests.Problem(images);
+			? PatchMatchSyntheticScene.Problem(images, truth, normals)
+			: PatchMatchSyntheticScene.Problem(images);
 		return (new PatchMatchGpu(options, problem, seed), options, problem);
 	}
 
