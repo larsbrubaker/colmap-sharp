@@ -255,8 +255,11 @@ fn pm_sweep_band_serial(workgroup_id: vec3<u32>, local_index: u32) {
 // geometric runs within tight bounds on a real GPU. The CPU twin (ReferenceComputeDevice) checks
 // this scheme's plan, dispatch shape and band coverage, but runs PatchMatchCpu.SweepRows, not this
 // WGSL; the real-GPU test is what pins the kernel. Every lane redundantly carries the row's
-// scalars (propagated depth, current and random hypotheses, the prepared window): they are
-// deterministic, so all lanes hold the same values, and recomputing is cheaper than sharing.
+// scalars (propagated depth, current and random hypotheses): they are deterministic, so all lanes
+// hold the same values, and recomputing is cheaper than sharing. The reference window is the
+// exception: its colors and bilateral weights (an exp each) are filled into workgroup memory by
+// all lanes together and its weight sum taken by lane 0 in the serial order (patch_match_ncc.wgsl's
+// shared window), which on Metal took ~26% off a sweep with bit-identical photometric output.
 
 // Per-source forward messages: lane image_idx mod lanes owns entry image_idx for the whole band.
 var<workgroup> pm_wg_forward_message: array<f32, PM_NUM_SRC_IMAGES>;
@@ -334,10 +337,18 @@ fn pm_sweep_band_cooperative(workgroup_id: vec3<u32>, local_index: u32) {
 			pm_wg_sampling_probs[image_idx] = sel_prob * tri_prob * inc_prob * res_prob;
 		}
 
+		// The shared reference window's slots, split across the lanes (patch_match_ncc.wgsl).
+		pm_fill_workgroup_window(rotation, row, col, lane, lanes);
+
 		workgroupBarrier();
 
 		// Lane 0: the CDF and the draws, in the serial order, and hypothesis 0's stored costs.
 		if (lane == 0i) {
+			// The shared window's weight sum, in the serial order, after the fill barrier above.
+			if (PM_WINDOW_FROM_WORKGROUP) {
+				pm_sum_workgroup_window();
+			}
+
 			var sampling_probs: array<f32, PM_NUM_SRC_IMAGES>;
 			for (var image_idx = 0i; image_idx < PM_NUM_SRC_IMAGES; image_idx += 1i) {
 				sampling_probs[image_idx] = pm_wg_sampling_probs[image_idx];
@@ -364,13 +375,21 @@ fn pm_sweep_band_cooperative(workgroup_id: vec3<u32>, local_index: u32) {
 			}
 		}
 
-		// The reference half of the NCC, the same in every lane.
-		let window = pm_prepare_window(rotation, row, col);
+		// The reference half of the NCC: an uncached window's weight sum, the same in every lane.
+		var window: PmWindow;
+		if (!PM_WINDOW_FROM_WORKGROUP) {
+			window = pm_prepare_window(rotation, row, col);
+		}
 
 		// storageBarrier orders lane 0's pm_costs reads above before the other lanes' pm_costs
-		// writes below (a cross-lane write-after-read on the same pixel).
+		// writes below (a cross-lane write-after-read on the same pixel). The workgroup barrier
+		// also publishes lane 0's shared window weight sum.
 		storageBarrier();
 		workgroupBarrier();
+
+		if (PM_WINDOW_FROM_WORKGROUP) {
+			window = PmWindow(pm_wg_window_weight_sum[0], pm_ref_texel(rotation, row, col));
+		}
 
 		// The (sample, hypothesis) evaluations, one per lane: hypotheses 1-4 get the NCC cost,
 		// every hypothesis the geometric term.

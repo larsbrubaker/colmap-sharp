@@ -13,7 +13,8 @@
 //   (docs/CPP_DIVERGENCES.md, entries 95-97).
 // Composed by ColmapSharp/Mvs/PatchMatchShaders.cs after common, textures, geometry, likelihood and
 // layout. A kernel that includes it supplies PM_WINDOW_RADIUS: i32 and PM_WINDOW_STEP: i32 in its
-// constants header and declares, at any group and binding it likes,
+// constants header, and PM_WINDOW_SHARED: bool (the cooperative sweep_band's shared window, below),
+// and declares, at any group and binding it likes,
 //   var<uniform> pm_problem: PmProblem;           (the bilateral normalizations)
 //   var<storage, read> pm_reference: array<f32>;  (the reference buffer, patch_match_layout.wgsl)
 //
@@ -41,6 +42,19 @@ const PM_MAX_COST: f32 = 2.0f;
 
 var<private> pm_window_colors: array<f32, PM_WINDOW_CACHE_SIZE>;
 var<private> pm_window_weights: array<f32, PM_WINDOW_CACHE_SIZE>;
+
+// Shared window (the cooperative sweep_band, PM_WINDOW_SHARED): the cached window lives in workgroup
+// memory instead of every lane's private arrays. The lanes fill its slots together
+// (pm_fill_workgroup_window), one lane sums the weights in the serial order
+// (pm_sum_workgroup_window), and every NCC evaluation reads it. Each slot's color and weight come from
+// the same pm_ref_texel and pm_bilateral_weight inputs as pm_prepare_window's, so the values match the
+// private cache's; the kernel orders fill, sum and reads with its barriers. An uncached (large)
+// window keeps recomputing per evaluation and leaves these arrays at one element.
+const PM_WINDOW_FROM_WORKGROUP: bool = PM_WINDOW_SHARED && PM_WINDOW_CACHED;
+const PM_WINDOW_WORKGROUP_SIZE: i32 = select(1i, PM_WINDOW_COUNT, PM_WINDOW_FROM_WORKGROUP);
+var<workgroup> pm_wg_window_colors: array<f32, PM_WINDOW_WORKGROUP_SIZE>;
+var<workgroup> pm_wg_window_weights: array<f32, PM_WINDOW_WORKGROUP_SIZE>;
+var<workgroup> pm_wg_window_weight_sum: array<f32, 1>;
 
 // The reference half of the NCC at one pixel: the window's weight sum and its centre color. With
 // the cache on, pm_prepare_window has also filled pm_window_colors / pm_window_weights.
@@ -89,6 +103,34 @@ fn pm_prepare_window(rotation: i32, row: i32, col: i32) -> PmWindow {
 	}
 
 	return PmWindow(bilateral_weight_sum, ref_center_color);
+}
+
+// The shared window's slots lane, lane + lanes, ...: slot i is pm_prepare_window's i-th sample
+// (row-major over the strided window), with the same integer offsets and so the same floats.
+fn pm_fill_workgroup_window(rotation: i32, row: i32, col: i32, lane: i32, lanes: i32) {
+	if (!PM_WINDOW_FROM_WORKGROUP) {
+		return;
+	}
+
+	let ref_center_color = pm_ref_texel(rotation, row, col);
+	for (var i = lane; i < PM_WINDOW_COUNT; i += lanes) {
+		let window_row = (i / PM_WINDOW_PER_AXIS) * PM_WINDOW_STEP - PM_WINDOW_RADIUS;
+		let window_col = (i % PM_WINDOW_PER_AXIS) * PM_WINDOW_STEP - PM_WINDOW_RADIUS;
+		let ref_color = pm_ref_texel(rotation, row + window_row, col + window_col);
+		pm_wg_window_colors[i] = ref_color;
+		pm_wg_window_weights[i] = pm_bilateral_weight(f32(window_row), f32(window_col), ref_center_color, ref_color);
+	}
+}
+
+// The shared window's weight sum, accumulated in pm_prepare_window's order; one lane calls it after
+// the fill is visible and stores it for the others.
+fn pm_sum_workgroup_window() {
+	var bilateral_weight_sum = 0.0f;
+	for (var i = 0i; i < PM_WINDOW_COUNT; i += 1i) {
+		bilateral_weight_sum += pm_wg_window_weights[i];
+	}
+
+	pm_wg_window_weight_sum[0] = bilateral_weight_sum;
 }
 
 // 1 - NCC from the weighted source sums and the reference window's statistics (FinishNcc).
@@ -162,7 +204,10 @@ fn pm_compute_ncc_cost(rotation: i32, frame: PmFrame, row: i32, col: i32, depth:
 			let norm_row_src = inv_z * row_src + 0.5f;
 			var ref_color: f32;
 			var weight: f32;
-			if (PM_WINDOW_CACHED) {
+			if (PM_WINDOW_FROM_WORKGROUP) {
+				ref_color = pm_wg_window_colors[i];
+				weight = pm_wg_window_weights[i];
+			} else if (PM_WINDOW_CACHED) {
 				ref_color = pm_window_colors[i];
 				weight = pm_window_weights[i];
 			} else {

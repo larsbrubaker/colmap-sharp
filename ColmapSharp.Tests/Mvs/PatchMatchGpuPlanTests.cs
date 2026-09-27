@@ -235,23 +235,24 @@ public class PatchMatchGpuPlanTests
 	[Test]
 	public async Task CooperativeSweepNeedsItsWorkgroupMemory()
 	{
-		// 4 (2 S + 12 N + 5) bytes: S = 20, the default N = 15 -> 4 x 225 = 900.
+		// 4 (2 S + 12 N + 5 + 2 W + 1) bytes: S = 20, the default N = 15 and 11 x 11 window W = 121
+		// -> 4 x 468 = 1872.
 		PatchMatchGpuProblemShape shape = Shape(100, 80, 20);
-		long needed = PatchMatchGpuKernels.SweepWorkgroupBytes(20, new PatchMatchOptions().NumSamples);
-		await Assert.That(needed).IsEqualTo(900L);
+		long needed = PatchMatchGpuKernels.SweepWorkgroupBytes(20, new PatchMatchOptions().NumSamples, new PatchMatchOptions().WindowRadius, new PatchMatchOptions().WindowStep);
+		await Assert.That(needed).IsEqualTo(1872L);
 
-		var (fits, plan, _) = Plan(shape, false, ComputeDeviceLimits.Defaults with { MaxComputeWorkgroupStorageSize = 900 });
+		var (fits, plan, _) = Plan(shape, false, ComputeDeviceLimits.Defaults with { MaxComputeWorkgroupStorageSize = 1872 });
 		await Assert.That(fits).IsTrue();
-		await Assert.That(plan!.SweepWorkgroupBytes).IsEqualTo(900L);
+		await Assert.That(plan!.SweepWorkgroupBytes).IsEqualTo(1872L);
 
-		var (tooSmall, _, _) = Plan(shape, false, ComputeDeviceLimits.Defaults with { MaxComputeWorkgroupStorageSize = 899 });
+		var (tooSmall, _, _) = Plan(shape, false, ComputeDeviceLimits.Defaults with { MaxComputeWorkgroupStorageSize = 1871 });
 		await Assert.That(tooSmall).IsFalse();
 
-		// At the default 16 KiB it takes 1956 sources: 4 (3912 + 185) = 16,388 bytes.
-		var (tooMany, _, reason) = Plan(Shape(100, 80, 1956), false, ComputeDeviceLimits.Defaults);
+		// At the default 16 KiB it takes 1835 sources: 4 (3670 + 428) = 16,392 bytes.
+		var (tooMany, _, reason) = Plan(Shape(100, 80, 1835), false, ComputeDeviceLimits.Defaults);
 		await Assert.That(tooMany).IsFalse();
 		await Assert.That(reason).IsEqualTo(
-			"The GPU gives a group of threads at most 16 KiB of shared memory; PatchMatch with 1,956 source images needs 17 KiB. Try fewer source images. Using the CPU.");
+			"The GPU gives a group of threads at most 16 KiB of shared memory; PatchMatch with 1,835 source images needs 17 KiB. Try fewer source images. Using the CPU.");
 
 		// The serial scheme declares no workgroup memory it uses.
 		var (serialFits, serial, _) = Plan(shape, false, ComputeDeviceLimits.Defaults with { MaxComputeWorkgroupStorageSize = 0 }, cooperativeSweep: false);

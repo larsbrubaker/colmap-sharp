@@ -379,7 +379,7 @@ internal sealed class PatchMatchGpuPlan
 		dispatches.Add(Dispatch("rotate_planes", Math.Max(3, s) * p, maxGroups));
 		dispatches.Add(Dispatch("rotate_normals", p, maxGroups));
 
-		long sweepWorkgroupBytes = cooperativeSweep ? PatchMatchGpuKernels.SweepWorkgroupBytes(shape.NumSources, options.NumSamples) : 0;
+		long sweepWorkgroupBytes = cooperativeSweep ? PatchMatchGpuKernels.SweepWorkgroupBytes(shape.NumSources, options.NumSamples, options.WindowRadius, options.WindowStep) : 0;
 		return new PatchMatchGpuPlan(shape, geometric, filter, windowCount, samplesPerPixel, bandRows, bandCounts, buffers, [.. dispatches], sweepWorkgroupBytes);
 	}
 

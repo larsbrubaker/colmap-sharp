@@ -129,11 +129,20 @@ internal static class PatchMatchGpuKernels
 	/// (patch_match_sweep_band.wgsl), every element 4 bytes: forward messages and sampling
 	/// priors (S each), per sample the drawn source and hypothesis 0's cost (N each), per
 	/// (sample, hypothesis) the NCC and geometric terms (N x NumCosts each), and the hypothesis
-	/// sums (NumCosts). The serial scheme's module declares the same arrays, but a backend only
-	/// allocates what the entry point reaches.
+	/// sums (NumCosts); and the shared reference window (patch_match_ncc.wgsl): its colors and
+	/// weights (the window count each while the window is cached, else one) and its weight sum. The
+	/// serial scheme's module declares the same arrays, but a backend only allocates what the
+	/// entry point reaches.
 	/// </summary>
-	public static long SweepWorkgroupBytes(int numSrc, int numSamples) =>
-		4L * ((2L * numSrc) + (2L * numSamples) + (2L * numSamples * NumCosts) + NumCosts);
+	public static long SweepWorkgroupBytes(int numSrc, int numSamples, int windowRadius, int windowStep)
+	{
+		int windowCount = PatchMatchPhotoConsistency.WindowCountFor(windowRadius, windowStep);
+		long windowSlots = windowCount <= WindowCacheLimit ? windowCount : 1;
+		return 4L * ((2L * numSrc) + (2L * numSamples) + (2L * numSamples * NumCosts) + NumCosts + (2L * windowSlots) + 1);
+	}
+
+	/// <summary>The largest window kept in a cache (PM_WINDOW_CACHE_LIMIT in patch_match_ncc.wgsl).</summary>
+	public const int WindowCacheLimit = 128;
 
 	/// <summary>Every kernel.</summary>
 	public static IReadOnlyList<PatchMatchGpuKernel> All { get; } = Enum.GetValues<PatchMatchGpuKernel>();
@@ -211,6 +220,7 @@ internal static class PatchMatchGpuKernels
 		{
 			names.Add("PM_WINDOW_RADIUS");
 			names.Add("PM_WINDOW_STEP");
+			names.Add("PM_WINDOW_SHARED");
 		}
 
 		if (kernel == PatchMatchGpuKernel.SweepBand)
@@ -247,6 +257,9 @@ internal static class PatchMatchGpuKernels
 				"PM_REF_HEIGHT" => constants.Add(name, shape.RefHeight),
 				"PM_WINDOW_RADIUS" => constants.Add(name, shape.WindowRadius),
 				"PM_WINDOW_STEP" => constants.Add(name, shape.WindowStep),
+
+				// Only the cooperative sweep_band shares the reference window across its lanes.
+				"PM_WINDOW_SHARED" => constants.Add(name, kernel == PatchMatchGpuKernel.SweepBand && shape.CooperativeSweep),
 				"PM_NUM_SAMPLES" => constants.Add(name, shape.NumSamples),
 				"PM_GEOM_CONSISTENCY" => constants.Add(name, shape.GeomConsistency),
 				"PM_SWEEP_COOPERATIVE" => constants.Add(name, shape.CooperativeSweep),

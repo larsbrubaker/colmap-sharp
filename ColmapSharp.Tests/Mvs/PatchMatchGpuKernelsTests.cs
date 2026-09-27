@@ -52,6 +52,8 @@ public class PatchMatchGpuKernelsTests
 						"PM_NUM_SRC_IMAGES" => shape.NumSrcImages,
 						"PM_NUM_SAMPLES" => shape.NumSamples,
 						"PM_NUM_COSTS" => PatchMatchGpuKernels.NumCosts,
+						"PM_WINDOW_WORKGROUP_SIZE" => SharedWindowSlots(shape),
+						"1" => 1,
 						string other => throw new InvalidOperationException($"Unknown workgroup array length term {other}."),
 					};
 				}
@@ -59,9 +61,17 @@ public class PatchMatchGpuKernelsTests
 				bytes += 4 * length;
 			}
 
-			await Assert.That(bytes).IsEqualTo(PatchMatchGpuKernels.SweepWorkgroupBytes(shape.NumSrcImages, shape.NumSamples));
+			await Assert.That(bytes).IsEqualTo(PatchMatchGpuKernels.SweepWorkgroupBytes(shape.NumSrcImages, shape.NumSamples, shape.WindowRadius, shape.WindowStep));
 			await Assert.That(source).Contains($"const PM_NUM_COSTS: i32 = {PatchMatchGpuKernels.NumCosts}i;");
 		}
+	}
+
+	// The shared window's slots, counted independently of SweepWorkgroupBytes: the whole window
+	// while it fits the cache (Photometric's 11 x 11), one when it does not (Geometric's 21 x 21).
+	private static int SharedWindowSlots(PatchMatchGpuShaderShape shape)
+	{
+		int perAxis = 2 * shape.WindowRadius / shape.WindowStep + 1;
+		return perAxis * perAxis <= 128 ? perAxis * perAxis : 1;
 	}
 
 	[Test]
