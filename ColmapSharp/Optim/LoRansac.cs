@@ -135,7 +135,9 @@ public class LoRansac<TEstimator, TLocalEstimator, TX, TY, TModel, TSupportMeasu
 			sampleModels.Clear();
 			threadEstimator.Estimate(xRand, yRand, sampleModels);
 
-			// Iterate through all estimated models.
+			// Iterate through all estimated models. The first one that beats the best support
+			// seeds the local optimization, so the order a minimal solver returns its models in
+			// can change the result (docs/CPP_DIVERGENCES.md entry 124).
 			foreach (TModel sampleModel in sampleModels)
 			{
 				threadEstimator.Residuals(x, y, sampleModel, residuals);

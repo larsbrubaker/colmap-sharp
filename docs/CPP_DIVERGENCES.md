@@ -393,7 +393,12 @@ not depend on the basis.
 **Evidence.** `TinyManifoldTests.SphereManifold_PlusStaysOnUnitSphere` and
 `SphereManifold_PlusJacobianMatchesFiniteDiff` (1:1: orthogonality to x within 1e-12 and the
 finite-difference Jacobian within 1e-6) and `TinySolverTests.TinySolver_ManifoldConvergesAndStaysOnManifold`
-(1:1: the sphere fit converges to target.normalized() within 1e-6) pass.
+(1:1: the sphere fit converges to target.normalized() within 1e-6) pass. Where TinySolver
+stops before converging (its 25-iteration cap in `EssentialMatrixTangentSampsonEstimator.Refine`,
+or LO-RANSAC's ten refit rounds), the basis does reach the result, at the rounding level:
+the relative poses `GlobalSfmOracleTests` re-estimates agree with pycolmap to 6.5e-7 deg.
+In an experiment with another tangent basis (b1 in the x-y plane), one of them agreed to 4e-14
+deg instead of 5e-7, so the ~1e-7 deg level of those differences comes from the basis.
 
 ## 20. CSV number parsing uses .NET's invariant parser
 
@@ -2555,3 +2560,37 @@ entry 106 for splatting).
 system6, system8) matches a single-threaded run of the vendored C++ bit for bit: the FEM and
 interpolation constraints, the restricted interpolation constraints, the Gauss-Seidel
 solutions and the base-depth multigrid solve.
+interpolation constraints, the restricted interpolation constraints, and the Gauss-Seidel
+solutions.
+
+## 124. LO-RANSAC can start its local optimization from a different five-point solution
+
+**What differs.** The five-point solver returns up to ten essential matrices per minimal
+sample, and ColmapSharp returns them in a different order than COLMAP: they come from the real
+roots of a polynomial whose coefficients depend on the null-space basis, and that basis
+differs (entry 27). `Optim/LoRansac.cs` walks a sample's models in order, as COLMAP's
+`LORANSAC::Estimate` does, and runs the local optimization from the first model that beats the
+best support so far; a later model of the same sample is only scored against the result. So
+when two of a sample's models both beat the current best, the two sides refine from different
+starting models. The local optimization is capped at ten refit rounds
+(`kMaxNumLocalTrials`), so a chain that has not converged by then stops somewhere else, and
+the final E and relative pose differ even though the inlier count is the same.
+
+**Why.** Reproducing COLMAP's order would mean reproducing the basis of Eigen's
+full-pivoting Householder QR, which entry 27 rules out (Eigen is MPL-2.0). Sorting the
+solutions by some canonical key would not match COLMAP either. The algorithm is followed
+exactly; only the order of an unordered solution set differs, and RANSAC is Tier C.
+
+**Evidence.** `GlobalSfmOracleTests.CSharpOnly_ViewGraphCalibrationMatchesPycolmap(uncalibrated)`
+(fixture `oracle/fixture_global_sfm.py`): 27 of the 28 re-estimated relative poses match
+pycolmap 4.2.0 within 6.5e-7 deg. Pair 2-3 has the same configuration and 47 inliers, but its
+pose is 0.41 deg (rotation) and 0.25 deg (translation direction) away. Traced in
+`LoRansac.Estimate`, the first trial's sample yields models with 5, 8 and 14 inliers in that
+order. ColmapSharp starts the local optimization from the 8-inlier model, and after ten
+rounds it stops at 46 inliers with score 11.85, still moving. With the sample's models
+reversed as an experiment (and entry 19's experimental basis also in place), the chain
+starts from the 14-inlier model, converges at score 11.45, and reproduces pycolmap's E and
+pose to 2.6e-14 deg. pycolmap's own result is stable: `estimate_essential_matrix` on the same pair gives the same E with `max_num_trials` 1 to
+1000, and with every keypoint perturbed by up to 1e-4 px, so the difference is not rounding
+noise. Downstream, the global pipeline on the two calibrations agrees to 4.0e-4 deg and 2.5e-5
+of the scene radius.
