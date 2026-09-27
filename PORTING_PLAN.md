@@ -31,13 +31,12 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
   solve, the iso-value and the level set's corner values/MC indices is done and bit-exact
   against the vendored C++. Remaining, in order (each bit-exact through a new
   `oracle/poisson_levelset3_harness.cc` fixture, each fixture file ≤ ~1 MB):
-  1. Iso-vertices: in-slice edges are done (`PoissonLevelSetExtractor.IsoVertices.cs`,
-     levelset3 fixture). Remaining: cross-slice edges (`SetXSliceIsoVertices`, the X-slice
-     part of `setFromScratch`) and the real Extract interleaving of vertex numbering. Then
-     close the coverage gaps review found — no fixture reaches the linear fallback, the
-     bad-root clamp, multi-root averaging, the zero-weight `zeroData` fallback, pushes below
-     `FullDepth`, or `GetSolutions`' complex/linear branches — and tidy the per-edge closure
-     and per-vertex `PoissonPolynomial` allocations and the uncopied `zeroData` argument.
+  1. Iso-vertex coverage (all iso-vertices are ported, levelset3/4 fixtures): no fixture
+     reaches the linear fallback, the bad-root clamp, multi-root averaging, the zero-weight
+     `zeroData` fallback, pushes below `FullDepth`, or `GetSolutions`' complex/linear
+     branches (25 random `MakeInput` runs never hit the clamp; needs a crafted input or a
+     harness-backed unit test). Also tidy the per-edge closure and per-vertex
+     `PoissonPolynomial` allocations and the uncopied `zeroData` argument.
   2. Iso-edges and polygons: `CopyFiner(X)SliceIsoEdgeKeys`, `Set(X)SliceIsoEdges`,
      `SetLevelSet`, `AddIsoPolygons` with addBarycenter (and `MinimalAreaTriangulation`,
      MAT.h), winding reversed (`2-j`).
