@@ -11,7 +11,9 @@
 // property layout; untrimmed, the same vertex and triangle counts, positions within
 // PositionTolerance, colors within one step, at most RetriangulatedFraction of the triangles
 // different and the area within 1e-4; trimmed, counts and area within TrimmedCountFraction and
-// the density values' range and mean close.
+// the density values' range and mean close (the fixture stores only those for trimmed cases).
+// The file wrapper against upstream's own code built at -O1, Tier A, is
+// PoissonMeshingOracleTests.Exact.cs.
 
 using System.Text;
 using System.Text.Json;
@@ -25,7 +27,7 @@ using TUnit.Core;
 
 namespace ColmapSharp.Tests.Mvs;
 
-public class PoissonMeshingOracleTests
+public partial class PoissonMeshingOracleTests
 {
 	private const string Fixture = "poisson_meshing.json";
 
@@ -67,12 +69,13 @@ public class PoissonMeshingOracleTests
 
 		int expectedVertices = expected.GetProperty("vertexcount").GetInt32();
 		int expectedTriangles = expected.GetProperty("trianglecount").GetInt32();
-		int[] expectedTriangleIndices = expected.GetProperty("triangles").EnumerateArray().Select(e => e.GetInt32()).ToArray();
-		float[] expectedPositions = Floats(expected, "positions");
-		double expectedArea = Area(expectedPositions, expectedTriangleIndices);
 		double area = Area(mesh.Positions, mesh.Triangles);
 		if (options.Trim == 0)
 		{
+			int[] expectedTriangleIndices = expected.GetProperty("triangles").EnumerateArray().Select(e => e.GetInt32()).ToArray();
+			float[] expectedPositions = Floats(expected, "positions");
+			double expectedArea = Area(expectedPositions, expectedTriangleIndices);
+
 			// Untrimmed: the same vertices in the same order, a few ulps apart; the only other
 			// difference is which diagonal MinimalAreaTriangulation picks for a near-tie polygon.
 			await Assert.That(mesh.VertexCount).IsEqualTo(expectedVertices);
@@ -88,15 +91,16 @@ public class PoissonMeshingOracleTests
 		{
 			// Trimmed: a vertex whose density sits within those ulps of the trim value can land on
 			// the other side, so a few vertices and triangles come or go and the indices shift.
+			// The fixture's area is Area over the wheel's mesh, summed in double the same way.
+			double expectedArea = expected.GetProperty("area").GetDouble();
 			await Assert.That(Math.Abs(mesh.VertexCount - expectedVertices)).IsLessThanOrEqualTo((int)(TrimmedCountFraction * expectedVertices));
 			await Assert.That(Math.Abs((mesh.Triangles.Length / 3) - expectedTriangles)).IsLessThanOrEqualTo((int)(TrimmedCountFraction * expectedTriangles));
 			await Assert.That(Math.Abs(area - expectedArea) / expectedArea).IsLessThanOrEqualTo(TrimmedCountFraction);
 			// Merged islands keep some below-trim vertices, so compare the range and mean, not a bound.
-			float[] expectedValues = Floats(expected, "values");
 			float[] values = mesh.Values!;
-			await Assert.That((double)Math.Abs(values.Min() - expectedValues.Min())).IsLessThanOrEqualTo(ValueTolerance);
-			await Assert.That((double)Math.Abs(values.Max() - expectedValues.Max())).IsLessThanOrEqualTo(ValueTolerance);
-			await Assert.That((double)Math.Abs(values.Average() - expectedValues.Average())).IsLessThanOrEqualTo(1e-3);
+			await Assert.That((double)Math.Abs(values.Min() - Float(expected, "value_min"))).IsLessThanOrEqualTo(ValueTolerance);
+			await Assert.That((double)Math.Abs(values.Max() - Float(expected, "value_max"))).IsLessThanOrEqualTo(ValueTolerance);
+			await Assert.That(Math.Abs(values.Average() - expected.GetProperty("value_mean").GetDouble())).IsLessThanOrEqualTo(1e-3);
 			await Assert.That(mesh.Colors!.Length).IsEqualTo(3 * mesh.VertexCount);
 		}
 	}
@@ -157,8 +161,13 @@ public class PoissonMeshingOracleTests
 		return max;
 	}
 
+	// The fixture writes floats in their shortest float32 form, so they parse exactly as float.
 	private static float[] Floats(JsonElement element, string name) =>
-		element.GetProperty(name).EnumerateArray().Select(e => (float)e.GetDouble()).ToArray();
+		element.GetProperty(name).EnumerateArray().Select(ParseFloat).ToArray();
+
+	private static float Float(JsonElement element, string name) => ParseFloat(element.GetProperty(name));
+
+	private static float ParseFloat(JsonElement e) => float.Parse(e.GetRawText(), System.Globalization.CultureInfo.InvariantCulture);
 
 	private static byte[] Bytes(JsonElement element, string name) =>
 		element.GetProperty(name).EnumerateArray().Select(e => e.GetByte()).ToArray();

@@ -100,7 +100,8 @@ public static partial class PoissonMeshing
 		output.Flush();
 	}
 
-	private readonly record struct PoissonInputPoints(float[] Positions, float[] Normals, byte[] Colors);
+	// HasColors comes from the header, so it holds for a PLY without points too.
+	private readonly record struct PoissonInputPoints(float[] Positions, float[] Normals, byte[] Colors, bool HasColors);
 
 	// RunPoissonRecon's input: the positions and normals (required), and the colors when the
 	// vertex element has red, green and blue uchar properties.
@@ -142,7 +143,7 @@ public static partial class PoissonMeshing
 			}
 		}
 
-		return new PoissonInputPoints(positions, normals, colors);
+		return new PoissonInputPoints(positions, normals, colors, hasColors);
 	}
 
 	// The "type name" of every scalar property of the vertex element (x, y, z as "float x" etc.).

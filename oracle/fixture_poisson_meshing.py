@@ -1,23 +1,40 @@
 #!/usr/bin/env python3
-# fixture_poisson_meshing.py: writes ColmapSharp.Tests/TestData/oracle/poisson_meshing.json,
-# COLMAP's PoissonMeshing (colmap/mvs/poisson_meshing.cc: RunPoissonRecon, then
-# RunSurfaceTrimmer when trim != 0) through the pinned pycolmap wheel's poisson_meshing, on a
+# fixture_poisson_meshing.py: writes two oracles for COLMAP's PoissonMeshing
+# (colmap/mvs/poisson_meshing.cc: RunPoissonRecon, then RunSurfaceTrimmer when trim != 0) on a
 # noisy, colored unit sphere with normals written as a fused.ply would be (float x, y, z,
-# nx, ny, nz; uchar red, green, blue). Read by ColmapSharp.Tests/Mvs/PoissonMeshingOracleTests.cs
-# (Tier C: the wheel is optimized, the C# stages are pinned bit-exact against -O1 harnesses).
+# nx, ny, nz; uchar red, green, blue), in ColmapSharp.Tests/TestData/oracle/:
+#   poisson_meshing.json        the pinned pycolmap wheel's poisson_meshing. Read by
+#                               ColmapSharp.Tests/Mvs/PoissonMeshingOracleTests.cs (Tier C: the
+#                               wheel is optimized). Each untrimmed case stores the output PLY's
+#                               header text, counts, positions, colors and triangles; each
+#                               trimmed case, whose vertices come and go near the trim value,
+#                               only the header, counts, surface area and the density values'
+#                               min, max and mean, which is all the test compares.
+#   poisson_meshing_exact.json  the same input and cases through
+#                               oracle/poisson_meshing_harness.cc: upstream's PoissonRecon.cpp and
+#                               SurfaceTrimmer.cpp built with clang++ -O1 -ffp-contract=off
+#                               -DRELEASE and run with one thread, as the other Poisson harnesses
+#                               are built (fixture_poisson_bspline.py's header explains why).
+#                               Stores the input PLYs and each output PLY whole (base64). Read by
+#                               ColmapSharp.Tests/Mvs/PoissonMeshingOracleTests.Exact.cs (Tier A).
+#                               It adds EXACT_ONLY_CASES: a PLY with the color properties and no
+#                               points, whose output still declares red, green and blue.
 #
-# Each case runs in its own Python process: PoissonRecon's command-line flags are globals whose
-# "set" state persists across calls in one process (a --density or --fullDepth from an earlier
-# call leaks into later ones; docs/CPP_DIVERGENCES.md, entry 131).
+# Each case runs in its own process: PoissonRecon's command-line flags are globals whose "set"
+# state persists across calls in one process (a --density or --fullDepth from an earlier call
+# leaks into later ones; docs/CPP_DIVERGENCES.md, entry 131).
 #
-# Each case stores the output PLY's header text, vertex and triangle counts, positions, density
-# values (when present), colors and triangles.
+# Floats are written in their shortest float32 round-trip form; the C# tests parse them as float.
 #
-# Usage: oracle/.venv/bin/python oracle/fixture_poisson_meshing.py
+# Usage: oracle/.venv/bin/python oracle/fixture_poisson_meshing.py   (COLMAP_REFERENCE=<checkout>
+# when cpp-reference/ is not next to this repo's oracle/, e.g. from a worktree)
 
+import base64
 import json
 import math
+import os
 import pathlib
+import platform
 import random
 import struct
 import subprocess
@@ -25,7 +42,14 @@ import sys
 import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
-OUTPUT = HERE.parent / "ColmapSharp.Tests" / "TestData" / "oracle" / "poisson_meshing.json"
+FIXTURES = HERE.parent / "ColmapSharp.Tests" / "TestData" / "oracle"
+OUTPUT = FIXTURES / "poisson_meshing.json"
+EXACT_OUTPUT = FIXTURES / "poisson_meshing_exact.json"
+REFERENCE = pathlib.Path(os.environ.get("COLMAP_REFERENCE", HERE.parent / "cpp-reference"))
+POISSON_RECON = REFERENCE / "src" / "thirdparty" / "PoissonRecon"
+# The other Poisson harnesses' flags, plus RELEASE, which COLMAP's CMakeLists.txt defines for
+# PoissonRecon.cpp and SurfaceTrimmer.cpp.
+FLAGS = ["-std=c++17", "-O1", "-ffp-contract=off", "-DRELEASE"]
 
 # (name, depth, point_weight, trim)
 CASES = [
@@ -33,6 +57,12 @@ CASES = [
     ("depth5trim", 5, 1.0, 3.6),
     ("depth4unscreened", 4, 0.0, 0.0),
     ("depth6trim", 6, 4.0, 3.5),
+]
+
+# (name, depth, point_weight, trim) on the empty input, harness only. Not trimmed: upstream's
+# SurfaceTrimmer crashes on an empty mesh.
+EXACT_ONLY_CASES = [
+    ("empty", 5, 1.0, 0.0),
 ]
 
 
@@ -70,6 +100,44 @@ def write_points(path, points):
             f.write(struct.pack("<6f3B", *position, *normal, *color))
 
 
+def f32(x):
+    """The shortest decimal that reads back as the float32 x."""
+    bits = struct.pack("<f", x)
+    for digits in range(1, 10):
+        text = f"{x:.{digits}g}"
+        if struct.pack("<f", float(text)) == bits:
+            return text
+    raise AssertionError(x)
+
+
+class Raw(str):
+    """Text written into the JSON as is (a number or number list)."""
+
+
+def floats(values):
+    return Raw("[" + ",".join(f32(v) for v in values) + "]")
+
+
+def to_json(value):
+    if isinstance(value, Raw):
+        return str(value)
+    if isinstance(value, dict):
+        return "{" + ",".join(json.dumps(k) + ":" + to_json(v) for k, v in value.items()) + "}"
+    return json.dumps(value, separators=(",", ":"))
+
+
+def area(positions, triangles):
+    """Surface area, summed in double as PoissonMeshingOracleTests.Area does."""
+    total = 0.0
+    for t in range(0, len(triangles), 3):
+        a, b, c = (3 * triangles[t + k] for k in range(3))
+        u = [positions[b + d] - positions[a + d] for d in range(3)]
+        v = [positions[c + d] - positions[a + d] for d in range(3)]
+        cross = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
+        total += 0.5 * math.sqrt(sum(x * x for x in cross))
+    return total
+
+
 def read_mesh(path):
     data = pathlib.Path(path).read_bytes()
     end = data.index(b"end_header\n") + len(b"end_header\n")
@@ -105,18 +173,25 @@ def read_mesh(path):
         triangles += list(struct.unpack_from("<3i", data, offset + 4))
         offset += 16
     assert offset == len(data)
-    return {
-        "header": header,
-        "vertexcount": counts["vertex"],
-        "trianglecount": counts["face"],
-        "positions": positions,
-        "values": values,
-        "colors": colors,
-        "triangles": triangles,
-    }
+    return header, counts["vertex"], counts["face"], positions, values, colors, triangles
 
 
-def run_case(input_path, output_path, depth, point_weight, trim):
+def pycolmap_case(path, trim):
+    header, vertices, faces, positions, values, colors, triangles = read_mesh(path)
+    case = {"header": header, "vertexcount": vertices, "trianglecount": faces}
+    if trim == 0:
+        case.update({"positions": floats(positions), "colors": colors, "triangles": triangles})
+    else:
+        case.update({
+            "area": area(positions, triangles),
+            "value_min": Raw(f32(min(values))),
+            "value_max": Raw(f32(max(values))),
+            "value_mean": sum(values) / len(values),
+        })
+    return case
+
+
+def run_pycolmap(input_path, output_path, depth, point_weight, trim):
     script = (
         "import pycolmap, sys\n"
         "o = pycolmap.PoissonMeshingOptions()\n"
@@ -129,26 +204,76 @@ def run_case(input_path, output_path, depth, point_weight, trim):
     subprocess.run([sys.executable, "-c", script, str(input_path), str(output_path)], check=True)
 
 
+def build_harness(binary):
+    if not POISSON_RECON.is_dir():
+        sys.exit(f"missing {POISSON_RECON}: run scripts/fetch-reference.sh first")
+    sources = [HERE / "poisson_meshing_harness.cc", POISSON_RECON / "PoissonRecon.cpp",
+               POISSON_RECON / "SurfaceTrimmer.cpp"]
+    subprocess.run(["clang++", *FLAGS, "-w", f"-I{POISSON_RECON}", *map(str, sources), "-o", str(binary)],
+                   check=True)
+
+
+def write_exact(exact):
+    # One case per line keeps the file diffable.
+    lines = ["{"] + [f" {json.dumps(k)}: {json.dumps(v)}," for k, v in exact.items() if k != "cases"]
+    lines.append(' "cases": {')
+    items = list(exact["cases"].items())
+    for i, (name, case) in enumerate(items):
+        lines.append(f"  {json.dumps(name)}: {json.dumps(case)}" + ("," if i + 1 < len(items) else ""))
+    lines += [" }", "}"]
+    EXACT_OUTPUT.write_text("\n".join(lines) + "\n")
+    print("wrote", EXACT_OUTPUT)
+
+
 def main():
     points = sphere_points(600, seed=7)
     result = {
-        "positions": [c for p, _, _ in points for c in p],
-        "normals": [c for _, n, _ in points for c in n],
+        "positions": floats([c for p, _, _ in points for c in p]),
+        "normals": floats([c for _, n, _ in points for c in n]),
         "colors": [c for _, _, col in points for c in col],
         "cases": {},
     }
+    compiler = subprocess.run(["clang++", "--version"], capture_output=True, text=True,
+                              check=True).stdout.splitlines()[0]
+    exact = {
+        "source": "oracle/fixture_poisson_meshing.py + oracle/poisson_meshing_harness.cc",
+        "compiler": compiler,
+        "platform": f"{platform.system()} {platform.machine()}",
+        "flags": " ".join(FLAGS),
+        "cases": {},
+    }
     with tempfile.TemporaryDirectory() as tmp:
-        input_path = pathlib.Path(tmp) / "points.ply"
+        tmp = pathlib.Path(tmp)
+        binary = tmp / "harness"
+        build_harness(binary)
+        input_path = tmp / "points.ply"
         write_points(input_path, points)
-        for name, depth, point_weight, trim in CASES:
-            output_path = pathlib.Path(tmp) / f"{name}.ply"
-            run_case(input_path, output_path, depth, point_weight, trim)
-            case = read_mesh(output_path)
-            case.update({"depth": depth, "point_weight": point_weight, "trim": trim})
-            result["cases"][name] = case
-            print(name, case["vertexcount"], case["trianglecount"])
-    OUTPUT.write_text(json.dumps(result, separators=(",", ":")) + "\n")
+        empty_path = tmp / "empty.ply"
+        write_points(empty_path, [])
+        inputs = {"sphere": input_path, "empty": empty_path}
+        exact["inputs"] = {k: base64.b64encode(v.read_bytes()).decode("ascii") for k, v in inputs.items()}
+        runs = [(case, "sphere") for case in CASES] + [(case, "empty") for case in EXACT_ONLY_CASES]
+        for (name, depth, point_weight, trim), input_name in runs:
+            input_path = inputs[input_name]
+            if input_name == "sphere":
+                output_path = tmp / f"{name}.ply"
+                run_pycolmap(input_path, output_path, depth, point_weight, trim)
+                case = {"depth": depth, "point_weight": point_weight, "trim": trim}
+                case.update(pycolmap_case(output_path, trim))
+                result["cases"][name] = case
+                print("pycolmap", name, case["vertexcount"], case["trianglecount"])
+
+            exact_path = tmp / f"{name}.exact.ply"
+            subprocess.run([str(binary), str(depth), repr(point_weight), repr(trim), str(input_path),
+                            str(exact_path)], check=True, stdout=subprocess.DEVNULL)
+            exact["cases"][name] = {
+                "input": input_name, "depth": depth, "point_weight": point_weight, "trim": trim,
+                "ply": base64.b64encode(exact_path.read_bytes()).decode("ascii"),
+            }
+            print("harness", name, exact_path.stat().st_size, "bytes")
+    OUTPUT.write_text(to_json(result) + "\n")
     print("wrote", OUTPUT)
+    write_exact(exact)
 
 
 if __name__ == "__main__":

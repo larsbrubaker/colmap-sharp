@@ -4,8 +4,10 @@
 // ColmapSharp/Mvs/PoissonMeshing.cs that poisson_meshing_test.cc does not reach - the
 // std::to_string/atof conversion of pointWeight and trim (Tier A: printf's "%f" rounds the exact
 // binary value half to even), PoissonMeshingOptions.Check, colors following the input's
-// properties rather than options.Color, a PLY without normals failing as PoissonRecon does,
-// and cancellation and progress.
+// properties rather than options.Color, a PLY without normals failing as PoissonRecon does, an
+// unwritable output path throwing as THROW_CHECK_PATH_OPEN does, and cancellation and
+// progress. (A PLY with color properties and no points is PoissonMeshingOracleTests.Exact.cs's
+// "empty" case, byte-exact against upstream.)
 
 using ColmapSharp.Mvs;
 using ColmapSharp.Mvs.PoissonRecon;
@@ -85,6 +87,31 @@ public partial class PoissonMeshingTests
 	}
 
 	[Test]
+	public async Task PoissonMeshing_UnwritableOutput_Throws()
+	{
+		// THROW_CHECK_PATH_OPEN runs before COLMAP's try, so it throws rather than returning false.
+		string testDir = MvsTestUtils.CreateTestDir();
+		string inputPath = Path.Combine(testDir, "points.ply");
+		float[] positions = SpherePositions();
+		var points = new List<PlyPoint>();
+		for (int i = 0; i < positions.Length / 3; i++)
+		{
+			points.Add(new PlyPoint
+			{
+				X = positions[3 * i], Y = positions[(3 * i) + 1], Z = positions[(3 * i) + 2],
+				Nx = positions[3 * i], Ny = positions[(3 * i) + 1], Nz = positions[(3 * i) + 2],
+			});
+		}
+
+		Ply.WriteBinaryPlyPoints(inputPath, points, writeNormal: true, writeRgb: true);
+		string directoryOutput = Path.Combine(testDir, "mesh.ply");
+		Directory.CreateDirectory(directoryOutput);
+		var options = new PoissonMeshingOptions { Depth = 3, Trim = 0 };
+		await Assert.That(() => PoissonMeshing.Run(options, inputPath, directoryOutput)).Throws<ArgumentException>();
+		await Assert.That(() => PoissonMeshing.Run(options, inputPath, Path.Combine(testDir, "missing", "mesh.ply"))).Throws<ArgumentException>();
+	}
+
+	[Test]
 	public async Task PoissonMeshing_CancellationAndProgress()
 	{
 		float[] points = SpherePositions();
@@ -97,6 +124,7 @@ public partial class PoissonMeshingTests
 		PoissonMeshing.Run(options, points, points, default, default, new SynchronousProgress(fractions.Add));
 		await Assert.That(fractions.Count).IsGreaterThan(2);
 		await Assert.That(fractions.All(f => f >= 0 && f <= 1)).IsTrue();
+		await Assert.That(fractions.Zip(fractions.Skip(1)).All(pair => pair.Second >= pair.First)).IsTrue();
 		await Assert.That(fractions[^1]).IsEqualTo(1.0);
 	}
 

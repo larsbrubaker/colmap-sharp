@@ -13,21 +13,32 @@
 // PoissonImplicitEvaluator), then extractLevelSet (PoissonLevelSetExtractor, PoissonMeshOutput)
 // and PoissonSurfaceTrimmer. Run(options, inputPath, outputPath) is the file wrapper, reading
 // and writing PLY as PoissonRecon does (PoissonMeshing.Ply.cs). Each stage is Tier A against
-// the vendored C++ (the PoissonTreeOracleTests harnesses); the whole chain is Tier C against
-// the pycolmap wheel (PoissonMeshingOracleTests), since the optimized wheel may round a few
-// floats differently (docs/CPP_DIVERGENCES.md, entry 125).
+// the vendored C++ (the PoissonTreeOracleTests harnesses); the whole chain is Tier A against
+// upstream's own code built the same way (see below) and Tier C against the pycolmap wheel
+// (PoissonMeshingOracleTests), since the optimized wheel may round a few floats differently
+// (docs/CPP_DIVERGENCES.md, entry 125).
 //
 // Translation notes:
 // - COLMAP formats pointWeight and trim with std::to_string and PoissonRecon parses them back
 //   with atof into a float; CppToStringAsFloat reproduces that exactly.
 // - PoissonRecon ignores --colors for PLY input: it carries the input's extra vertex properties
-//   through as auxiliary data, so the mesh has colors exactly when the points do (see
+//   through as auxiliary data, so the mesh has colors exactly when the input does (see
 //   PoissonMeshingOptions.Color). --density is passed when trim > 0, so the density "value"
 //   property is in the output only then.
-// - num_threads only sets PoissonRecon's thread pool; the port runs sequentially, which gives
-//   the same result.
-// - COLMAP catches a failing reconstruction, logs a warning and returns false; the file wrapper
-//   does the same, except that cancellation propagates as OperationCanceledException.
+// - num_threads only sets PoissonRecon's thread pool; the port runs sequentially. Its result
+//   equals upstream's run with num_threads = 1. Upstream with more threads (COLMAP's default
+//   num_threads = -1 uses every hardware thread) sums some floats and numbers some nodes and
+//   vertices in thread order, so its output varies from run to run in the last bits
+//   (docs/CPP_DIVERGENCES.md, entries 106 and 123).
+// - The file wrapper is Tier A against upstream's own RunPoissonRecon and RunSurfaceTrimmer
+//   built at -O1 (PoissonMeshingOracleTests.Exact.cs): the output PLY is byte-identical, except
+//   where PoissonSplat.LogF's rounding differs from Apple's logf (entry 116).
+// - COLMAP opens (and truncates) the output for writing before it starts (THROW_CHECK_PATH_OPEN),
+//   so an unwritable output path throws; the file wrapper does the same. It then catches a
+//   failing reconstruction, logs a warning and returns false; the file wrapper does the same,
+//   except that cancellation propagates as OperationCanceledException.
+// - Whether the mesh has colors follows the input's vertex properties, not its point count: a
+//   PLY with red, green and blue and no points still writes a header with those properties.
 
 using System.Globalization;
 using System.Numerics;
@@ -62,18 +73,31 @@ public static partial class PoissonMeshing
 		ReadOnlySpan<float> normals,
 		ReadOnlySpan<byte> colors = default,
 		CancellationToken cancellationToken = default,
-		IProgress<double>? progress = null)
+		IProgress<double>? progress = null) =>
+		Run(options, positions, normals, colors, hasColors: !colors.IsEmpty, cancellationToken, progress);
+
+	// The in-memory Run with the colors' presence explicit, so that an input with color
+	// properties but no points still gives a mesh with (no) colors, as PoissonRecon's
+	// DynamicFactory is built from the PLY header, not from the points.
+	private static PoissonMeshOutput Run(
+		PoissonMeshingOptions options,
+		ReadOnlySpan<float> positions,
+		ReadOnlySpan<float> normals,
+		ReadOnlySpan<byte> colors,
+		bool hasColors,
+		CancellationToken cancellationToken,
+		IProgress<double>? progress)
 	{
 		ArgumentNullException.ThrowIfNull(options);
 		Check.That(options.Check());
 		int pointCount = positions.Length / 3;
-		if (!colors.IsEmpty && colors.Length != 3 * pointCount)
+		if (hasColors ? colors.Length != 3 * pointCount : !colors.IsEmpty)
 		{
 			throw new ArgumentException("colors must be empty or hold red, green and blue bytes per point.", nameof(colors));
 		}
 
 		// DynamicFactory< float > reads each uchar channel as a float.
-		int auxPerPoint = colors.IsEmpty ? 0 : 3;
+		int auxPerPoint = hasColors ? 3 : 0;
 		float[] aux = new float[colors.Length];
 		for (int i = 0; i < colors.Length; i++)
 		{
@@ -123,8 +147,11 @@ public static partial class PoissonMeshing
 	/// oriented points of the PLY at <paramref name="inputPath"/> (it must have normals), and
 	/// writes the reconstructed mesh as a binary PLY to <paramref name="outputPath"/> with the
 	/// properties PoissonRecon (and SurfaceTrimmer) write: x, y, z, the density "value" when
-	/// options.Trim is positive, and red, green, blue when the input has them. Returns false,
-	/// after logging a warning, when the reconstruction fails; invalid options or paths throw.
+	/// options.Trim is positive, and red, green, blue when the input has them. Invalid options or
+	/// paths throw, as does an output path that cannot be opened for writing (COLMAP's
+	/// THROW_CHECK_PATH_OPEN, which also creates or truncates the file before the
+	/// reconstruction starts). Returns false, after logging a warning, when the reconstruction
+	/// fails.
 	/// </summary>
 	public static bool Run(
 		PoissonMeshingOptions options,
@@ -138,13 +165,17 @@ public static partial class PoissonMeshing
 		Check.That(FileUtils.HasFileExtension(inputPath, ".ply"), inputPath);
 		Check.That(File.Exists(inputPath), inputPath);
 		Check.That(FileUtils.HasFileExtension(outputPath, ".ply"), outputPath);
-		string? outputDir = Path.GetDirectoryName(Path.GetFullPath(outputPath));
-		Check.That(outputDir != null && Directory.Exists(outputDir), outputPath);
+
+		// THROW_CHECK_PATH_OPEN( output_path ): outside the try, so a directory or a missing
+		// parent directory throws rather than returning false.
+		using (FileOpen.OpenWrite(outputPath))
+		{
+		}
 
 		try
 		{
 			PoissonInputPoints input = ReadInputPoints(inputPath);
-			PoissonMeshOutput mesh = Run(options, input.Positions, input.Normals, input.Colors, cancellationToken, progress);
+			PoissonMeshOutput mesh = Run(options, input.Positions, input.Normals, input.Colors, input.HasColors, cancellationToken, progress);
 			WriteMeshPly(outputPath, mesh);
 			return true;
 		}
@@ -165,7 +196,7 @@ public static partial class PoissonMeshing
 	/// CmdLineParameter&lt;float&gt; (<c>float( atof( str ) )</c>). So 10.0 stays 10, but
 	/// 1e-7 becomes 0 and 0.0078125 becomes 0.007812f.
 	/// </summary>
-	public static float CppToStringAsFloat(double value) =>
+	internal static float CppToStringAsFloat(double value) =>
 		(float)double.Parse(CppToString(value), NumberStyles.Float, CultureInfo.InvariantCulture);
 
 	/// <summary>std::to_string( double ): printf's "%f" of the exact binary value.</summary>

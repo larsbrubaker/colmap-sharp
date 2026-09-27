@@ -2441,7 +2441,12 @@ but those rare cases.
 
 **Evidence.** `PoissonTreeOracleTests.LogF_MatchesLibm`: over 4000 float arguments spanning
 2^-40..2^40 (`TestData/oracle/poisson_libm.json`, from `oracle/poisson_libm_harness.cc`), the
-result equals Apple's `logf` (the oracle's) bit for bit.
+result equals Apple's `logf` (the oracle's) bit for bit. End to end, one of the rare cases shows:
+`PoissonMeshingOracleTests.PoissonMeshing_FileMatchesUpstreamExactly` (the file wrapper against
+upstream's own PoissonRecon and SurfaceTrimmer, `oracle/poisson_meshing_harness.cc`) matches
+byte for byte except, in its depth6trim case, output vertex 898's density `value`, one float ulp
+from upstream's; the review that found it traced the ulp to this logarithm. The test pins that
+one exception.
 
 ## 117. Bitmap interpolation treats points beyond int range and NaN as outside the image
 
