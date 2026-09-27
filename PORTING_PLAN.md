@@ -31,8 +31,8 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
   solve, the iso-value, the level set's iso-vertices, iso-edges and polygons, the Extract
   driver, model-space output (`PoissonMeshOutput`), `PoissonSurfaceTrimmer` and the public
   `PoissonMeshing` API (`Mvs/PoissonMeshing.cs`, `poisson_meshing_test.cc` ported) are done
-  and bit-exact against the vendored C++ (harnesses `oracle/poisson_levelset{,2,3,4,5,6}_harness.cc` and
-  `poisson_{extract,trim}_harness.cc`, built at `-O1`). Remaining (harness fixtures ≤ ~1 MB):
+  and bit-exact against the vendored C++ (harnesses `oracle/poisson_levelset{,2,3,4,5,6}_harness.cc`,
+  `poisson_{extract,trim,meshing}_harness.cc`, built at `-O1`). Remaining coverage gaps:
   1. Coverage: the vertex-pair push loops (`PoissonLevelSetExtractor.IsoEdges.cs` slice and
      slab pushes) are reached (vertexpairs2) but not pinned — deleting either still passes, and
      a 320-input C++ search found no input where a walk uses a pushed pair. Likely needs a leaf
@@ -42,15 +42,6 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
      `componentEdges`; walking `componentHalfEdges` (`PoissonSurfaceTrimmer.Islands.cs:83`) or
      `componentBoundaryHalfEdges` (:97) in insertion order still passes. Needs a crafted mesh
      with more neighbor-rich merges.
-  3. `PoissonMeshing` follow-ups (API, tests and Tier C fixture are in): add a Tier A
-     end-to-end fixture from upstream `RunPoissonRecon`/`RunSurfaceTrimmer` built at `-O1`
-     with COLMAP's argv (review found it byte-identical except one density ulp from `LogF`,
-     divergence 116); throw on an unwritable output path before the try, like
-     `THROW_CHECK_PATH_OPEN`; carry a has-colors flag so an empty colored PLY keeps its
-     red/green/blue header; reword the header's thread-independence claim (upstream is
-     thread-dependent, divergences 106/123); assert progress is monotonic; make
-     `CppToStringAsFloat` internal; shrink `poisson_meshing.json` (1.37 MB) with `%.9g`
-     floats and summary-only trimmed cases.
 
 ### Verification
 - End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us (also the
