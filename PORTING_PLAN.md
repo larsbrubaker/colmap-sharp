@@ -28,15 +28,17 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
 
 ### Phase 12 — Dense reconstruction (MVS)
 - `poisson_meshing` (PoissonRecon port, `Mvs/PoissonRecon/`). Everything through the linear
-  solve, the iso-value and the level set's iso-vertices and iso-edges is done and bit-exact
-  against the vendored C++ (harnesses `oracle/poisson_levelset{,2,3,4,5}_harness.cc`).
-  Remaining, in order (each bit-exact through a new harness fixture, each file ≤ ~1 MB):
-  1. Coverage: no fixture produces an iso-edge vertex pair (those branches are pinned by
-     reading only; needs a crafted input with leaves coarser than `FullDepth` beside finer
-     ones). Tidy: zero-count faces still allocate a `LevelSetIsoEdge[0]` (use `Array.Empty`).
-  2. Polygons: `SetLevelSet`, `AddIsoPolygons` with addBarycenter (and
-     `MinimalAreaTriangulation`, MAT.h), winding reversed (`2-j`), plus the polygon-side
-     lookups (`addIsoEdges`, `setVertexPair`, `setEdgeVertex`).
+  solve, the iso-value and the level set's iso-vertices, iso-edges and polygons is done and
+  bit-exact against the vendored C++ (harnesses `oracle/poisson_levelset{,2,3,4,5,6}_harness.cc`,
+  built at `-O1`). Remaining, in order (each bit-exact through a harness fixture, ≤ ~1 MB):
+  1. Coverage: no fixture produces an iso-edge vertex pair, so the pair branches, the polygon
+     loop walk across a pair and the pushed-up `faceEdgeMap` fallbacks are pinned by reading
+     only (needs a crafted input with leaves coarser than `FullDepth` beside finer ones).
+     Tidy: zero-count faces still allocate a `LevelSetIsoEdge[0]`; `SetLevelSet` allocates
+     a list per loop and an array per polygon.
+  2. Root-cause why the levelset harnesses at `-O0` change some triangle connectivity
+     checksums (levelset5/6/8) versus `-O1`; `-O2` only changes barycenter depths
+     (divergence 125). If it is another upstream uninitialized read, document it.
   3. Extract's slab driver (no boundaries; CancellationToken and IProgress per slab),
      `unitCubeToModel`, output vertices (position, RGB, density value when trimming).
   4. SurfaceTrimmer, the public in-memory `PoissonMeshing` API plus the file wrapper, and
