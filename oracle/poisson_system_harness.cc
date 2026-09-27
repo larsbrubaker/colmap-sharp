@@ -6,7 +6,8 @@
 // constraints (_getSliceMatrixAndProlongationConstraints, _getProlongedMatrixRowSize) and its
 // point-constraint transfers (_setPointValuesFromProlongedSolution,
 // _updateRestrictedInterpolationConstraints) and the sliced Gauss-Seidel relaxation
-// (_solveSystemGS). Built and run by
+// (_solveSystemGS), and the base-depth multigrid's sparse algebra (downSampleMatrix, transpose,
+// multiply, setDiagonalR). Built and run by
 // oracle/fixture_poisson_tree.py, which writes ColmapSharp.Tests/TestData/oracle/poisson_system.json
 // (read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests.System.cs). Not part of any
 // build. The shared set-up and output format are in oracle/poisson_harness.h; the stages up to
@@ -234,6 +235,42 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input) {
     };
     gs("gsprolongation", 8, true, 1);
     gs("gsblocked", 3, false, 2);
+
+    // The base-depth multigrid's sparse algebra at each small depth: downSampleMatrix R, its
+    // transpose P, R * x, P * y added to z, and setDiagonalR of systemMatrix.
+    {
+      typedef SparseMatrix<Real, matrix_index_type> Matrix;
+      std::vector<long long> shape;
+      std::vector<double> entries, products, diagonals;
+      auto dumpMatrix = [&](const Matrix& m) {
+        shape.push_back((long long)m.rows());
+        for (size_t i = 0; i < m.rows(); i++) {
+          shape.push_back((long long)m.rowSize(i));
+          for (size_t j = 0; j < m.rowSize(i); j++) shape.push_back(m[i][j].N), entries.push_back(m[i][j].Value);
+        }
+      };
+      for (int d = 1; d <= tree._maxDepth; d++) {
+        size_t high = tree._sNodesSize(d), low = tree._sNodesSize(d - 1);
+        if (high > kSliceLimit) continue;
+        Matrix R = tree.downSampleMatrix(Sigs(), d);
+        Matrix P = R.transpose(high);
+        dumpMatrix(R), dumpMatrix(P);
+        std::vector<Real> x(high), y(low), z(high);
+        for (size_t i = 0; i < high; i++) x[i] = (Real)((long long)(i * 29 % 83) - 41) / (Real)16, z[i] = (Real)((long long)(i * 7 % 13) - 6) / (Real)8;
+        R.multiply(&x[0], &y[0]);
+        P.multiply(&y[0], &z[0], MULTIPLY_ADD);
+        for (Real v : y) products.push_back(v);
+        for (Real v : z) products.push_back(v);
+        Matrix M = tree.systemMatrix(Sigs(), S, d, std::make_tuple(iInfo));
+        std::vector<Real> D(M.rows());
+        M.setDiagonalR(&D[0]);
+        for (Real v : D) diagonals.push_back(v);
+      }
+      PrintI(name + "/sparseshape", shape);
+      PrintF(name + "/sparseentries", entries);
+      PrintF(name + "/sparseproducts", products);
+      PrintF(name + "/sparsediagonals", diagonals);
+    }
   }
 
   delete normalInfo;

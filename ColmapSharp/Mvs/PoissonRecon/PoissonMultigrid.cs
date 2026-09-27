@@ -6,7 +6,8 @@
 // _setFEM2ValidityFlags, isValidFEMNode, _isValidFEM1Node/_isValidFEM2Node in FEMTree.inl/.h),
 // BaseFEMIntegrator's IsInteriorlyOverlapped and ParentOverlapBounds loop tables
 // (WindowLoopData, FEMTree.h), and the restriction (_downSample) and prolongation (_upSample)
-// of per-node values between adjacent depths (FEMTree.System.inl). PoissonFemConstraints
+// of per-node values between adjacent depths (FEMTree.System.inl), and the restriction as a
+// sparse matrix (_downSampleMatrix) for the base-depth multigrid. PoissonFemConstraints
 // assembles the right-hand side with them; the solver (a later slice) restricts residuals and
 // prolongs solutions with the same two functions. Tier A (oracle/poisson_system_harness.cc,
 // through PoissonFemConstraints).
@@ -270,6 +271,125 @@ public static class PoissonMultigrid
 				}
 			}
 		}
+	}
+
+	/// <summary>
+	/// The restriction matrix from <paramref name="highDepth"/> to highDepth - 1: row i (a node
+	/// of the coarse depth, relative to its first index) holds, for each child-depth node its
+	/// function refines into that is valid (FEM_FLAG_1, and not a Dirichlet element at or past
+	/// <paramref name="baseDepth"/>), the column (relative to the fine depth's first index) and the
+	/// two-scale coefficient; invalid coarse nodes get empty rows. Port of
+	/// <c>downSampleMatrix( highDepth )</c> (<c>_downSampleMatrix</c>); the FEM_FLAG_1 flags must
+	/// be set for <paramref name="signature"/>.
+	/// </summary>
+	public static PoissonSparseMatrix DownSampleMatrix(FemTree tree, SortedTreeNodes sorted, int signature, int highDepth, int baseDepth)
+	{
+		var matrix = new PoissonSparseMatrix();
+		int lowDepth = highDepth - 1;
+		if (lowDepth < 0)
+		{
+			return matrix;
+		}
+
+		bool ValidNode(int node) => IsValidFem1Node(tree, node) && (tree.LocalDepth(node) < baseDepth || (tree.Flags(node) & FemTree.DirichletElementFlag) == 0);
+		int lowBegin = Begin(tree, sorted, lowDepth), lowEnd = End(tree, sorted, lowDepth), highBegin = Begin(tree, sorted, highDepth);
+		matrix.Resize(lowEnd - lowBegin);
+		BSplineSupportSizes sizes = BSplineSupportSizes.For(FemSignature.Degree(signature));
+		int degree = sizes.Degree;
+		int n = sizes.UpSampleSize;
+		var upSampler = new BSplineUpSampleEvaluator(signature, lowDepth);
+		var neighborKey = new NeighborKey(tree, -sizes.UpSampleStart, sizes.UpSampleEnd, resetOnMissing: false);
+		neighborKey.Set(lowDepth + tree.DepthOffset);
+
+		// The stencil around the centered coarse function, multiplied from the first axis.
+		int lowCenter = (1 << lowDepth) >> 1;
+		var stencil = new double[n * n * n];
+		for (int i0 = 0; i0 < n; i0++)
+		{
+			double v0 = 1.0 * upSampler.Value(lowCenter, 2 * lowCenter + i0 + sizes.UpSampleStart);
+			for (int i1 = 0; i1 < n; i1++)
+			{
+				double v1 = v0 * upSampler.Value(lowCenter, 2 * lowCenter + i1 + sizes.UpSampleStart);
+				for (int i2 = 0; i2 < n; i2++)
+				{
+					stencil[((i0 * n) + i1) * n + i2] = v1 * upSampler.Value(lowCenter, 2 * lowCenter + i2 + sizes.UpSampleStart);
+				}
+			}
+		}
+
+		var neighbors = new int[n * n * n];
+		var upSampleValues = new double[3, n];
+		for (int i = lowBegin; i < lowEnd; i++)
+		{
+			int pNode = sorted.TreeNodes[i];
+			if (!ValidNode(pNode))
+			{
+				continue;
+			}
+
+			int row = i - lowBegin;
+			neighborKey.GetNeighbors(pNode);
+			Array.Fill(neighbors, FemTree.None);
+			neighborKey.GetChildNeighbors(0, tree.Depth(pNode), neighbors);
+			int rowSize = 0;
+			foreach (int node in neighbors)
+			{
+				if (IsValidFem1Node(tree, node))
+				{
+					rowSize++;
+				}
+			}
+
+			matrix.SetRowSize(row, rowSize);
+			int count = 0;
+
+			// Want to make sure test if contained children are interior.
+			// This is more conservative because we are test that overlapping children are interior
+			if (IsInteriorlyOverlapped(tree, degree, degree, pNode))
+			{
+				for (int j = 0; j < neighbors.Length; j++)
+				{
+					if (ValidNode(neighbors[j]))
+					{
+						matrix.Column(row, count) = tree.NodeIndex(neighbors[j]) - highBegin;
+						matrix.Value(row, count++) = (float)stencil[j];
+					}
+				}
+			}
+			else
+			{
+				for (int d = 0; d < 3; d++)
+				{
+					int off = tree.LocalOffset(pNode, d);
+					for (int k = 0; k < n; k++)
+					{
+						upSampleValues[d, k] = upSampler.Value(off, 2 * off + k + sizes.UpSampleStart);
+					}
+				}
+
+				for (int i0 = 0; i0 < n; i0++)
+				{
+					double v0 = 1.0 * upSampleValues[0, i0];
+					for (int i1 = 0; i1 < n; i1++)
+					{
+						double v1 = v0 * upSampleValues[1, i1];
+						for (int i2 = 0; i2 < n; i2++)
+						{
+							int node = neighbors[((i0 * n) + i1) * n + i2];
+							if (ValidNode(node))
+							{
+								matrix.Column(row, count) = tree.NodeIndex(node) - highBegin;
+								matrix.Value(row, count++) = (float)(v1 * upSampleValues[2, i2]);
+							}
+						}
+					}
+				}
+			}
+
+			matrix.SetUsedSize(row, count);
+		}
+
+		return matrix;
 	}
 
 	// WindowLoopData: per corner c, the window indices ((i0 * n) + i1) * n + i2 with

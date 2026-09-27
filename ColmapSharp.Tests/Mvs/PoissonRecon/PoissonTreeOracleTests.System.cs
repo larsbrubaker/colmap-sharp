@@ -186,6 +186,72 @@ public partial class PoissonTreeOracleTests
 
 		produced.F("gsprolongation", Gs(8, coarseToFine: true, 1));
 		produced.F("gsblocked", Gs(3, coarseToFine: false, 2));
+		AddSparseCases(produced, tree, sorted, system, f, (int)p.Parameters.BaseDepth, SliceLimit);
+	}
+
+	// The harness's base-depth multigrid algebra: DownSampleMatrix, its transpose, the two
+	// products and the reciprocal diagonal of the system matrix, per small depth.
+	private static void AddSparseCases(Cases produced, FemTree tree, SortedTreeNodes sorted, PoissonSystem system, FemSystemIntegrator f, int baseDepth, int sliceLimit)
+	{
+		var shape = new List<double>();
+		var entries = new List<double>();
+		var products = new List<double>();
+		var diagonals = new List<double>();
+		void DumpMatrix(PoissonSparseMatrix m)
+		{
+			shape.Add(m.Rows);
+			for (int i = 0; i < m.Rows; i++)
+			{
+				shape.Add(m.RowSize(i));
+				for (int j = 0; j < m.RowSize(i); j++)
+				{
+					shape.Add(m.Column(i, j));
+					entries.Add(m.Value(i, j));
+				}
+			}
+		}
+
+		int maxDepth = PoissonMultigrid.MaxDepth(tree);
+		var sliceMatrix = new PoissonSystemMatrix(27);
+		for (int d = 1; d <= maxDepth; d++)
+		{
+			int highBegin = PoissonMultigrid.Begin(tree, sorted, d), highEnd = PoissonMultigrid.End(tree, sorted, d);
+			int high = highEnd - highBegin, low = PoissonMultigrid.End(tree, sorted, d - 1) - PoissonMultigrid.Begin(tree, sorted, d - 1);
+			if (high > sliceLimit)
+			{
+				continue;
+			}
+
+			PoissonSparseMatrix r = PoissonMultigrid.DownSampleMatrix(tree, sorted, PoissonFemConstraints.TestSignature, d, baseDepth);
+			PoissonSparseMatrix pm = r.Transpose(high);
+			DumpMatrix(r);
+			DumpMatrix(pm);
+			var x = new float[high];
+			var y = new float[low];
+			var z = new float[high];
+			for (int i = 0; i < high; i++)
+			{
+				x[i] = (float)((long)(i * 29L % 83) - 41) / 16f;
+				z[i] = (float)((long)(i * 7L % 13) - 6) / 8f;
+			}
+
+			r.Multiply(x, 0, y, 0);
+			pm.Multiply(y, 0, z, 0, add: true);
+			products.AddRange(y.Select(v => (double)v));
+			products.AddRange(z.Select(v => (double)v));
+
+			// systemMatrix( d ): the slice rows without a prolonged solution.
+			f.Init(d);
+			system.GetSliceMatrixAndProlongationConstraints(sliceMatrix, null, d, highBegin, highEnd, null, null, f.SetStencil(), f.SetParentChildStencils());
+			var diagonal = new float[high];
+			PoissonSparseMatrix.From(sliceMatrix).SetDiagonalR(diagonal);
+			diagonals.AddRange(diagonal.Select(v => (double)v));
+		}
+
+		produced.I("sparseshape", shape);
+		produced.F("sparseentries", entries);
+		produced.F("sparseproducts", products);
+		produced.F("sparsediagonals", diagonals);
 	}
 
 	// The harness's Run up to and including finalizeForMultigrid, emitting its sorted slices.

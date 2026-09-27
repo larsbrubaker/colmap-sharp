@@ -1,0 +1,189 @@
+// Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
+// Ported from Kazhdan's PoissonRecon as vendored by COLMAP (MIT, see THIRD_PARTY_NOTICES.md).
+//
+// PoissonSparseMatrix: SparseMatrix< float , int > with unbounded rows
+// (thirdparty/PoissonRecon/SparseMatrix.h/.inl, SparseMatrixInterface.inl), the general sparse
+// matrix of the base-depth multigrid (_solveRegularMG): the restriction matrices
+// (PoissonMultigrid.DownSampleMatrix), their transposes (the prolongations), the Galerkin
+// products R * M * P, matrix-vector products and the reciprocal diagonal. Each row keeps its
+// entries in the order they were set, since that order reaches every float sum (products and
+// Gauss-Seidel residuals). PoissonSystemMatrix is the fixed-stride counterpart for the
+// per-slice system rows.
+//
+// Translation notes: vectors are float arrays with an offset, standing in for the C++'s
+// pointer arithmetic (solution + nodesBegin( depth )). The C++ multiplies rows with
+// ThreadPool::ParallelFor; each row writes only its own output, so the port runs them in order.
+
+namespace ColmapSharp.Mvs.PoissonRecon;
+
+/// <summary>
+/// A row-major sparse matrix with per-row entry lists. Port of PoissonRecon's
+/// <c>SparseMatrix&lt; Real , matrix_index_type , 0 &gt;</c>.
+/// </summary>
+public sealed class PoissonSparseMatrix
+{
+	private int[][] columns = [];
+	private float[][] values = [];
+	private int[] rowSizes = [];
+
+	/// <summary>The number of rows (rowNum).</summary>
+	public int Rows => rowSizes.Length;
+
+	/// <summary>Sets the row count, every row empty. Port of <c>resize( rows )</c>.</summary>
+	public void Resize(int rows)
+	{
+		columns = new int[rows][];
+		values = new float[rows][];
+		rowSizes = new int[rows];
+		for (int i = 0; i < rows; i++)
+		{
+			columns[i] = [];
+			values[i] = [];
+		}
+	}
+
+	/// <summary>The number of entries in a row. Port of <c>rowSize( row )</c>.</summary>
+	public int RowSize(int row) => rowSizes[row];
+
+	/// <summary>Allocates <paramref name="count"/> entries for a row. Port of <c>setRowSize( row , count )</c>.</summary>
+	public void SetRowSize(int row, int count)
+	{
+		columns[row] = new int[count];
+		values[row] = new float[count];
+		rowSizes[row] = count;
+	}
+
+	/// <summary>Sets the number of used entries of an allocated row (the C++'s rowSizes[row] = n).</summary>
+	public void SetUsedSize(int row, int count) => rowSizes[row] = count;
+
+	/// <summary>The column of entry j of a row (MatrixEntry::N).</summary>
+	public ref int Column(int row, int j) => ref columns[row][j];
+
+	/// <summary>The value of entry j of a row (MatrixEntry::Value).</summary>
+	public ref float Value(int row, int j) => ref values[row][j];
+
+	/// <summary>The rows of a fixed-stride system matrix, entry order kept.</summary>
+	public static PoissonSparseMatrix From(PoissonSystemMatrix m)
+	{
+		var result = new PoissonSparseMatrix();
+		result.Resize(m.Rows);
+		for (int i = 0; i < m.Rows; i++)
+		{
+			result.SetRowSize(i, m.RowSize(i));
+			for (int j = 0; j < m.RowSize(i); j++)
+			{
+				result.columns[i][j] = m.Column(i, j);
+				result.values[i][j] = m.Value(i, j);
+			}
+		}
+
+		return result;
+	}
+
+	/// <summary>
+	/// The transpose with <paramref name="outRows"/> rows: row c lists (r, value) for every
+	/// entry (r, c), in increasing r and then entry order. Port of <c>transpose( aRows )</c>.
+	/// </summary>
+	public PoissonSparseMatrix Transpose(int outRows)
+	{
+		// The C++'s dimension check, with its test as written (it only looks at entries whose
+		// column is at least the row count).
+		int requiredRows = 0;
+		for (int i = 0; i < Rows; i++)
+		{
+			for (int j = 0; j < rowSizes[i]; j++)
+			{
+				if (Rows <= columns[i][j])
+				{
+					requiredRows = columns[i][j] + 1;
+				}
+			}
+		}
+
+		if (requiredRows > outRows)
+		{
+			throw new InvalidOperationException($"Prescribed output dimension too low: {outRows} < {requiredRows}");
+		}
+
+		var a = new PoissonSparseMatrix();
+		a.Resize(outRows);
+		var counts = new int[outRows];
+		for (int i = 0; i < Rows; i++)
+		{
+			for (int j = 0; j < rowSizes[i]; j++)
+			{
+				counts[columns[i][j]]++;
+			}
+		}
+
+		for (int i = 0; i < outRows; i++)
+		{
+			a.SetRowSize(i, counts[i]);
+			a.rowSizes[i] = 0;
+		}
+
+		for (int i = 0; i < Rows; i++)
+		{
+			for (int j = 0; j < rowSizes[i]; j++)
+			{
+				int ii = columns[i][j];
+				int k = a.rowSizes[ii]++;
+				a.columns[ii][k] = i;
+				a.values[ii][k] = values[i][j];
+			}
+		}
+
+		return a;
+	}
+
+	/// <summary>
+	/// out[i] = (or +=) the sum over row i of in[N] * value, accumulated in float in entry order.
+	/// Port of <c>multiply( in , out , multiplyFlag )</c> (0 or MULTIPLY_ADD).
+	/// </summary>
+	public void Multiply(float[] input, int inOffset, float[] output, int outOffset, bool add = false)
+	{
+		for (int i = 0; i < Rows; i++)
+		{
+			float temp = 0;
+			int[] cols = columns[i];
+			float[] vals = values[i];
+			for (int j = 0; j < rowSizes[i]; j++)
+			{
+				temp += input[inOffset + cols[j]] * vals[j];
+			}
+
+			if (add)
+			{
+				output[outOffset + i] += temp;
+			}
+			else
+			{
+				output[outOffset + i] = temp;
+			}
+		}
+	}
+
+	/// <summary>
+	/// The reciprocal of each row's diagonal (the sum of its entries in column i; 0 stays 0),
+	/// the reciprocal taken in double. Port of <c>setDiagonalR( diagonal )</c>.
+	/// </summary>
+	public void SetDiagonalR(float[] diagonal)
+	{
+		for (int i = 0; i < Rows; i++)
+		{
+			diagonal[i] = 0;
+			for (int j = 0; j < rowSizes[i]; j++)
+			{
+				if (columns[i][j] == i)
+				{
+					diagonal[i] += values[i][j];
+				}
+			}
+
+			if (diagonal[i] != 0)
+			{
+				diagonal[i] = (float)(1.0 / diagonal[i]);
+			}
+		}
+	}
+}
