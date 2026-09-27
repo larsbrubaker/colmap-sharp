@@ -37,7 +37,6 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
 - End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us (also the
   first chance to reach the structure-based → structure-less registration fallback, which no
   synthetic scene triggers).
-- Rotation averaging pycolmap oracle.
 
 ### Performance (keep results bit-identical and thread-count independent)
 - Schur eliminator (~88% of SPARSE_SCHUR, 0.32 s/solve at 200 cams/20k pts, Release; BA is
