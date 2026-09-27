@@ -4,7 +4,8 @@
 // Poisson::Solver::Solve after finalizeForMultigrid - the normal-divergence constraints
 // (PoissonFemConstraints, with PoissonMultigrid's restriction and prolongation), the point
 // interpolation constraints, and the solver's per-depth matrix rows and prolongation
-// constraints and point-constraint transfers (PoissonSystem, PoissonSystemMatrix) - against the
+// constraints and point-constraint transfers (PoissonSystem, PoissonSystemMatrix), the
+// base-depth multigrid and the cascadic solve after each depth (PoissonSystem.Solve) - against the
 // "system*" runs of oracle/poisson_system_harness.cc (TestData/oracle/poisson_system.json).
 // Tier A, bit-identical floats. Each run replays the harness's input through the stages the
 // other PoissonTreeOracleTests files check step by step, then compares the stages here.
@@ -49,7 +50,37 @@ public partial class PoissonTreeOracleTests
 		PoissonFemConstraints.AddInterpolationConstraints(tree, sorted, p.Interpolation, constraints, depth);
 		produced.F("interpolationconstraints", constraints.Select(v => (double)v).ToList());
 		AddSliceCases(produced, tree, sorted, p, depth, constraints);
+
+		// Solve's linear solve, capped at each depth from the base depth up (the solution after
+		// each depth), as the harness runs it.
+		var system = new FemSystemIntegrator(PoissonFemConstraints.TestSignature, 1, 0.0, 1.0);
+		PoissonSolutionParameters parameters = p.Parameters;
+		int baseDepth = (int)parameters.BaseDepth;
+		for (int k = baseDepth; k <= depth; k++)
+		{
+			var solver = new PoissonSystem(tree, sorted, system, new PoissonPointEvaluator(PoissonFemConstraints.TestSignature, 1, k), p.Interpolation, p.PointWeight);
+			var solvedDepths = new List<int>();
+			float[] solution = solver.Solve(constraints, baseDepth, baseDepth, k, (int)parameters.Iters, (int)parameters.BaseVCycles, parameters.CgSolverAccuracy, constrainsDCTerm: true, new SynchronousProgress(solvedDepths.Add));
+			await Assert.That(string.Join(",", solvedDepths)).IsEqualTo(string.Join(",", Enumerable.Range(baseDepth, k - baseDepth + 1)));
+			produced.F("solve" + k, solution.Select(v => (double)v).ToList());
+		}
+
 		await Assert.That(CompareRun(cases, name, produced)).IsEqualTo(string.Empty);
+	}
+
+	[Test]
+	public async Task Solve_StopsWhenCancelled()
+	{
+		// C#-only: the solve checks the token before each depth, so a cancelled token stops it
+		// before any work.
+		JsonElement cases = OracleFixture.Load(SystemFixture).GetProperty("cases");
+		(FemTree tree, SortedTreeNodes sorted, Prepared p) = Finalize(cases, "system3", 3, new Cases("system3"));
+		var system = new FemSystemIntegrator(PoissonFemConstraints.TestSignature, 1, 0.0, 1.0);
+		var solver = new PoissonSystem(tree, sorted, system, new PoissonPointEvaluator(PoissonFemConstraints.TestSignature, 1, 3), p.Interpolation, p.PointWeight);
+		using var cancelled = new CancellationTokenSource();
+		cancelled.Cancel();
+		int baseDepth = (int)p.Parameters.BaseDepth;
+		await Assert.That(() => solver.Solve(new float[sorted.Size], baseDepth, baseDepth, 3, 8, 1, 1e-3f, constrainsDCTerm: true, cancellationToken: cancelled.Token)).Throws<OperationCanceledException>();
 	}
 
 	// The harness's solver-assembly block: per depth of at most SliceLimit nodes, the matrix rows,
@@ -294,6 +325,12 @@ public partial class PoissonTreeOracleTests
 
 		produced.F("regularmg", RegularMG(baseDepth, 1, 8));
 		produced.F("regularmgshallow", RegularMG(baseDepth - 1, 2, 3));
+	}
+
+	// An IProgress that reports on the calling thread, so the test sees every depth in order.
+	private sealed class SynchronousProgress(Action<int> report) : IProgress<int>
+	{
+		public void Report(int value) => report(value);
 	}
 
 	// The harness's Run up to and including finalizeForMultigrid, emitting its sorted slices.

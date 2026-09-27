@@ -7,8 +7,8 @@
 // point-constraint transfers (_setPointValuesFromProlongedSolution,
 // _updateRestrictedInterpolationConstraints) and the sliced Gauss-Seidel relaxation
 // (_solveSystemGS), and the base-depth multigrid's sparse algebra (downSampleMatrix, transpose,
-// multiply, setDiagonalR, the Galerkin products R * M * P) and its solve (_solveRegularMG).
-// Built and run by
+// multiply, setDiagonalR, the Galerkin products R * M * P) and its solve (_solveRegularMG),
+// and Solve's cascadic solveSystem. Built and run by
 // oracle/fixture_poisson_tree.py, which writes ColmapSharp.Tests/TestData/oracle/poisson_system.json
 // (read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests.System.cs). Not part of any
 // build. The shared set-up and output format are in oracle/poisson_harness.h; the stages up to
@@ -303,6 +303,22 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input) {
       };
       regularMG("regularmg", tree._baseDepth, 1, 8);
       regularMG("regularmgshallow", tree._baseDepth - 1, 2, 3);
+    }
+
+    // Solve's linear solve: solveSystem( Sigs , F , constraints , baseDepth , solveDepth ,
+    // _sInfo , iInfo ) with Solve's SolverInfo, run with maxSolveDepth capped at each depth from
+    // the base depth up: that is the solution after each depth of the full cascadic solve (the
+    // depths are solved coarse to fine, each from the ones before).
+    {
+      typename FEMTree<Dim, Real>::SolverInfo sInfo;
+      sInfo.cgDepth = 0, sInfo.cascadic = true, sInfo.vCycles = 1, sInfo.iters = params.iters, sInfo.cgAccuracy = params.cgSolverAccuracy, sInfo.verbose = false, sInfo.showResidual = false, sInfo.showGlobalResidual = SHOW_GLOBAL_RESIDUAL_NONE, sInfo.sliceBlockSize = 1;
+      sInfo.baseVCycles = params.baseVCycles;
+      for (int k = (int)params.baseDepth; k <= solveDepth; k++) {
+        DenseNodeData<Real, Sigs> solution = tree.solveSystem(Sigs(), S, constraints, params.baseDepth, k, sInfo, std::make_tuple(iInfo));
+        std::vector<double> out;
+        for (size_t i = 0; i < solution.size(); i++) out.push_back(solution[i]);
+        PrintF(name + "/solve" + std::to_string(k), out);
+      }
     }
   }
 
