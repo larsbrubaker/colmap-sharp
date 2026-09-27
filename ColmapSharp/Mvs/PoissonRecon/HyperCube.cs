@@ -324,7 +324,7 @@ public static class HyperCube
 	}
 
 	/// <summary>
-	/// The same offset linearized into the 3^D neighbor window, axis 0 fastest. Port of
+	/// The same offset linearized into the 3^D neighbor window, the last axis fastest (NeighborKey's order). Port of
 	/// <c>Cube::CellOffset( e , d )</c>.
 	/// </summary>
 	public static int CellOffset(int d, int k, int e, int ic)
