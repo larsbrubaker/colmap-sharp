@@ -37,9 +37,9 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
      only (needs a crafted input with leaves coarser than `FullDepth` beside finer ones).
      Tidy: zero-count faces still allocate a `LevelSetIsoEdge[0]`; `SetLevelSet` allocates
      a list per loop and an array per polygon.
-  2. Root-cause why the levelset harnesses at `-O0` change some triangle connectivity
-     checksums (levelset5/6/8) versus `-O1`; `-O2` only changes barycenter depths
-     (divergence 125). If it is another upstream uninitialized read, document it.
+  2. Harness hardening: pin `MakeInput`'s sin/cos in `oracle/poisson_harness.h` to
+     `__sincosf_stret` so fixtures don't depend on `-O` level (verified byte-identical at
+     `-O1`; see divergence 125's evidence).
   3. SurfaceTrimmer (SurfaceTrimmer.cpp, bit-exact via a harness on `PoissonMeshOutput`).
   4. The public in-memory `PoissonMeshing` API plus the file wrapper, and
      `poisson_meshing_test.cc` 1:1, with a Tier C pycolmap fixture. Colors follow the input's
