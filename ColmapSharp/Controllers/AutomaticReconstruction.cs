@@ -5,7 +5,8 @@
 // photos in, sparse models, fused dense points and a mesh out. It runs feature extraction
 // (FeatureExtraction.cs), matching (FeatureMatching.cs), sparse mapping (IncrementalPipeline,
 // HierarchicalPipeline or GlobalPipeline) and, per model, the dense stages in
-// AutomaticReconstruction.Dense.cs. The options and presets are in
+// AutomaticReconstruction.Dense.cs, the last of which (texturing, C#-only) is in
+// AutomaticReconstruction.Texture.cs. The options and presets are in
 // AutomaticReconstructionOptions.cs. Tests: ColmapSharp.Tests/Controllers/
 // AutomaticReconstructionTests.cs (automatic_reconstruction_test.cc).
 //
@@ -143,6 +144,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		optionManager.PatchMatchStereo.NumThreads = options.NumThreads;
 		optionManager.PoissonMeshing.NumThreads = options.NumThreads;
 		optionManager.DelaunayMeshing.NumThreads = options.NumThreads;
+		optionManager.MeshTextureMapping.NumThreads = options.NumThreads;
 
 		// COLMAP turns on loop detection with its downloadable vocabulary tree; without
 		// vocabulary-tree support sequential matching runs without loop detection
@@ -179,7 +181,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 	/// Receives a report at the start of every step (Done = Total = 0, Stage = the step's
 	/// COLMAP heading) and the steps' own progress. Stage is always one of
 	/// FeatureExtraction.ExtractionStage, FeatureMatching.MatchingStage, SparseStage,
-	/// DenseStage (undistortion and PatchMatch), FusionStage or MeshingStage; a sub-stage's
+	/// DenseStage (undistortion and PatchMatch), FusionStage, MeshingStage or TexturingStage; a sub-stage's
 	/// own name (e.g. "Geometric verification", "Image undistortion") is prefixed to Message.
 	/// Done/Total count the units of the sub-stage reporting, so they restart when it changes.
 	/// </summary>

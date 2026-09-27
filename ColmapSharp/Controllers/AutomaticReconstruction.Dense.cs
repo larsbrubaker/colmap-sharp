@@ -5,8 +5,11 @@
 // colmap/controllers/automatic_reconstruction.cc. Per sparse model it undistorts the images
 // (ColmapUndistorter.cs) into <workspace>/dense/<i>, runs PatchMatch stereo
 // (Mvs/PatchMatchController.cs), fuses the depth maps (Mvs/Fusion.cs) into fused.ply and
-// fused.ply.vis, and meshes them (Mvs/PoissonMeshing.cs or Mvs/DelaunayMeshing.cs). The rest
-// of the controller is in AutomaticReconstruction.cs.
+// fused.ply.vis, and meshes them (Mvs/PoissonMeshing.cs or Mvs/DelaunayMeshing.cs). With
+// Options.Texture on it then textures the mesh (AutomaticReconstruction.Texture.cs, C#-only,
+// docs/CPP_DIVERGENCES.md entry 135); a model whose fused.ply and mesh already exist is then
+// still undistorted and textured once per controller, since the texture lives in memory. The
+// rest of the controller is in AutomaticReconstruction.cs.
 //
 // Translation notes (docs/CPP_DIVERGENCES.md entry 134):
 // - COLMAP skips PatchMatch (and so everything after undistortion) without CUDA; the
@@ -67,7 +70,11 @@ public sealed partial class AutomaticReconstructionController
 				_ => Path.Combine(densePath, "meshed-advancing-front.ply"),
 			};
 
-			if (File.Exists(fusedPath) && File.Exists(meshingPath))
+			// Texturing needs the undistorted images even when the mesh exists, and its result
+			// lives in memory, so a model whose mesh exists is still textured once per controller.
+			bool haveDense = File.Exists(fusedPath) && File.Exists(meshingPath);
+			bool needTexture = NeedsTexturing(i);
+			if (haveDense && !needTexture)
 			{
 				// Skipping dense reconstruction for model i as it already exists.
 				continue;
@@ -105,31 +112,9 @@ public sealed partial class AutomaticReconstructionController
 				? undistortedImages
 				: new WorkspaceBitmapSource(undistortedImages, options.Masks);
 
-			// Patch match stereo (on the CPU; COLMAP needs CUDA here).
-
-			var patchMatchController = new PatchMatchController(
-				optionManager.PatchMatchStereo, densePath, "COLMAP", "", bitmaps);
-			patchMatchController.Run(CancellationToken, Under(DenseStage));
-
-			if (CheckIfStopped())
+			if (!haveDense && !RunDenseStages(i, densePath, fusedPath, meshingPath, bitmaps))
 			{
 				return;
-			}
-
-			// Stereo fusion.
-
-			if (!File.Exists(fusedPath))
-			{
-				StereoFusionOptions fusionOptions = optionManager.StereoFusion.Clone();
-				int numRegImages = reconstructionManager.Get(i).NumRegImages;
-				fusionOptions.MinNumPixels = Math.Min(numRegImages + 1, fusionOptions.MinNumPixels);
-				var fuser = new StereoFusion(fusionOptions, densePath, "COLMAP", "",
-					optionManager.PatchMatchStereo.GeomConsistency ? "geometric" : "photometric", bitmaps);
-				fuser.Run(CancellationToken, Forward<StereoFusionProgress>(
-					p => new ControllerProgress(FusionStage, p.NumFusedImages, p.NumImages, "")));
-
-				Ply.WriteBinaryPlyPoints(fusedPath, fuser.GetFusedPoints());
-				StereoFusion.WritePointsVisibility(fusedPath + ".vis", fuser.GetFusedPointsVisibility());
 			}
 
 			if (CheckIfStopped())
@@ -137,27 +122,72 @@ public sealed partial class AutomaticReconstructionController
 				return;
 			}
 
-			// Surface meshing.
-
-			if (!File.Exists(meshingPath))
+			if (needTexture)
 			{
-				IProgress<double>? meshingProgress = Forward<double>(
-					v => new ControllerProgress(MeshingStage, (int)(v * 1000), 1000, ""));
-				if (options.Mesher == AutomaticReconstructionOptions.MesherType.Poisson)
-				{
-					PoissonMeshing.Run(optionManager.PoissonMeshing, fusedPath, meshingPath, CancellationToken, meshingProgress);
-				}
-				else if (options.Mesher == AutomaticReconstructionOptions.MesherType.Delaunay)
-				{
-					RunDenseDelaunayMeshing(densePath, fusedPath, meshingPath, meshingProgress);
-				}
-				else
-				{
-					Log.Warning("Skipping advancing front meshing because CGAL is not available");
-					return;
-				}
+				RunTexturing(i, densePath, meshingPath, undistortedImages);
 			}
 		}
+	}
+
+	// PatchMatch, fusion and meshing of model i: the part of RunDenseMapper's loop after
+	// undistortion. Returns false where that loop returns (once stopped, and after the
+	// advancing-front warning).
+	private bool RunDenseStages(int i, string densePath, string fusedPath, string meshingPath, IBitmapSource bitmaps)
+	{
+		// Patch match stereo (on the CPU; COLMAP needs CUDA here).
+
+		var patchMatchController = new PatchMatchController(
+			optionManager.PatchMatchStereo, densePath, "COLMAP", "", bitmaps);
+		patchMatchController.Run(CancellationToken, Under(DenseStage));
+
+		if (CheckIfStopped())
+		{
+			return false;
+		}
+
+		// Stereo fusion.
+
+		if (!File.Exists(fusedPath))
+		{
+			StereoFusionOptions fusionOptions = optionManager.StereoFusion.Clone();
+			int numRegImages = reconstructionManager.Get(i).NumRegImages;
+			fusionOptions.MinNumPixels = Math.Min(numRegImages + 1, fusionOptions.MinNumPixels);
+			var fuser = new StereoFusion(fusionOptions, densePath, "COLMAP", "",
+				optionManager.PatchMatchStereo.GeomConsistency ? "geometric" : "photometric", bitmaps);
+			fuser.Run(CancellationToken, Forward<StereoFusionProgress>(
+				p => new ControllerProgress(FusionStage, p.NumFusedImages, p.NumImages, "")));
+
+			Ply.WriteBinaryPlyPoints(fusedPath, fuser.GetFusedPoints());
+			StereoFusion.WritePointsVisibility(fusedPath + ".vis", fuser.GetFusedPointsVisibility());
+		}
+
+		if (CheckIfStopped())
+		{
+			return false;
+		}
+
+		// Surface meshing.
+
+		if (!File.Exists(meshingPath))
+		{
+			IProgress<double>? meshingProgress = Forward<double>(
+				v => new ControllerProgress(MeshingStage, (int)(v * 1000), 1000, ""));
+			if (options.Mesher == AutomaticReconstructionOptions.MesherType.Poisson)
+			{
+				PoissonMeshing.Run(optionManager.PoissonMeshing, fusedPath, meshingPath, CancellationToken, meshingProgress);
+			}
+			else if (options.Mesher == AutomaticReconstructionOptions.MesherType.Delaunay)
+			{
+				RunDenseDelaunayMeshing(densePath, fusedPath, meshingPath, meshingProgress);
+			}
+			else
+			{
+				Log.Warning("Skipping advancing front meshing because CGAL is not available");
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	// Port of mvs::DenseDelaunayMeshing(options, dense_path, output_path): reads the

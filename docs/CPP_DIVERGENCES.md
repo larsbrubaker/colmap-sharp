@@ -2757,3 +2757,34 @@ masks and the undistorted images cannot be confused, even for a workspace at `ma
 `CSharpOnly_VideoDataKeepsImageNamesSelection` pins the video-data fix: with four of six
 consecutive views selected, only those four reach the database and are registered (the test
 fails when the restore after `ModifyForVideoData` is removed).
+
+## 135. AutomaticReconstructionController textures each dense mesh
+
+**What differs.** COLMAP's automatic reconstruction ends at the mesh; texturing is the separate
+`mesh_texturer` command (`RunMeshTexturer`, colmap/exe/mvs.cc). The port adds
+`AutomaticReconstructionOptions.Texture` (default true) and, per dense model after meshing, runs
+that command's body (`Controllers/AutomaticReconstruction.Texture.cs`) with
+`workspace_path = dense/<i>`, `input_path` = the Poisson or Delaunay mesh just written,
+`output_path = dense/<i>/<mesh name>-textured` (e.g. `meshed-delaunay-textured`), `output_type`
+BIN and default `MeshTextureMappingOptions` (only `num_threads` follows the controller's, like
+every other stage). Where that command reads image files and encodes `texture.png`, the port
+reads the controller's in-memory undistorted images and hands the atlas to the host's
+`AutomaticReconstructionOptions.TextureSink` under `.../texture.png` (not at all when the atlas
+is empty); `mesh.ply` (per-corner UVs, `comment TextureFile texture.png`) is written as COLMAP
+writes it. Every result is also kept in memory in
+`AutomaticReconstructionController.TexturedMeshes`, and progress is reported under a
+`"Texturing"` stage. Because that result lives in memory, a model whose `fused.ply` and mesh
+already exist is still undistorted again and textured once per controller (PatchMatch, fusion
+and meshing stay skipped); with `Texture` off, the skip is COLMAP's.
+
+**Why.** MatterCAD's photo-to-mesh result carries the photos' colors as a texture, so the
+automatic pipeline has to end in a textured mesh; running COLMAP's own texturer step with its
+own defaults keeps the result what `colmap automatic_reconstructor` followed by
+`colmap mesh_texturer` gives. Image encoding is left to the host throughout the library
+(entry 98).
+
+**Evidence.** `AutomaticReconstructionTests.CSharpOnly_DenseTexturedSceneGivesFusedPointsAndMesh`
+runs photos in to a textured Delaunay mesh: one textured model whose UVs number six floats per
+face and lie in [0, 1], more than half the faces assigned a view, a non-empty atlas that is the
+same bitmap the sink received, a `mesh.ply` whose header names `texture.png` and whose UVs match,
+and the `"Texturing"` stage last in the progress stages.

@@ -18,6 +18,10 @@
 // scene, the port and pycolmap 4.2.0's poisson_meshing both give an empty mesh at trim 10,
 // while pycolmap keeps 26325 faces at trim 0. Delaunay meshing has no density trim.
 //
+// The same run pins the C#-only texturing step (docs/CPP_DIVERGENCES.md entry 135): the mesh
+// comes out textured, with one UV in [0, 1] per face corner, most faces assigned a view, a
+// non-empty atlas in memory and at the host's sink, and mesh.ply written next to it.
+//
 // The same run pins the progress contract: a host grouping reports by Stage sees only the
 // controller's own stage headings, whatever the sub-stages call themselves.
 //
@@ -51,6 +55,7 @@ public partial class AutomaticReconstructionTests
 			images.Add($"view{i}.png", RenderTexturedScene(i, NumViews, width: 200, height: 150));
 		}
 
+		var textureSink = new InMemoryBitmapStore();
 		var options = new AutomaticReconstructionOptions
 		{
 			WorkspacePath = workspacePath,
@@ -60,6 +65,7 @@ public partial class AutomaticReconstructionTests
 			Dense = true,
 			RandomSeed = 1,
 			Mesher = AutomaticReconstructionOptions.MesherType.Delaunay,
+			TextureSink = textureSink,
 		};
 
 		var reconstructionManager = new ReconstructionManager();
@@ -79,6 +85,22 @@ public partial class AutomaticReconstructionTests
 		int numFusedPoints = File.Exists(fusedPath) ? Ply.ReadPly(fusedPath).Count : -1;
 		int numMeshFaces = File.Exists(meshPath) ? Ply.ReadPlyMesh(meshPath).Mesh.Faces.Count : -1;
 
+		// The textured mesh, in memory, at the sink and on disk.
+		int numTextured = controller.TexturedMeshes.Count;
+		TexturedModelMesh? textured = numTextured == 1 ? controller.TexturedMeshes[0] : null;
+		int texturedFaces = textured?.Mesh.Faces.Count ?? -1;
+		int numUvs = textured?.Texture.FaceUvs.Length ?? -1;
+		bool uvsInUnitRange = textured is not null && textured.Texture.FaceUvs.All(uv => uv >= 0 && uv <= 1);
+		int numAssignedFaces = textured?.Texture.FaceViewIds.Count(v => v >= 0) ?? -1;
+		int atlasWidth = textured?.Texture.TextureAtlas.Width ?? 0;
+		int atlasHeight = textured?.Texture.TextureAtlas.Height ?? 0;
+		string texturedDir = Path.Combine(densePath, "meshed-delaunay-textured");
+		string sinkKey = Path.Combine(texturedDir, AutomaticReconstructionController.TextureFileName);
+		bool sinkHasAtlas = textureSink.Exists(sinkKey) && ReferenceEquals(textureSink.Get(sinkKey), textured?.Texture.TextureAtlas);
+		PlyTexturedMesh? texturedPly = File.Exists(Path.Combine(texturedDir, "mesh.ply"))
+			? Ply.ReadPlyMesh(Path.Combine(texturedDir, "mesh.ply"))
+			: null;
+
 		try
 		{
 			Directory.Delete(testDir, recursive: true);
@@ -92,6 +114,18 @@ public partial class AutomaticReconstructionTests
 		await Assert.That(numRegImages).IsEqualTo(NumViews);
 		await Assert.That(numFusedPoints).IsGreaterThan(1000);
 		await Assert.That(numMeshFaces).IsGreaterThan(0);
+		await Assert.That(numTextured).IsEqualTo(1);
+		await Assert.That(textured!.ModelIdx).IsEqualTo(0);
+		await Assert.That(texturedFaces).IsEqualTo(numMeshFaces);
+		await Assert.That(numUvs).IsEqualTo(6 * texturedFaces);
+		await Assert.That(uvsInUnitRange).IsTrue();
+		await Assert.That(numAssignedFaces).IsGreaterThan(texturedFaces / 2);
+		await Assert.That(atlasWidth).IsGreaterThan(0);
+		await Assert.That(atlasHeight).IsGreaterThan(0);
+		await Assert.That(sinkHasAtlas).IsTrue();
+		await Assert.That(texturedPly).IsNotNull();
+		await Assert.That(texturedPly!.TextureFile).IsEqualTo(AutomaticReconstructionController.TextureFileName);
+		await Assert.That(texturedPly.FaceUvs.Count).IsEqualTo(numUvs);
 		await Assert.That(string.Join(" | ", stages.Stages())).IsEqualTo(string.Join(" | ", new[]
 		{
 			FeatureExtraction.ExtractionStage,
@@ -100,6 +134,7 @@ public partial class AutomaticReconstructionTests
 			AutomaticReconstructionController.DenseStage,
 			AutomaticReconstructionController.FusionStage,
 			AutomaticReconstructionController.MeshingStage,
+			AutomaticReconstructionController.TexturingStage,
 		}));
 	}
 

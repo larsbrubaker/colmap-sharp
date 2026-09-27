@@ -16,6 +16,8 @@
 // - vocab_tree_path, use_gpu, gpu_index and ba_backend are not options here: vocabulary-tree
 //   matching, GPU stages and the Caspar backend are out of scope (docs/CPP_DIVERGENCES.md
 //   entry 134).
+// - Texture / TextureSink and the MeshTextureMapping option set are C#-only: they add COLMAP's
+//   separate mesh_texturer step to the dense stages (docs/CPP_DIVERGENCES.md entry 135).
 // - `int /= 1.5` in ModifyForMediumQuality converts to double and truncates back, as C++
 //   does; the casts below reproduce that.
 
@@ -156,6 +158,21 @@ public sealed class AutomaticReconstructionOptions
 	/// <summary>The meshing algorithm to be used.</summary>
 	public MesherType Mesher { get; set; } = MesherType.Poisson;
 
+	/// <summary>
+	/// Whether to texture each dense model's mesh with the photos' colors after meshing (only
+	/// when <see cref="Dense"/> is on). C#-only: COLMAP's automatic reconstruction stops at the
+	/// mesh and textures only through its separate mesh_texturer command
+	/// (docs/CPP_DIVERGENCES.md entry 135).
+	/// </summary>
+	public bool Texture { get; set; } = true;
+
+	/// <summary>
+	/// Receives each texture atlas as dense/&lt;i&gt;/&lt;mesh name&gt;-textured/texture.png
+	/// for the host to encode (COLMAP's texturer writes that PNG itself), or null to keep the
+	/// atlases in memory only (AutomaticReconstructionController.TexturedMeshes).
+	/// </summary>
+	public IBitmapSink? TextureSink { get; set; }
+
 	/// <summary>The number of threads to use in all stages.</summary>
 	public int NumThreads { get; set; } = -1;
 
@@ -191,6 +208,8 @@ internal sealed class ReconstructionOptionSet
 
 	public DelaunayMeshingOptions DelaunayMeshing { get; private set; } = new();
 
+	public MeshTextureMappingOptions MeshTextureMapping { get; private set; } = new();
+
 	/// <summary>Port of OptionManager::ResetOptions(reset_paths = false).</summary>
 	public void ResetOptions()
 	{
@@ -205,6 +224,7 @@ internal sealed class ReconstructionOptionSet
 		StereoFusion = new();
 		PoissonMeshing = new();
 		DelaunayMeshing = new();
+		MeshTextureMapping = new();
 	}
 
 	/// <summary>Port of OptionManager::ModifyForIndividualData.</summary>
