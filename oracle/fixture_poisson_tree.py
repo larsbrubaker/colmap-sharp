@@ -11,6 +11,8 @@
 #                       (PoissonFemConstraints)
 #   poisson_levelset.json oracle/poisson_levelset_harness.cc: what follows the linear solve
 #                       (PoissonImplicitEvaluator, the iso-value; PoissonCornerEvaluator)
+#   poisson_hypercube.json oracle/poisson_hypercube_harness.cc: the level-set extractor's
+#                       hypercube algebra and tables (MarchingCubes.h, FEMTree.LevelSet.inl)
 #   poisson_libm.json   oracle/poisson_libm_harness.cc: libm's pow( x , 1./3 ) and logf
 # Tier A, bit-exact. Read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests*.cs.
 #
@@ -53,6 +55,7 @@ HARNESSES = [
     ("poisson_libm_harness.cc", "poisson_libm.json", add_correct_pow),
     ("poisson_system_harness.cc", "poisson_system.json", None),
     ("poisson_levelset_harness.cc", "poisson_levelset.json", None),
+    ("poisson_hypercube_harness.cc", "poisson_hypercube.json", None),
 ]
 
 if __name__ == "__main__":
