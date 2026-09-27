@@ -29,6 +29,17 @@ namespace ColmapSharp.Compute;
 /// device throws on this hazard rather than letting it corrupt results silently.
 /// </para>
 /// <para>
+/// <b>Writable bindings are exclusive.</b> WebGPU checks buffer usage per whole buffer for the
+/// whole dispatch, so a buffer bound as <see cref="ComputeBindingType.Storage"/> (read_write) in
+/// any of a dispatch's groups may not be bound again anywhere in that dispatch: not by another
+/// binding in any group, not as read-only, not over a disjoint range. <see cref="Dispatch"/>
+/// throws when it is. Read-only and uniform bindings may share a buffer freely.
+/// </para>
+/// <para>
+/// <b>Buffers.</b> Both buffer kinds can be written and read back: an adapter creates every
+/// buffer with <c>CopySrc | CopyDst</c> usage in addition to <c>Storage</c> or <c>Uniform</c>.
+/// </para>
+/// <para>
 /// <b>Alignment.</b> Buffer sizes, write and read offsets and lengths, and binding sizes are
 /// multiples of 4. Binding offsets are multiples of
 /// <see cref="ComputeDeviceLimits.MinStorageBufferOffsetAlignment"/>.
@@ -39,25 +50,45 @@ namespace ColmapSharp.Compute;
 /// return stale or zero bytes.
 /// </para>
 /// <para>
+/// <b>Errors.</b> Argument and state errors (a broken rule above, a disposed or foreign handle)
+/// throw synchronously from the call. GPU execution and map failures - including a WGSL compile
+/// or pipeline error the device only learns of asynchronously - fault the task returned by
+/// <see cref="FlushAsync"/> or <see cref="ReadBufferAsync"/>.
+/// </para>
+/// <para>
 /// <b>Async.</b> <see cref="FlushAsync"/> and <see cref="ReadBufferAsync"/> complete when the GPU
 /// has finished. On a desktop device they may complete synchronously; in the browser they
 /// genuinely wait for the JS event loop, which a blocked thread would never return to. So when
 /// <see cref="SupportsBlockingWait"/> is false a caller must <c>await</c> them and never block on
-/// them. A canceled flush or read may or may not have submitted the recorded work; the caller
-/// abandons the computation (disposes its handles) rather than continuing it.
+/// them. Cancellation is observed only on entry, before anything is submitted: a call whose
+/// token is already canceled still submits every pending write and dispatch, then completes as
+/// canceled (a canceled read copies nothing into its destination); a token canceled after the
+/// call has submitted does not cut the wait short. So after any flush or read completes -
+/// successfully, canceled or faulted - nothing is pending and the device is reusable.
 /// </para>
 /// <para>
-/// <b>Threading.</b> Not thread-safe. One logical thread of control records, flushes and reads;
-/// calls never overlap. Continuing on another thread after an <c>await</c> is fine.
+/// <b>Threading.</b> Not thread-safe, and not safe against the host's own use of the underlying
+/// GPU device either. Every call must be serialized with any other use of that device: one
+/// caller at a time, and the host must not interleave its own rendering or other work on the
+/// same device while compute work is being recorded (between the first <see cref="Dispatch"/>
+/// and the flush or read that submits it). A host should give compute its own device.
+/// Continuing on another thread after an <c>await</c> is fine only if the host's device allows
+/// calls from that thread.
 /// </para>
 /// <para>
 /// <b>Ownership.</b> The host owns the device and disposes it; callers dispose only the handles
-/// they created.
+/// they created. Disposing a handle that recorded or in-flight work binds is allowed: WebGPU
+/// releases are reference counted, so that work keeps it alive until it has run. A disposed
+/// handle cannot be used in any later call.
 /// </para>
 /// </summary>
 public interface IComputeDevice
 {
-	/// <summary>The limits this device enforces. Constant for the device's lifetime.</summary>
+	/// <summary>
+	/// The limits this device enforces. Fixed when the device is created and constant for its
+	/// lifetime; <see cref="ComputeDeviceLimits.MinStorageBufferOffsetAlignment"/> is a positive
+	/// power of two.
+	/// </summary>
 	ComputeDeviceLimits Limits { get; }
 
 	/// <summary>
@@ -93,11 +124,18 @@ public interface IComputeDevice
 	void WriteBuffer(IComputeBuffer buffer, long offset, ReadOnlySpan<byte> data);
 
 	/// <summary>Compiles a kernel from WGSL with an explicit bind group layout.</summary>
-	/// <param name="descriptor">Source, entry point and bindings. Groups run 0, 1, ... with no gap;
-	/// no (group, binding) repeats; at most
-	/// <see cref="ComputeDeviceLimits.MaxStorageBuffersPerShaderStage"/> storage bindings.</param>
-	/// <exception cref="ArgumentException">The descriptor breaks one of those rules, or the WGSL
-	/// does not compile.</exception>
+	/// <remarks>
+	/// A WGSL compile or pipeline creation error may throw from this call, or - where the device
+	/// reports it asynchronously, as browser WebGPU does - fault the task of a later
+	/// <see cref="FlushAsync"/> or <see cref="ReadBufferAsync"/> instead. A caller handles both.
+	/// </remarks>
+	/// <param name="descriptor">Source, entry point and bindings. Groups run 0, 1, ... with no gap
+	/// and number at most <see cref="ComputeDeviceLimits.MaxBindGroups"/>; no (group, binding)
+	/// repeats; binding indices are below <see cref="ComputeDeviceLimits.MaxBindingsPerBindGroup"/>;
+	/// at most <see cref="ComputeDeviceLimits.MaxStorageBuffersPerShaderStage"/> storage and
+	/// <see cref="ComputeDeviceLimits.MaxUniformBuffersPerShaderStage"/> uniform bindings.</param>
+	/// <exception cref="ArgumentException">The descriptor breaks one of those rules, or the device
+	/// reports synchronously that the WGSL does not compile.</exception>
 	IComputeKernel CreateKernel(in ComputeKernelDescriptor descriptor);
 
 	/// <summary>
@@ -124,7 +162,8 @@ public interface IComputeDevice
 	/// <param name="x">Workgroups along X.</param>
 	/// <param name="y">Workgroups along Y.</param>
 	/// <param name="z">Workgroups along Z.</param>
-	/// <exception cref="ArgumentException">The groups do not match the kernel's layout.</exception>
+	/// <exception cref="ArgumentException">The groups do not match the kernel's layout, or a buffer
+	/// bound read_write is bound again in the same dispatch.</exception>
 	/// <exception cref="ArgumentOutOfRangeException">A count exceeds
 	/// <see cref="ComputeDeviceLimits.MaxComputeWorkgroupsPerDimension"/>.</exception>
 	/// <exception cref="ObjectDisposedException">The kernel, a bind group, or a buffer one of them
@@ -135,10 +174,9 @@ public interface IComputeDevice
 	/// Submits every pending write and recorded dispatch, and completes when the GPU has finished
 	/// them. Must be awaited, not blocked on, when <see cref="SupportsBlockingWait"/> is false.
 	/// </summary>
-	/// <param name="cancellationToken">Cancels the wait; see the async rule on <see cref="IComputeDevice"/>.</param>
-	/// <exception cref="OperationCanceledException">The token was canceled.</exception>
-	/// <exception cref="InvalidOperationException">A recorded dispatch binds a buffer that has
-	/// since been disposed.</exception>
+	/// <param name="cancellationToken">Checked on entry only; see the async rule on <see cref="IComputeDevice"/>.</param>
+	/// <returns>A task that is canceled if the token was canceled on entry (the work is still
+	/// submitted), and faults if the GPU reports an execution or pipeline error.</returns>
 	ValueTask FlushAsync(CancellationToken cancellationToken = default);
 
 	/// <summary>
@@ -149,9 +187,11 @@ public interface IComputeDevice
 	/// <param name="buffer">The buffer to read, of either kind.</param>
 	/// <param name="offset">Byte offset, a multiple of 4.</param>
 	/// <param name="destination">Where the bytes go; its length, a multiple of 4, is how many are read.</param>
-	/// <param name="cancellationToken">Cancels the wait; see the async rule on <see cref="IComputeDevice"/>.</param>
+	/// <param name="cancellationToken">Checked on entry only; see the async rule on <see cref="IComputeDevice"/>.</param>
+	/// <returns>A task that completes once <paramref name="destination"/> holds the bytes; nothing
+	/// is written to it before then. Canceled (with the pending work still submitted and nothing
+	/// copied) if the token was canceled on entry; faulted on a GPU execution or map failure.</returns>
 	/// <exception cref="ArgumentException">The range is misaligned or runs past the buffer.</exception>
 	/// <exception cref="ObjectDisposedException">The buffer has been disposed.</exception>
-	/// <exception cref="OperationCanceledException">The token was canceled.</exception>
 	ValueTask ReadBufferAsync(IComputeBuffer buffer, long offset, Memory<byte> destination, CancellationToken cancellationToken = default);
 }

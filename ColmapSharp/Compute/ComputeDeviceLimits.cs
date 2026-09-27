@@ -34,7 +34,7 @@ namespace ColmapSharp.Compute;
 /// <param name="MinStorageBufferOffsetAlignment">The alignment, in bytes, of every
 /// <see cref="ComputeBufferBinding.Offset"/> (<c>minStorageBufferOffsetAlignment</c>). The seam
 /// applies it to uniform bindings too, so a host adapter reports the larger of WebGPU's storage
-/// and uniform offset alignments here (both are 256 by default).</param>
+/// and uniform offset alignments here (both are 256 by default). A positive power of two.</param>
 public readonly record struct ComputeDeviceLimits(
 	long MaxBufferSize,
 	long MaxStorageBufferBindingSize,
@@ -44,10 +44,32 @@ public readonly record struct ComputeDeviceLimits(
 	int MaxComputeInvocationsPerWorkgroup,
 	int MinStorageBufferOffsetAlignment)
 {
+	// The three limits below were added after the positional ones; they are init properties
+	// with their WebGPU defaults so the seven-argument constructor keeps its meaning.
+
+	/// <summary>
+	/// The most bind groups one kernel may declare, so its groups run 0 to this minus one
+	/// (<c>maxBindGroups</c>).
+	/// </summary>
+	public int MaxBindGroups { get; init; } = 4;
+
+	/// <summary>
+	/// The most <see cref="ComputeBindingType.Uniform"/> bindings, across all groups, one kernel
+	/// may declare (<c>maxUniformBuffersPerShaderStage</c>).
+	/// </summary>
+	public int MaxUniformBuffersPerShaderStage { get; init; } = 12;
+
+	/// <summary>
+	/// One more than the largest binding index a kernel may declare within a group
+	/// (<c>maxBindingsPerBindGroup</c>, which WebGPU applies to binding numbers).
+	/// </summary>
+	public int MaxBindingsPerBindGroup { get; init; } = 1000;
+
 	/// <summary>
 	/// The WebGPU default limits: 256 MiB buffers, 128 MiB storage bindings, 8 storage buffers
 	/// per stage, 64 KiB uniform bindings, 65535 workgroups per dimension, 256 invocations per
-	/// workgroup, 256-byte binding offsets. Every WebGPU device supports at least these.
+	/// workgroup, 256-byte binding offsets, 4 bind groups, 12 uniform buffers per stage, binding
+	/// indices below 1000. Every WebGPU device supports at least these.
 	/// </summary>
 	public static ComputeDeviceLimits Defaults { get; } = new(
 		MaxBufferSize: 268435456,

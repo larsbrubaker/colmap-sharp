@@ -67,8 +67,9 @@ public readonly record struct ComputeBufferBinding(int Binding, IComputeBuffer B
 
 /// <summary>
 /// A GPU buffer. Its contents start as the initial data given at creation, zero after it.
-/// Disposing it releases the GPU memory; it must not be disposed while a dispatch that binds it
-/// is recorded but not yet flushed.
+/// Every buffer can be written and read back, whatever its kind. Disposing it releases the
+/// caller's reference; work already recorded or in flight that binds it keeps it alive until
+/// that work has run.
 /// </summary>
 public interface IComputeBuffer : IDisposable
 {
@@ -91,7 +92,8 @@ public interface IComputeKernel : IDisposable
 
 /// <summary>
 /// A set of buffer ranges bound to one group index of a kernel's layout. Holds its buffers; a
-/// bind group whose buffer has been disposed can no longer be dispatched.
+/// bind group whose buffer has been disposed can no longer be dispatched (work already recorded
+/// with it still runs).
 /// </summary>
 public interface IComputeBindGroup : IDisposable
 {

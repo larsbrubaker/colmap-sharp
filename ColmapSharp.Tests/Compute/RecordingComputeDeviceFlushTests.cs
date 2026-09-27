@@ -3,8 +3,8 @@
 // RecordingComputeDeviceFlushTests: C#-only tests (COLMAP has no compute seam) of the
 // submission side of ColmapSharp/Compute/Testing/RecordingComputeDevice.cs: the command
 // stream's order, what a flush and a readback carry, the write-after-dispatch hazard the
-// IComputeDevice contract forbids, disposing a buffer a pending dispatch binds, the browser
-// (no blocking wait) completion, and cancellation. Argument rules are in
+// IComputeDevice contract forbids, disposing handles a pending dispatch binds, the browser
+// (no blocking wait) completion, and how cancellation and GPU faults leave the device. Argument rules are in
 // RecordingComputeDeviceTests.cs, whose kernel helpers these reuse.
 
 using ColmapSharp.Compute;
@@ -131,37 +131,105 @@ public class RecordingComputeDeviceFlushTests
 	}
 
 	[Test]
-	public async Task Flush_AfterDisposingABufferAPendingDispatchBinds_Throws()
+	public async Task DisposingHandlesAPendingDispatchBinds_IsAllowed()
 	{
+		// WebGPU releases are reference counted: work already recorded keeps its buffers,
+		// bind groups and pipeline alive, so a caller may drop them as soon as it has dispatched.
 		var s = Create();
 		s.Device.Dispatch(s.Kernel, new[] { s.Group }, 1);
 		s.Storage.Dispose();
-		await Assert.ThrowsAsync<InvalidOperationException>(async () => await s.Device.FlushAsync());
-		await Assert.That(s.Device.CommandsOf<FlushCommand>().Count).IsEqualTo(0);
+		s.Uniform.Dispose();
+		s.Group.Dispose();
+		s.Kernel.Dispose();
+		await s.Device.FlushAsync();
+		await Assert.That(s.Device.CommandsOf<FlushCommand>().Single().DispatchCount).IsEqualTo(1);
 	}
 
 	[Test]
-	public async Task CanceledFlush_SubmitsNothing()
+	public async Task CanceledFlush_SubmitsThePendingWorkAndLeavesTheDeviceReusable()
 	{
 		var s = Create();
 		s.Device.Dispatch(s.Kernel, new[] { s.Group }, 1);
 		using var cancel = new CancellationTokenSource();
 		cancel.Cancel();
 		await Assert.ThrowsAsync<OperationCanceledException>(async () => await s.Device.FlushAsync(cancel.Token));
-		await Assert.That(s.Device.CommandsOf<FlushCommand>().Count).IsEqualTo(0);
-		await Assert.That(s.Device.PendingDispatchCount).IsEqualTo(1);
+		await Assert.That(s.Device.CommandsOf<FlushCommand>().Single().DispatchCount).IsEqualTo(1);
+		await Assert.That(s.Device.PendingDispatchCount).IsEqualTo(0);
+
+		// Nothing is pending, so the buffers the dispatch bound may be written again.
+		s.Device.WriteBuffer(s.Uniform, 0, new byte[16]);
 	}
 
 	[Test]
-	public async Task CanceledRead_LeavesTheDestinationUntouched()
+	public async Task CanceledRead_SubmitsThePendingWorkAndLeavesTheDestinationUntouched()
 	{
-		var s = Create();
+		var s = Create(supportsBlockingWait: false);
+		s.Device.Dispatch(s.Kernel, new[] { s.Group }, 1);
 		using var cancel = new CancellationTokenSource();
 		cancel.Cancel();
 		var destination = new byte[] { 9, 9, 9, 9 };
 		await Assert.ThrowsAsync<OperationCanceledException>(async () => await s.Device.ReadBufferAsync(s.Storage, 0, destination, cancel.Token));
 		await Assert.That(destination).IsEquivalentTo(new byte[] { 9, 9, 9, 9 }, CollectionOrdering.Matching);
 		await Assert.That(s.Device.CommandsOf<ReadBufferCommand>().Count).IsEqualTo(0);
+		await Assert.That(s.Device.CommandsOf<FlushCommand>().Single().DispatchCount).IsEqualTo(1);
+		await Assert.That(s.Device.PendingDispatchCount).IsEqualTo(0);
+		s.Device.WriteBuffer(s.Storage, 0, new byte[4]);
+	}
+
+	[Test]
+	public async Task CancelingAfterSubmission_DoesNotCancelTheWait()
+	{
+		// Cancellation is observed only before anything is submitted.
+		var s = Create(supportsBlockingWait: false);
+		using var cancel = new CancellationTokenSource();
+		var destination = new byte[4];
+		var read = s.Device.ReadBufferAsync(s.Storage, 0, destination, cancel.Token);
+		cancel.Cancel();
+		await read;
+		await Assert.That(destination).IsEquivalentTo(new byte[] { 1, 2, 3, 4 }, CollectionOrdering.Matching);
+	}
+
+	[Test]
+	public async Task FaultedSubmit_FaultsTheTaskAndLeavesTheDeviceReusable()
+	{
+		foreach (var supportsBlockingWait in new[] { true, false })
+		{
+			var s = Create(supportsBlockingWait);
+			s.Device.Dispatch(s.Kernel, new[] { s.Group }, 1);
+			s.Device.FaultNextSubmit(new InvalidOperationException("pipeline compile failed"));
+
+			// A GPU-side failure faults the returned task rather than throwing from the call.
+			var flush = s.Device.FlushAsync();
+			var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () => await flush);
+			await Assert.That(exception!.Message).IsEqualTo("pipeline compile failed");
+			await Assert.That(s.Device.PendingDispatchCount).IsEqualTo(0);
+
+			// The fault is spent; the next flush and read succeed.
+			s.Device.WriteBuffer(s.Uniform, 0, new byte[16]);
+			await s.Device.FlushAsync();
+			s.Device.Dispatch(s.Kernel, new[] { s.Group }, 1);
+			s.Device.FaultNextSubmit(new InvalidOperationException("device lost"));
+			var destination = new byte[] { 9, 9, 9, 9 };
+			var read = s.Device.ReadBufferAsync(s.Storage, 0, destination);
+			await Assert.ThrowsAsync<InvalidOperationException>(async () => await read);
+			await Assert.That(destination).IsEquivalentTo(new byte[] { 9, 9, 9, 9 }, CollectionOrdering.Matching);
+			await Assert.That(s.Device.PendingDispatchCount).IsEqualTo(0);
+		}
+	}
+
+	[Test]
+	public async Task WithoutBlockingWait_ReadCopiesTheSubmittedBytesOnlyOnCompletion()
+	{
+		var s = Create(supportsBlockingWait: false);
+		var destination = new byte[4];
+		var read = s.Device.ReadBufferAsync(s.Storage, 0, destination);
+
+		// Nothing lands in the destination before the task completes, and a write queued after
+		// the read was submitted does not reach it.
+		await Assert.That(destination).IsEquivalentTo(new byte[4], CollectionOrdering.Matching);
+		s.Device.WriteBuffer(s.Storage, 0, new byte[] { 7, 7, 7, 7 });
+		await read;
+		await Assert.That(destination).IsEquivalentTo(new byte[] { 1, 2, 3, 4 }, CollectionOrdering.Matching);
 	}
 
 	[Test]

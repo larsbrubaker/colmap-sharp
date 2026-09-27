@@ -7,9 +7,12 @@
 // run, in what order, how many flushes. It runs no kernels; a read returns what was uploaded.
 //
 // It is deliberately strict about every rule IComputeDevice states - limits, alignment,
-// layouts, disposed handles, and the write-after-dispatch hazard - because a real WebGPU
+// layouts, disposed handles, writable-binding aliasing, and the write-after-dispatch hazard -
+// because a real WebGPU
 // device reports most of those out of band and a readback then returns stale or zero bytes.
 // A test that never sees a rule enforced proves nothing about a caller that keeps it.
+
+using System.Numerics;
 
 namespace ColmapSharp.Compute.Testing;
 
@@ -25,13 +28,33 @@ public sealed class RecordingComputeDevice : IComputeDevice
 	// WriteBuffer must not touch until the next flush submits those dispatches.
 	private readonly List<DispatchCommand> pendingDispatches = new();
 	private readonly HashSet<RecordingComputeBuffer> pendingBoundBuffers = new();
+	private readonly ComputeDeviceLimits limits = ComputeDeviceLimits.Defaults;
 	private int bufferCount;
 
+	// Set by FaultNextSubmit: the GPU-side failure (a pipeline that failed to compile, a lost
+	// device) the next submission reports through its task.
+	private Exception? nextSubmitFault;
+
 	/// <summary>
-	/// The limits this double reports and enforces. Settable so a test can pin small limits and
-	/// prove a caller that plans against them really stays inside them.
+	/// The limits this double reports and enforces, fixed at construction (an object
+	/// initializer) so a test can pin small limits and prove a caller that plans against them
+	/// really stays inside them.
 	/// </summary>
-	public ComputeDeviceLimits Limits { get; set; } = ComputeDeviceLimits.Defaults;
+	/// <exception cref="ArgumentException">The offset alignment is not a positive power of two.</exception>
+	public ComputeDeviceLimits Limits
+	{
+		get => this.limits;
+		init
+		{
+			var alignment = value.MinStorageBufferOffsetAlignment;
+			if (alignment <= 0 || !BitOperations.IsPow2(alignment))
+			{
+				throw new ArgumentException($"MinStorageBufferOffsetAlignment ({alignment}) must be a positive power of two.", nameof(value));
+			}
+
+			this.limits = value;
+		}
+	}
 
 	/// <summary>
 	/// What the double reports. When false (a browser device) <see cref="FlushAsync"/> and
@@ -51,6 +74,19 @@ public sealed class RecordingComputeDevice : IComputeDevice
 	public IReadOnlyList<T> CommandsOf<T>()
 		where T : ComputeCommand
 		=> this.commands.OfType<T>().ToList();
+
+	/// <summary>
+	/// Makes the next submission (the next <see cref="FlushAsync"/> or
+	/// <see cref="ReadBufferAsync"/>) fail on the "GPU": it still submits everything pending,
+	/// then its task faults with <paramref name="fault"/>, as a real device reports a WGSL
+	/// compile error or a lost device. Lets a test prove its caller handles such a fault.
+	/// </summary>
+	/// <param name="fault">The exception the task faults with.</param>
+	public void FaultNextSubmit(Exception fault)
+	{
+		ArgumentNullException.ThrowIfNull(fault);
+		this.nextSubmitFault = fault;
+	}
 
 	/// <summary>Drops the recorded commands so a test can measure only what follows.</summary>
 	public void ClearRecording() => this.commands.Clear();
@@ -113,6 +149,7 @@ public sealed class RecordingComputeDevice : IComputeDevice
 
 		var groupCount = 0;
 		var storageCount = 0;
+		var uniformCount = 0;
 		var seen = new HashSet<(int Group, int Binding)>();
 		foreach (var binding in descriptor.Bindings)
 		{
@@ -127,11 +164,30 @@ public sealed class RecordingComputeDevice : IComputeDevice
 					$"Kernel '{descriptor.Label}' declares @group({binding.Group}) @binding({binding.Binding}) twice.", nameof(descriptor));
 			}
 
+			if (binding.Binding >= this.Limits.MaxBindingsPerBindGroup)
+			{
+				throw new ArgumentException(
+					$"Kernel '{descriptor.Label}' declares @binding({binding.Binding}); this device allows binding indices below"
+					+ $" {this.Limits.MaxBindingsPerBindGroup}.",
+					nameof(descriptor));
+			}
+
 			groupCount = Math.Max(groupCount, binding.Group + 1);
-			if (binding.Type != ComputeBindingType.Uniform)
+			if (binding.Type == ComputeBindingType.Uniform)
+			{
+				uniformCount++;
+			}
+			else
 			{
 				storageCount++;
 			}
+		}
+
+		if (groupCount > this.Limits.MaxBindGroups)
+		{
+			throw new ArgumentException(
+				$"Kernel '{descriptor.Label}' uses {groupCount} bind groups; this device allows at most {this.Limits.MaxBindGroups}.",
+				nameof(descriptor));
 		}
 
 		var layouts = new IReadOnlyList<ComputeKernelBinding>[groupCount];
@@ -154,6 +210,14 @@ public sealed class RecordingComputeDevice : IComputeDevice
 			throw new ArgumentException(
 				$"Kernel '{descriptor.Label}' declares {storageCount} storage buffers; this device allows at most"
 				+ $" {this.Limits.MaxStorageBuffersPerShaderStage} per shader stage.",
+				nameof(descriptor));
+		}
+
+		if (uniformCount > this.Limits.MaxUniformBuffersPerShaderStage)
+		{
+			throw new ArgumentException(
+				$"Kernel '{descriptor.Label}' declares {uniformCount} uniform buffers; this device allows at most"
+				+ $" {this.Limits.MaxUniformBuffersPerShaderStage} per shader stage.",
 				nameof(descriptor));
 		}
 
@@ -232,6 +296,7 @@ public sealed class RecordingComputeDevice : IComputeDevice
 			bound[i] = bindGroup;
 		}
 
+		RejectWritableAliasing(owner, bound);
 		ValidateWorkgroups(this.Limits, x, nameof(x));
 		ValidateWorkgroups(this.Limits, y, nameof(y));
 		ValidateWorkgroups(this.Limits, z, nameof(z));
@@ -251,13 +316,12 @@ public sealed class RecordingComputeDevice : IComputeDevice
 	/// <inheritdoc/>
 	public ValueTask FlushAsync(CancellationToken cancellationToken = default)
 	{
-		if (cancellationToken.IsCancellationRequested)
-		{
-			return ValueTask.FromCanceled(cancellationToken);
-		}
-
-		this.commands.Add(new FlushCommand(this.Submit()));
-		return this.Complete(cancellationToken);
+		// Cancellation is observed only here, before submitting, and even then everything
+		// pending is submitted so the device is left with nothing pending.
+		var canceled = cancellationToken.IsCancellationRequested;
+		var (dispatchCount, fault) = this.Submit();
+		this.commands.Add(new FlushCommand(dispatchCount));
+		return this.Complete(fault, canceled, cancellationToken, onSuccess: null);
 	}
 
 	/// <inheritdoc/>
@@ -265,44 +329,107 @@ public sealed class RecordingComputeDevice : IComputeDevice
 	{
 		var source = this.Own(buffer, nameof(buffer));
 		ValidateRange(source, offset, destination.Length, "read");
-		if (cancellationToken.IsCancellationRequested)
+		var canceled = cancellationToken.IsCancellationRequested;
+		var (dispatchCount, fault) = this.Submit();
+		if (canceled)
+		{
+			// The pending work went out, but the copy to the readback buffer did not.
+			this.commands.Add(new FlushCommand(dispatchCount));
+			return this.Complete(fault, canceled, cancellationToken, onSuccess: null);
+		}
+
+		// The GPU copies the bytes as of submission; the caller sees them only when the map
+		// completes, so a browser caller cannot mistake an unfinished read for a finished one.
+		var snapshot = new byte[destination.Length];
+		source.Read(offset, snapshot);
+		this.commands.Add(new ReadBufferCommand(source, offset, destination.Length, dispatchCount));
+		return this.Complete(fault, canceled: false, cancellationToken, () => snapshot.CopyTo(destination.Span));
+	}
+
+	// Rejects a dispatch that binds a buffer read_write and also binds it anywhere else: WebGPU
+	// tracks usage per whole buffer per dispatch, so even disjoint ranges fail validation.
+	private static void RejectWritableAliasing(RecordingComputeKernel kernel, RecordingComputeBindGroup[] bound)
+	{
+		var bindingCounts = new Dictionary<RecordingComputeBuffer, int>();
+		var writable = new List<RecordingComputeBuffer>();
+		for (var i = 0; i < bound.Length; i++)
+		{
+			var layout = kernel.GroupLayouts[i];
+			var entries = bound[i].Entries;
+			for (var e = 0; e < entries.Count; e++)
+			{
+				var buffer = (RecordingComputeBuffer)entries[e].Buffer;
+				bindingCounts[buffer] = bindingCounts.GetValueOrDefault(buffer) + 1;
+				if (layout[e].Type == ComputeBindingType.Storage)
+				{
+					writable.Add(buffer);
+				}
+			}
+		}
+
+		foreach (var buffer in writable)
+		{
+			if (bindingCounts[buffer] > 1)
+			{
+				throw new ArgumentException(
+					$"{kernel} binds {buffer} read_write and binds it again in the same dispatch. WebGPU forbids any other"
+					+ " binding of a buffer bound read_write, even of a disjoint range; split it into separate buffers.",
+					"groups");
+			}
+		}
+	}
+
+	/// <summary>
+	/// Hands the pending dispatches to the (absent) GPU. Always leaves nothing pending, even when
+	/// the submission faults. Returns how many dispatches went and the fault to report, if any.
+	/// </summary>
+	private (int DispatchCount, Exception? Fault) Submit()
+	{
+		var count = this.pendingDispatches.Count;
+		var fault = this.nextSubmitFault;
+		this.nextSubmitFault = null;
+		this.pendingDispatches.Clear();
+		this.pendingBoundBuffers.Clear();
+		return (count, fault);
+	}
+
+	// A GPU fault wins over cancellation: it is the more important thing for the caller to see.
+	private ValueTask Complete(Exception? fault, bool canceled, CancellationToken cancellationToken, Action? onSuccess)
+	{
+		if (!this.SupportsBlockingWait)
+		{
+			return new ValueTask(CompleteLater(fault, canceled, cancellationToken, onSuccess));
+		}
+
+		if (fault != null)
+		{
+			return ValueTask.FromException(fault);
+		}
+
+		if (canceled)
 		{
 			return ValueTask.FromCanceled(cancellationToken);
 		}
 
-		var dispatchCount = this.Submit();
-		source.Read(offset, destination.Span);
-		this.commands.Add(new ReadBufferCommand(source, offset, destination.Length, dispatchCount));
-		return this.Complete(cancellationToken);
+		onSuccess?.Invoke();
+		return default;
 	}
-
-	/// <summary>Hands the pending dispatches to the (absent) GPU; returns how many there were.</summary>
-	private int Submit()
-	{
-		foreach (var buffer in this.pendingBoundBuffers)
-		{
-			if (buffer.IsDisposed)
-			{
-				// WebGPU rejects a submit whose commands use a destroyed buffer.
-				throw new InvalidOperationException(
-					$"{buffer} was disposed while a dispatch that binds it was recorded but not flushed.");
-			}
-		}
-
-		var count = this.pendingDispatches.Count;
-		this.pendingDispatches.Clear();
-		this.pendingBoundBuffers.Clear();
-		return count;
-	}
-
-	private ValueTask Complete(CancellationToken cancellationToken)
-		=> this.SupportsBlockingWait ? default : new ValueTask(CompleteLater(cancellationToken));
 
 	// The browser's completion: control returns to the caller (the JS event loop) first.
-	private static async Task CompleteLater(CancellationToken cancellationToken)
+	private static async Task CompleteLater(Exception? fault, bool canceled, CancellationToken cancellationToken, Action? onSuccess)
 	{
 		await Task.Yield();
-		cancellationToken.ThrowIfCancellationRequested();
+		if (fault != null)
+		{
+			throw fault;
+		}
+
+		if (canceled)
+		{
+			throw new OperationCanceledException(cancellationToken);
+		}
+
+		onSuccess?.Invoke();
 	}
 
 	private void ValidateEntry(RecordingComputeKernel kernel, int group, in ComputeBufferBinding entry, ComputeBindingType type)

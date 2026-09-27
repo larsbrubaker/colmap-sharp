@@ -47,7 +47,20 @@ public class RecordingComputeDeviceTests
 		await Assert.That(limits.MaxComputeWorkgroupsPerDimension).IsEqualTo(65535u);
 		await Assert.That(limits.MaxComputeInvocationsPerWorkgroup).IsEqualTo(256);
 		await Assert.That(limits.MinStorageBufferOffsetAlignment).IsEqualTo(256);
+		await Assert.That(limits.MaxBindGroups).IsEqualTo(4);
+		await Assert.That(limits.MaxUniformBuffersPerShaderStage).IsEqualTo(12);
+		await Assert.That(limits.MaxBindingsPerBindGroup).IsEqualTo(1000);
 		await Assert.That(new RecordingComputeDevice().Limits).IsEqualTo(limits);
+	}
+
+	[Test]
+	public async Task Limits_RefuseAnAlignmentThatIsNotAPositivePowerOfTwo()
+	{
+		Assert.Throws<ArgumentException>(() => new RecordingComputeDevice { Limits = ComputeDeviceLimits.Defaults with { MinStorageBufferOffsetAlignment = 0 } });
+		Assert.Throws<ArgumentException>(() => new RecordingComputeDevice { Limits = ComputeDeviceLimits.Defaults with { MinStorageBufferOffsetAlignment = -256 } });
+		Assert.Throws<ArgumentException>(() => new RecordingComputeDevice { Limits = ComputeDeviceLimits.Defaults with { MinStorageBufferOffsetAlignment = 96 } });
+		var device = new RecordingComputeDevice { Limits = ComputeDeviceLimits.Defaults with { MinStorageBufferOffsetAlignment = 64 } };
+		await Assert.That(device.Limits.MinStorageBufferOffsetAlignment).IsEqualTo(64);
 	}
 
 	[Test]
@@ -113,6 +126,37 @@ public class RecordingComputeDeviceTests
 
 		var tooMany = fits.Append(new ComputeKernelBinding(2, 1, ComputeBindingType.ReadOnlyStorage)).ToArray();
 		Assert.Throws<ArgumentException>(() => device.CreateKernel(new ComputeKernelDescriptor("tooMany", "src", "main", tooMany)));
+	}
+
+	[Test]
+	public async Task CreateKernel_EnforcesBindGroupUniformAndBindingIndexLimits()
+	{
+		var device = new RecordingComputeDevice
+		{
+			Limits = ComputeDeviceLimits.Defaults with { MaxBindGroups = 2, MaxUniformBuffersPerShaderStage = 2, MaxBindingsPerBindGroup = 8 },
+		};
+		var uniform = ComputeBindingType.Uniform;
+
+		// Two groups, two uniforms, binding index 7: exactly at every limit.
+		device.CreateKernel(new ComputeKernelDescriptor("fits", "src", "main", new[]
+		{
+			new ComputeKernelBinding(0, 0, uniform), new ComputeKernelBinding(1, 7, uniform),
+		}));
+
+		Assert.Throws<ArgumentException>(() => device.CreateKernel(new ComputeKernelDescriptor("groups", "src", "main", new[]
+		{
+			new ComputeKernelBinding(0, 0, ComputeBindingType.Storage), new ComputeKernelBinding(1, 0, ComputeBindingType.Storage),
+			new ComputeKernelBinding(2, 0, ComputeBindingType.Storage),
+		})));
+		Assert.Throws<ArgumentException>(() => device.CreateKernel(new ComputeKernelDescriptor("uniforms", "src", "main", new[]
+		{
+			new ComputeKernelBinding(0, 0, uniform), new ComputeKernelBinding(0, 1, uniform), new ComputeKernelBinding(1, 0, uniform),
+		})));
+		Assert.Throws<ArgumentException>(() => device.CreateKernel(new ComputeKernelDescriptor("index", "src", "main", new[]
+		{
+			new ComputeKernelBinding(0, 8, uniform),
+		})));
+		await Assert.That(device.CommandsOf<CreateKernelCommand>().Count).IsEqualTo(1);
 	}
 
 	[Test]
@@ -293,5 +337,55 @@ public class RecordingComputeDeviceTests
 		kernel.Dispose();
 		Assert.Throws<ObjectDisposedException>(() => device.Dispatch(kernel, new[] { group }, 1));
 		await Assert.That(device.PendingDispatchCount).IsEqualTo(0);
+	}
+
+	[Test]
+	public async Task Dispatch_RefusesAWritableBufferThatIsAlsoBoundElsewhere()
+	{
+		// WebGPU's usage scope is the whole buffer for the whole dispatch: a buffer bound
+		// read_write may not be bound again anywhere in it, even over a disjoint range.
+		var device = new RecordingComputeDevice();
+		var kernel = device.CreateKernel(new ComputeKernelDescriptor("k", "src", "main", new[]
+		{
+			new ComputeKernelBinding(0, 0, ComputeBindingType.Storage),
+			new ComputeKernelBinding(1, 0, ComputeBindingType.ReadOnlyStorage),
+		}));
+		var shared = device.CreateBuffer(ComputeBufferKind.Storage, 512);
+		var other = device.CreateBuffer(ComputeBufferKind.Storage, 16);
+		var writeShared = device.CreateBindGroup(kernel, 0, new[] { new ComputeBufferBinding(0, shared, 0, 16) });
+		var readShared = device.CreateBindGroup(kernel, 1, new[] { new ComputeBufferBinding(0, shared, 256, 16) });
+		var writeOther = device.CreateBindGroup(kernel, 0, new[] { new ComputeBufferBinding(0, other, 0, 16) });
+
+		var exception = Assert.Throws<ArgumentException>(() => device.Dispatch(kernel, new IComputeBindGroup[] { writeShared, readShared }, 1));
+		await Assert.That(exception.Message).Contains("read_write");
+		await Assert.That(device.PendingDispatchCount).IsEqualTo(0);
+
+		// The same bind groups are fine once the writable binding is a different buffer.
+		device.Dispatch(kernel, new IComputeBindGroup[] { writeOther, readShared }, 1);
+
+		// Two writable bindings of one buffer in one group are refused as well.
+		var twoWrites = device.CreateKernel(new ComputeKernelDescriptor("two", "src", "main", new[]
+		{
+			new ComputeKernelBinding(0, 0, ComputeBindingType.Storage),
+			new ComputeKernelBinding(0, 1, ComputeBindingType.Storage),
+		}));
+		var aliased = device.CreateBindGroup(twoWrites, 0, new[]
+		{
+			new ComputeBufferBinding(0, other, 0, 4), new ComputeBufferBinding(1, other, 0, 4),
+		});
+		Assert.Throws<ArgumentException>(() => device.Dispatch(twoWrites, new[] { aliased }, 1));
+
+		// Read-only bindings may share a buffer freely.
+		var twoReads = device.CreateKernel(new ComputeKernelDescriptor("reads", "src", "main", new[]
+		{
+			new ComputeKernelBinding(0, 0, ComputeBindingType.ReadOnlyStorage),
+			new ComputeKernelBinding(0, 1, ComputeBindingType.ReadOnlyStorage),
+		}));
+		var readsTwice = device.CreateBindGroup(twoReads, 0, new[]
+		{
+			new ComputeBufferBinding(0, shared, 0, 16), new ComputeBufferBinding(1, shared, 0, 16),
+		});
+		device.Dispatch(twoReads, new[] { readsTwice }, 1);
+		await Assert.That(device.PendingDispatchCount).IsEqualTo(2);
 	}
 }
