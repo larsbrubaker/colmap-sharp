@@ -68,10 +68,12 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		{
 			case AutomaticReconstructionOptions.DataType.Video:
 				optionManager.ModifyForVideoData();
-				// COLMAP's ResetOptions(false) restores only project/database/image *paths*, so
-				// there the image_names set above is cleared and video data processes every
-				// image. The port keeps the host's selection instead (docs/CPP_DIVERGENCES.md
-				// entry 134). The image source is restored because it is image_path in COLMAP.
+				// Deliberate fix of an upstream ordering bug (docs/CPP_DIVERGENCES.md entry 134):
+				// COLMAP sets image_names above, then ModifyForVideoData's ResetOptions(false)
+				// rebuilds image_reader and mapper and restores only the project/database/image
+				// *paths*, so video data silently ignores the selection that individual and
+				// internet data keep. The port restores it. The image source is restored too
+				// because it is image_path in COLMAP.
 				optionManager.ImageReader.Images = options.Images!;
 				optionManager.ImageReader.ImageNames = [.. options.ImageNames];
 				optionManager.Mapper.ImageNames = [.. options.ImageNames];

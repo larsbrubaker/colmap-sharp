@@ -2730,19 +2730,21 @@ the port behaves like this:
   `InMemoryDatabase` unless the host passes one), `sparse/project.ini` is not written, and the
   undistorted images stay in memory, so a model is undistorted again when its images are not in
   the controller's store even though `dense/<i>` exists.
-- Video data keeps the host's `ImageNames` selection. In COLMAP, `ModifyForVideoData` calls
-  `ResetOptions(false)`, which rebuilds `image_reader` and `mapper` and restores only the
-  project/database/image *paths* (base_option_manager.cc), so the `image_names` set just before
-  it is cleared and a video run processes every image, unlike individual and internet data.
+- Video data keeps the host's `ImageNames` selection, a deliberate fix of an upstream ordering
+  bug. COLMAP sets `image_reader`/`mapper` `image_names` (automatic_reconstruction.cc:67-69) and
+  then calls `ModifyForVideoData`, whose `ResetOptions(false)` (option_manager.cc:103-105, 1221,
+  1231) rebuilds `image_reader` and `mapper`, while `BaseOptionManager::ResetOptions` restores
+  only the project/database/image *paths*. So a COLMAP video run silently processes every image,
+  unlike individual and internet data, which keep the selection.
 
 **Why.** CUDA/GPU, CGAL, vocabulary-tree retrieval, SQLite files, OpenImageIO decoding and the
 CLI option registry are out of scope (`PORTING_PLAN.md`, `docs/LICENSE_AUDIT.md`), while the
 PatchMatch algorithm and Delaunay meshing are ported, so running them is what a COLMAP build with
 those features does. Sequential matching with loop detection throws here
 (`SequentialPairGenerator.cs`), so leaving COLMAP's `loop_detection = true` would make every video
-run fail. COLMAP's clearing of `image_names` for video data reads as an ordering accident (the
-names are set before the preset that wipes them) that silently drops the user's image
-selection; whether to keep the selection or match COLMAP is still an open decision.
+run fail. COLMAP's clearing of `image_names` for video data is an ordering bug (the names are
+set before the preset that wipes them) that silently drops the user's image selection, so the
+port restores the selection after the preset, matching individual and internet data.
 
 **Evidence.** `AutomaticReconstructionTests.ParameterizedAutomaticReconstructionTests_Nominal`
 (automatic_reconstruction_test.cc 1:1, dense off as in COLMAP's test) passes for the incremental
@@ -2752,4 +2754,6 @@ ray-traced textured scene goes photos in through CPU PatchMatch, fusion and Dela
 a non-empty `fused.ply` and `meshed-delaunay.ply`, reporting progress only under the
 controller's stage names. `CSharpOnly_MaskSourceRoutesByReservedKey` pins that the fusion's
 masks and the undistorted images cannot be confused, even for a workspace at `masks/ws`.
-The video-data `ImageNames` behavior has no test yet.
+`CSharpOnly_VideoDataKeepsImageNamesSelection` pins the video-data fix: with four of six
+consecutive views selected, only those four reach the database and are registered (the test
+fails when the restore after `ModifyForVideoData` is removed).

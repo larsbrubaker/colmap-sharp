@@ -103,6 +103,59 @@ public partial class AutomaticReconstructionTests
 		}));
 	}
 
+	// Pins divergence 134's fix of an upstream ordering bug: COLMAP sets image_names and then
+	// ModifyForVideoData's ResetOptions(false) wipes them, so a video run there processes
+	// every image. Here only the selected (consecutive) views are extracted and registered.
+	[Test]
+	public async Task CSharpOnly_VideoDataKeepsImageNamesSelection()
+	{
+		const int NumViews = 6;
+		string testDir = CreateTestDir();
+		string workspacePath = Path.Combine(testDir, "workspace");
+		Directory.CreateDirectory(workspacePath);
+		var images = new InMemoryImageSource();
+		for (int i = 0; i < NumViews; ++i)
+		{
+			images.Add($"view{i}.png", RenderTexturedScene(i, NumViews, width: 200, height: 150));
+		}
+
+		string[] selected = ["view1.png", "view2.png", "view3.png", "view4.png"];
+		var options = new AutomaticReconstructionOptions
+		{
+			WorkspacePath = workspacePath,
+			Images = images,
+			ImageNames = [.. selected],
+			Data = AutomaticReconstructionOptions.DataType.Video,
+			Quality = AutomaticReconstructionOptions.QualityLevel.Low,
+			Dense = false,
+			RandomSeed = 1,
+		};
+
+		var database = new InMemoryDatabase();
+		var reconstructionManager = new ReconstructionManager();
+		var controller = new AutomaticReconstructionController(options, reconstructionManager, database);
+		controller.Setup();
+		controller.Run();
+
+		string databaseNames = string.Join(",", database.ReadAllImages().Select(image => image.Name).Order());
+		int size = reconstructionManager.Size;
+		string registeredNames = size == 0 ? "" : string.Join(",", reconstructionManager.Get(0).RegImageIds()
+			.Select(id => reconstructionManager.Get(0).Image(id).Name).Order());
+
+		try
+		{
+			Directory.Delete(testDir, recursive: true);
+		}
+		catch (IOException)
+		{
+			// A leftover temp folder is harmless.
+		}
+
+		await Assert.That(databaseNames).IsEqualTo(string.Join(",", selected));
+		await Assert.That(size).IsEqualTo(1);
+		await Assert.That(registeredNames).IsEqualTo(string.Join(",", selected));
+	}
+
 	[Test]
 	public async Task CSharpOnly_MaskSourceRoutesByReservedKey()
 	{
