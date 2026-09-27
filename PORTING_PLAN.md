@@ -41,16 +41,11 @@ divergence 134), with a C#-only texturing step per dense model (divergence 135).
   driver, model-space output (`PoissonMeshOutput`), `PoissonSurfaceTrimmer` and the public
   `PoissonMeshing` API (`Mvs/PoissonMeshing.cs`, `poisson_meshing_test.cc` ported) are done
   and bit-exact against the vendored C++ (harnesses `oracle/poisson_levelset{,2,3,4,5,6}_harness.cc`,
-  `poisson_{extract,trim,meshing}_harness.cc`, built at `-O1`). Remaining coverage gaps:
-  1. Coverage: the vertex-pair push loops (`PoissonLevelSetExtractor.IsoEdges.cs` slice and
+  `poisson_{extract,trim,meshing}_harness.cc`, built at `-O1`). Remaining coverage gap: the vertex-pair push loops (`PoissonLevelSetExtractor.IsoEdges.cs` slice and
      slab pushes) are reached (vertexpairs2) but not pinned — deleting either still passes, and
      a 320-input C++ search found no input where a walk uses a pushed pair. Likely needs a leaf
      two levels coarser than its neighbors across a doubly crossed edge, or a proof that grading
      rules it out.
-  2. Trimmer coverage: `SurfaceTrimmer_Crafted_MatchesHarness` pins libc++ order only for
-     `componentEdges`; walking `componentHalfEdges` (`PoissonSurfaceTrimmer.Islands.cs:83`) or
-     `componentBoundaryHalfEdges` (:97) in insertion order still passes. Needs a crafted mesh
-     with more neighbor-rich merges.
 
 ### Verification
 - End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us (also the
