@@ -2560,11 +2560,12 @@ sorted node (or row) order, which is what
 PoissonRecon does with one thread (`ThreadPool::NONE`). The multi-colored Gauss-Seidel
 relaxation (`PoissonSystem.GaussSeidel.cs`) is not affected: two rows of one color never share
 an unknown, so their order cannot change the result, and the port relaxes them in index order.
-The level-set extractor's iso-vertices (`PoissonLevelSetExtractor.IsoVertices.cs`) are the same
-case for numbering rather than sums: upstream sets a slice's vertices in a `ParallelFor` over its
-leaves, numbers them with the vertex stream's atomic counter and keeps per-thread key lists, so
-the vertex order varies with threads; the port visits the leaves in sorted order with one list,
-as a single-threaded run does.
+The level-set extractor's iso-vertices (`PoissonLevelSetExtractor.IsoVertices.cs` for slice
+edges, `PoissonLevelSetExtractor.XSliceIsoVertices.cs` for slab edges) are the same case for
+numbering rather than sums: upstream sets a slice's or slab's vertices in a `ParallelFor` over
+its leaves, numbers them with the vertex stream's atomic counter and keeps per-thread key lists,
+so the vertex order varies with threads; the port visits the leaves in sorted order with one
+list, as a single-threaded run does.
 
 **Why.** CLAUDE.md requires deterministic results, and there is no fixed multi-threaded order
 to match. The single-threaded order is the one reproducible reference (the same choice as
@@ -2575,7 +2576,8 @@ system6, system8) matches a single-threaded run of the vendored C++ bit for bit:
 interpolation constraints, the restricted interpolation constraints, the Gauss-Seidel
 solutions and the base-depth multigrid solve; `PoissonTreeOracleTests.PostSolveStages_MatchHarness`
 (levelset3, levelset5, levelset6, levelset8) does the same for the iso-value sums, and
-`PoissonTreeOracleTests.LevelSetSliceIsoVertices_MatchHarness` for the vertex order.
+`PoissonTreeOracleTests.LevelSetSliceIsoVertices_MatchHarness` and
+`PoissonTreeOracleTests.LevelSetIsoVertices_MatchHarness` for the vertex order.
 ## 124. LO-RANSAC can start its local optimization from a different five-point solution
 
 **What differs.** The five-point solver returns up to ten essential matrices per minimal

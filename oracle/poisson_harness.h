@@ -85,12 +85,13 @@ bool quiet = false;
 // count, 1 for floats / 0 for integers, and one FNV-1a hash (masked to 52 bits, so the JSON
 // number is exact) per chunk of 256 values, over each value's 64 bits (the integer, or the
 // double's bit pattern). The C# test hashes its own values the same way and, on a mismatch,
-// reports the first differing chunk and its values. Inputs and the libm tables stay in full.
+// reports the first differing chunk and its values. Inputs, the libm tables and the level-set
+// vertex colors (so a color mismatch can be located) stay in full.
 const size_t kChunk = 256;
 const size_t kFullLimit = 1024;
 
 bool KeepFull(const std::string& name) {
-  return name.find("/input") != std::string::npos || name.rfind("powonethird/", 0) == 0 || name.rfind("logf/", 0) == 0;
+  return name.find("/input") != std::string::npos || name.find("/vertexcolors") != std::string::npos || name.rfind("powonethird/", 0) == 0 || name.rfind("logf/", 0) == 0;
 }
 
 void PrintChunks(const std::string& name, const std::vector<unsigned long long>& bits, bool isFloat) {

@@ -9,7 +9,10 @@
 // vertex goes to the sink (Vertices) in the order upstream's vertexStream.write sees it; its
 // edge key is recorded on the slice and, when the edge borders a coarser leaf, pushed to the
 // coarser slices (or, across an odd slice, to the coarser slab) that share it. The cross-slice
-// (slab) edges' vertices are not ported yet. Tier A against oracle/poisson_levelset3_harness.cc.
+// (slab) edges' vertices are in PoissonLevelSetExtractor.XSliceIsoVertices.cs; the Hermite
+// root (AverageRoot), the push-down test (IsNeeded) and the color evaluation (DataAt) here are
+// shared by both GetIsoVertex forms. Tier A against oracle/poisson_levelset3_harness.cc and,
+// interleaved with the slab vertices as Extract runs them, oracle/poisson_levelset4_harness.cc.
 //
 // Translation notes:
 // - COLMAP runs Extract with nonLinearFit on (it never passes --linearFit) and gradientNormals
@@ -122,7 +125,6 @@ public sealed partial class PoissonLevelSetExtractor
 
 		int nodeSlice = slice - (zDir == HyperCubeDirection.Back ? 0 : 1) + tree.LocalInset(depth);
 		int end = sorted.End(globalDepth, nodeSlice);
-		HyperCubeElementTable edges3 = HyperCubeTables.Of(3, 1);
 		HyperCubeOverlapTable edgeFaces = HyperCubeTables.Of(3, 1, 2);
 		HyperCubeOverlapTable faceCorners = HyperCubeTables.Of(3, 2, 0);
 		for (int i = sorted.Begin(globalDepth, nodeSlice); i < end; i++)
@@ -174,23 +176,7 @@ public sealed partial class PoissonLevelSetExtractor
 				sValues.EdgeKeyValues.Add((key, vertexIndex));
 
 				// We only need to pass the iso-vertex down if the edge it lies on is adjacent to a coarser leaf
-				bool IsNeeded(int d)
-				{
-					bool isNeeded = false;
-					int myIncidentCube = edges3.IncidentCube[e];
-					int[] window = neighborKey.Window(d + tree.DepthOffset);
-					for (int ic = 0; ic < edges3.IncidentCubeNum; ic++)
-					{
-						if (ic != myIncidentCube)
-						{
-							isNeeded |= !PoissonMultigrid.IsValidSpaceNode(tree, window[edges3.CellOffset[e][ic]]);
-						}
-					}
-
-					return isNeeded;
-				}
-
-				if (!IsNeeded(depth))
+				if (!IsNeeded(neighborKey, e, depth))
 				{
 					continue;
 				}
@@ -227,7 +213,7 @@ public sealed partial class PoissonLevelSetExtractor
 							SlabValues[nodeDepth].SliceValues(nodeSliceIndex).EdgeKeyValues.Add((key, vertexIndex));
 						}
 
-						if (!IsNeeded(nodeDepth))
+						if (!IsNeeded(neighborKey, e, nodeDepth))
 						{
 							break;
 						}
@@ -235,6 +221,26 @@ public sealed partial class PoissonLevelSetExtractor
 				}
 			}
 		}
+	}
+
+	// SetSliceIsoVertices' and SetXSliceIsoVertices' IsNeeded: whether edge e of the leaf is
+	// adjacent to a coarser leaf at depth d, i.e. whether one of the other cubes around the
+	// edge is missing from the leaf's one-ring there.
+	private bool IsNeeded(NeighborKey neighborKey, int e, int d)
+	{
+		HyperCubeElementTable edges3 = HyperCubeTables.Of(3, 1);
+		bool isNeeded = false;
+		int myIncidentCube = edges3.IncidentCube[e];
+		int[] window = neighborKey.Window(d + tree.DepthOffset);
+		for (int ic = 0; ic < edges3.IncidentCubeNum; ic++)
+		{
+			if (ic != myIncidentCube)
+			{
+				isNeeded |= !PoissonMultigrid.IsValidSpaceNode(tree, window[edges3.CellOffset[e][ic]]);
+			}
+		}
+
+		return isNeeded;
 	}
 
 	// GetIsoVertex( ... , node , _e , zDir , sValues , vertex , zeroData ) with nonLinearFit on
@@ -265,13 +271,31 @@ public sealed partial class PoissonLevelSetExtractor
 
 		position[2] = s[2] + (width * (zDir == HyperCubeDirection.Back ? 0 : 1));
 
+		// Float products, widened.
+		double averageRoot = AverageRoot(x0, x1, sValues.CornerGradients![(3 * i0) + o] * width, sValues.CornerGradients[(3 * i1) + o] * width);
+		position[o] = (float)(start + (width * averageRoot));
+
+		// gradientNormals is off, so both corner gradients are zero and so is the blend.
+		float gradient = (0f * (float)(1.0 - averageRoot)) + (0f * (float)averageRoot);
+		float depth = 1f;
+		if (density != null)
+		{
+			depth = PoissonSplat.GetSampleDepthAndWeight(tree, density, node, position, weightKey).Depth;
+		}
+
+		float[] dataValue = data == null ? [] : DataAt(dataKey, s[0] + (width / 2), s[1] + (width / 2), s[2] + (width / 2));
+		return new LevelSetVertex(position[0], position[1], position[2], gradient, gradient, gradient, depth, dataValue);
+	}
+
+	// Both GetIsoVertex forms' root: the Hermite quadratic through the edge's end values x0, x1
+	// with end derivatives dx0, dx1 (the corner gradients times the edge length), its roots in
+	// [0, 1] averaged, falling back to the linear root, then clamped to [0, 1] (counted as bad
+	// when it lands on or outside an end).
+	private double AverageRoot(float x0, float x1, double dx0, double dx1)
+	{
 		double averageRoot;
 		bool rootFound = false;
 		{
-			// Float products, widened.
-			double dx0 = sValues.CornerGradients![(3 * i0) + o] * width;
-			double dx1 = sValues.CornerGradients[(3 * i1) + o] * width;
-
 			// The scaling will turn the Hermite Spline into a quadratic
 			double scl = (x1 - x0) / ((dx1 + dx0) / 2);
 			dx0 *= scl;
@@ -329,27 +353,16 @@ public sealed partial class PoissonLevelSetExtractor
 			}
 		}
 
-		position[o] = (float)(start + (width * averageRoot));
-
-		// gradientNormals is off, so both corner gradients are zero and so is the blend.
-		float gradient = (0f * (float)(1.0 - averageRoot)) + (0f * (float)averageRoot);
-		float depth = 1f;
-		if (density != null)
-		{
-			depth = PoissonSplat.GetSampleDepthAndWeight(tree, density, node, position, weightKey).Depth;
-		}
-
-		float[] dataValue = data == null ? [] : DataAtCenter(dataKey, s, width);
-		return new LevelSetVertex(position[0], position[1], position[2], gradient, gradient, gradient, depth, dataValue);
+		return averageRoot;
 	}
 
-	// GetIsoVertex's DataDegree == 0 branch: _addEvaluation of the data at the cell center into
-	// ProjectiveData( zeroData ), then its value, or zeroData if it has no weight.
-	private float[] DataAtCenter(NeighborKey dataKey, ReadOnlySpan<float> s, float width)
+	// GetIsoVertex's DataDegree == 0 branch: _addEvaluation of the data at the cell center
+	// (cx, cy, cz) into ProjectiveData( zeroData ), then its value, or zeroData if it has no weight.
+	private float[] DataAt(NeighborKey dataKey, float cx, float cy, float cz)
 	{
 		int width1 = data!.Width;
 		int channels = width1 - 1;
-		Span<float> center = [s[0] + (width / 2), s[1] + (width / 2), s[2] + (width / 2)];
+		Span<float> center = [cx, cy, cz];
 		Span<float> sum = stackalloc float[width1];
 		for (int k = 0; k < channels; k++)
 		{
