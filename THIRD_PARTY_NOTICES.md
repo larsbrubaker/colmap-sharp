@@ -321,7 +321,9 @@ match the libc++-built pycolmap oracle. Ported in `ColmapSharp/Mvs/CollapseHeap.
 simplification pops tied candidates in the wheel's order. Ported in
 `ColmapSharp/Util/LibcxxUnorderedMap.cs`: `std::unordered_map`'s hash table (insertion,
 rehashing and iteration order), so PoissonRecon's sparse matrix products order row entries as
-libc++ does. Copyright the LLVM Project contributors.
+libc++ does; the same table is ported for pair keys in
+`ColmapSharp/Mvs/PoissonRecon/TrimmerEdgeHashTable.cs`, so SurfaceTrimmer's island merge
+visits components as libc++ does. Copyright the LLVM Project contributors.
 
 ```
 ==============================================================================

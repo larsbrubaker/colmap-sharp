@@ -33,6 +33,9 @@
 #                       transformed by unitCubeToModel, and the output vertices (position,
 #                       density value, PLY uchar colors) and triangles
 #                       (PoissonLevelSetExtractor.Extract, PoissonMeshOutput)
+#   poisson_trim.json   oracle/poisson_trim_harness.cc: upstream's SurfaceTrimmer, run as
+#                       COLMAP runs it, on the extracted meshes at several trim values
+#                       (PoissonSurfaceTrimmer)
 #   poisson_libm.json   oracle/poisson_libm_harness.cc: libm's pow( x , 1./3 ) and logf
 # Tier A, bit-exact. Read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests*.cs.
 #
@@ -83,6 +86,7 @@ HARNESSES = [
     ("poisson_isoroot_harness.cc", "poisson_isoroot.json", None),
     ("poisson_levelset6_harness.cc", "poisson_levelset6.json", None),
     ("poisson_extract_harness.cc", "poisson_extract.json", None),
+    ("poisson_trim_harness.cc", "poisson_trim.json", None),
 ]
 
 if __name__ == "__main__":

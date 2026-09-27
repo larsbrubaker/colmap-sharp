@@ -24,7 +24,8 @@ namespace ColmapSharp.Mvs.PoissonRecon;
 /// </summary>
 public sealed class PoissonMeshOutput
 {
-	private PoissonMeshOutput(int vertexCount, int colorChannels, float[] positions, float[]? values, byte[]? colors, int[] triangles)
+	// Also PoissonSurfaceTrimmer's output.
+	internal PoissonMeshOutput(int vertexCount, int colorChannels, float[] positions, float[]? values, byte[]? colors, int[] triangles)
 	{
 		VertexCount = vertexCount;
 		ColorChannels = colorChannels;
