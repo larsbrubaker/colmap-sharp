@@ -31,8 +31,10 @@
 // - Source images, S x L bytes packed four per u32 (patch_match_textures.wgsl); source depth
 //   maps, S x L floats when geometric consistency is on, else a 4-byte dummy (WGSL resolves
 //   every declared name, so a photometric kernel still binds one).
-// - Uniforms: the byte / 255 table (1024 bytes), the pose tables of all four rotations,
-//   one problem uniform, one uniform per sweep and one per band per orientation, all created
+// - Uniforms: the byte / 255 table (1024 bytes); the pose table, array<vec4<f32>, 8 + 43S>
+//   as patch_match_geometry.wgsl reads it (floats [8r, 8r + 4) RefK(r), [8r + 4, 8r + 8)
+//   RefInvK(r) for rotations r = 0..3, then source s of rotation r at float
+//   32 + 43 (r S + s), unpadded; 4 x 43 S floats is always whole vec4s); one problem uniform, one uniform per sweep and one per band per orientation, all created
 //   with their data up front so nothing is written while dispatches are being recorded.
 // Every storage buffer is bound whole, so a buffer's size is also its binding size.
 
@@ -69,7 +71,7 @@ internal enum PatchMatchGpuBufferRole
 	/// <summary>The per-problem options and derived constants.</summary>
 	Problem,
 
-	/// <summary>One uniform per sweep (rotation, frame, per-sweep constants).</summary>
+	/// <summary>One uniform per sweep (rotation, per-sweep constants).</summary>
 	SweepUniforms,
 
 	/// <summary>One uniform per row band of each orientation.</summary>
@@ -126,12 +128,15 @@ internal sealed class PatchMatchGpuPlan
 
 	/// <summary>
 	/// Floats per source per rotation in the pose-table uniform: PatchMatchTransforms'
-	/// NumTformParams (43) rounded up to whole vec4s, since a uniform array's stride is 16 bytes.
+	/// NumTformParams, packed with no per-record padding.
 	/// </summary>
-	public const int PoseRecordFloats = (PatchMatchTransforms.NumTformParams + 3) / 4 * 4;
+	public const int PoseFloatsPerSource = PatchMatchTransforms.NumTformParams;
 
-	/// <summary>Bytes per source per rotation in the pose-table uniform.</summary>
-	public const int PoseRecordBytes = PoseRecordFloats * 4;
+	/// <summary>
+	/// vec4s at the start of the pose-table uniform: RefK(r) and RefInvK(r), one vec4 each,
+	/// for the four rotations r.
+	/// </summary>
+	public const int PoseTableHeaderVec4 = 8;
 
 	/// <summary>The byte / 255 table: 256 floats (patch_match_textures.wgsl's PmByteToUnit).</summary>
 	public const int ByteTableBytes = 256 * 4;
@@ -144,8 +149,8 @@ internal sealed class PatchMatchGpuPlan
 	public const int ProblemUniformBytes = 256;
 
 	/// <summary>
-	/// Bytes reserved for a sweep uniform: rotation index, the rotation's reference frame
-	/// (K and K^-1, 8 floats), perturbation, previous-selection weight and sweep flags.
+	/// Bytes reserved for a sweep uniform: rotation index, perturbation, previous-selection
+	/// weight and sweep flags (the rotation's reference frame is in the pose table).
 	/// </summary>
 	public const int SweepUniformBytes = 64;
 
@@ -314,7 +319,7 @@ internal sealed class PatchMatchGpuPlan
 			new(PatchMatchGpuBufferRole.SourceImages, ComputeBufferKind.Storage, RoundUp(s * layer, 4), 1, "source images"),
 			new(PatchMatchGpuBufferRole.SourceDepths, ComputeBufferKind.Storage, geometric ? s * layer * 4 : 4, 1, "source depth maps"),
 			new(PatchMatchGpuBufferRole.ByteTable, ComputeBufferKind.Uniform, ByteTableBytes, 1, "color lookup table"),
-			new(PatchMatchGpuBufferRole.PoseTable, ComputeBufferKind.Uniform, RoundUp(4 * s * PoseRecordBytes, 16), 1, "camera poses of the source images"),
+			new(PatchMatchGpuBufferRole.PoseTable, ComputeBufferKind.Uniform, 16 * (PoseTableHeaderVec4 + PoseFloatsPerSource * s), 1, "camera poses of the source images"),
 			new(PatchMatchGpuBufferRole.Problem, ComputeBufferKind.Uniform, ProblemUniformBytes, 1, "PatchMatch settings"),
 			new(PatchMatchGpuBufferRole.SweepUniforms, ComputeBufferKind.Uniform, SweepUniformBytes, sweeps, "sweep settings"),
 			new(PatchMatchGpuBufferRole.BandUniforms, ComputeBufferKind.Uniform, BandUniformBytes, bandCounts[0] + bandCounts[1], "row band settings"),

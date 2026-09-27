@@ -7,7 +7,7 @@
 // fallback reason, the band sizes, and determinism. Expected sizes are the layout formula
 // worked by hand (P pixels, S sources, L = P source layer pixels, C = max(W, H)):
 //   2 x 12P + 2 x (16P + 4C(S + 4)) + 3 x 4SP + SL + (geometric ? 4SL : 4)
-//   + 1024 + 704S + 256 + 20 x 64 + 16 x bands.
+//   + 1024 + 16(8 + 43S) + 256 + 20 x 64 + 16 x bands.
 
 using ColmapSharp.Compute;
 using ColmapSharp.Mvs;
@@ -43,10 +43,10 @@ public class PatchMatchGpuPlanTests
 	}
 
 	[Test]
-	[Arguments(1000, 750, 4, false, 81_072_340L, 12_032_000L, 8, 11)]
-	[Arguments(1000, 750, 4, true, 93_072_336L, 12_032_000L, 8, 11)]
-	[Arguments(1000, 750, 20, false, 237_212_436L, 60_000_000L, 6, 9)]
-	[Arguments(1000, 750, 20, true, 297_212_432L, 60_000_000L, 6, 9)]
+	[Arguments(1000, 750, 4, false, 81_072_404L, 12_032_000L, 8, 11)]
+	[Arguments(1000, 750, 4, true, 93_072_400L, 12_032_000L, 8, 11)]
+	[Arguments(1000, 750, 20, false, 237_212_244L, 60_000_000L, 6, 9)]
+	[Arguments(1000, 750, 20, true, 297_212_240L, 60_000_000L, 6, 9)]
 	public async Task LowPresetFitsDefaultLimits(
 		int width, int height, int numSources, bool geometric, long totalBytes, long largestBinding, int rows0, int rows1)
 	{
@@ -60,12 +60,12 @@ public class PatchMatchGpuPlanTests
 	}
 
 	[Test]
-	[Arguments(1000, 750, 4, false, 81_072_340L)]
-	[Arguments(1000, 750, 20, true, 297_212_432L)]
-	[Arguments(1600, 1200, 20, false, 607_053_764L)]
-	[Arguments(1600, 1200, 20, true, 760_653_760L)]
-	[Arguments(2400, 1800, 20, false, 1_365_624_644L)]
-	[Arguments(2400, 1800, 20, true, 1_711_224_640L)]
+	[Arguments(1000, 750, 4, false, 81_072_404L)]
+	[Arguments(1000, 750, 20, true, 297_212_240L)]
+	[Arguments(1600, 1200, 20, false, 607_053_572L)]
+	[Arguments(1600, 1200, 20, true, 760_653_568L)]
+	[Arguments(2400, 1800, 20, false, 1_365_624_452L)]
+	[Arguments(2400, 1800, 20, true, 1_711_224_448L)]
 	public async Task EveryPresetFitsM5Limits(int width, int height, int numSources, bool geometric, long totalBytes)
 	{
 		var (fits, plan, reason) = Plan(Shape(width, height, numSources), geometric, M5Limits);
@@ -86,7 +86,7 @@ public class PatchMatchGpuPlanTests
 			(PatchMatchGpuBufferRole.SourceImages, ComputeBufferKind.Storage, 3_000_000, 1),
 			(PatchMatchGpuBufferRole.SourceDepths, ComputeBufferKind.Storage, 4, 1),
 			(PatchMatchGpuBufferRole.ByteTable, ComputeBufferKind.Uniform, 1024, 1),
-			(PatchMatchGpuBufferRole.PoseTable, ComputeBufferKind.Uniform, 2816, 1),
+			(PatchMatchGpuBufferRole.PoseTable, ComputeBufferKind.Uniform, 2880, 1),
 			(PatchMatchGpuBufferRole.Problem, ComputeBufferKind.Uniform, 256, 1),
 			(PatchMatchGpuBufferRole.SweepUniforms, ComputeBufferKind.Uniform, 64, 20),
 			(PatchMatchGpuBufferRole.BandUniforms, ComputeBufferKind.Uniform, 16, 94 + 91),
@@ -142,7 +142,7 @@ public class PatchMatchGpuPlanTests
 			"This image needs 1,632 MiB of GPU memory, more than the 1,024 MiB available. Using the CPU.");
 
 		// A budget of exactly the total fits.
-		var (fitsExactly, _, _) = Plan(Shape(2400, 1800, 20), true, M5Limits, budget: 1_711_224_640);
+		var (fitsExactly, _, _) = Plan(Shape(2400, 1800, 20), true, M5Limits, budget: 1_711_224_448);
 		await Assert.That(fitsExactly).IsTrue();
 	}
 
@@ -183,15 +183,16 @@ public class PatchMatchGpuPlanTests
 	[Test]
 	public async Task PoseTableExceedsUniformBindingSize()
 	{
-		// 4 rotations x 100 sources x 176 bytes = 70,400 bytes, past 64 KiB.
-		var (fits, _, reason) = Plan(Shape(100, 80, 100), false, ComputeDeviceLimits.Defaults);
+		// 16 x (8 + 43 x 96) = 66,176 bytes, past 64 KiB.
+		var (fits, _, reason) = Plan(Shape(100, 80, 96), false, ComputeDeviceLimits.Defaults);
 		await Assert.That(fits).IsFalse();
 		await Assert.That(reason).IsEqualTo(
-			"The GPU can bind at most 64 KiB of uniform data per buffer; the camera poses of the source images need 69 KiB. Using the CPU.");
+			"The GPU can bind at most 64 KiB of uniform data per buffer; the camera poses of the source images need 65 KiB. Using the CPU.");
 
-		// 93 sources (65,472 bytes) still fit.
-		var (fits93, _, _) = Plan(Shape(100, 80, 93), false, ComputeDeviceLimits.Defaults);
-		await Assert.That(fits93).IsTrue();
+		// 95 sources (16 x (8 + 43 x 95) = 65,488 bytes) still fit.
+		var (fits95, plan95, _) = Plan(Shape(100, 80, 95), false, ComputeDeviceLimits.Defaults);
+		await Assert.That(fits95).IsTrue();
+		await Assert.That(plan95!.Buffers.Single(b => b.Role == PatchMatchGpuBufferRole.PoseTable).Size).IsEqualTo(65_488L);
 	}
 
 	[Test]
