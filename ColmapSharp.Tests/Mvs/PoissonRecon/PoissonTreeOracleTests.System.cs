@@ -186,12 +186,12 @@ public partial class PoissonTreeOracleTests
 
 		produced.F("gsprolongation", Gs(8, coarseToFine: true, 1));
 		produced.F("gsblocked", Gs(3, coarseToFine: false, 2));
-		AddSparseCases(produced, tree, sorted, system, f, (int)p.Parameters.BaseDepth, SliceLimit);
+		AddSparseCases(produced, tree, sorted, system, f, (int)p.Parameters.BaseDepth, SliceLimit, systemConstraints);
 	}
 
 	// The harness's base-depth multigrid algebra: DownSampleMatrix, its transpose, the two
 	// products and the reciprocal diagonal of the system matrix, per small depth.
-	private static void AddSparseCases(Cases produced, FemTree tree, SortedTreeNodes sorted, PoissonSystem system, FemSystemIntegrator f, int baseDepth, int sliceLimit)
+	private static void AddSparseCases(Cases produced, FemTree tree, SortedTreeNodes sorted, PoissonSystem system, FemSystemIntegrator f, int baseDepth, int sliceLimit, float[] systemConstraints)
 	{
 		var shape = new List<double>();
 		var entries = new List<double>();
@@ -277,6 +277,23 @@ public partial class PoissonTreeOracleTests
 
 		produced.I("galerkinshape", galerkinShape);
 		produced.F("galerkinentries", galerkinEntries);
+
+		// _solveRegularMG from a zero solution, as the harness runs it.
+		List<double> RegularMG(int maxSolveDepth, int vCycles, int iters)
+		{
+			var x = new float[PoissonMultigrid.End(tree, sorted, maxDepth)];
+			system.SolveRegularMG(baseDepth, maxSolveDepth, x, systemConstraints, vCycles, iters, (double)1e-3f, constrainsDCTerm: true);
+			var result = new List<double>();
+			for (int i = PoissonMultigrid.Begin(tree, sorted, baseDepth); i < PoissonMultigrid.End(tree, sorted, baseDepth); i++)
+			{
+				result.Add(x[i]);
+			}
+
+			return result;
+		}
+
+		produced.F("regularmg", RegularMG(baseDepth, 1, 8));
+		produced.F("regularmgshallow", RegularMG(baseDepth - 1, 2, 3));
 	}
 
 	// The harness's Run up to and including finalizeForMultigrid, emitting its sorted slices.

@@ -2536,10 +2536,13 @@ half-computed maps.
 atomic float adds into shared entries in several places: `_addFEMConstraints` (each normal
 scattering into the constraints around its parent), `_addInterpolationConstraints` and
 `_updateRestrictedInterpolationConstraints` (each interpolation point adding into the
-constraints of the functions supported on it). With COLMAP's default of every hardware thread,
+constraints of the functions supported on it), and the conjugate-gradient solve at the base
+of `_solveRegularMG` (`SolveCG` sums its dot products in per-thread partial sums). With
+COLMAP's default of every hardware thread,
 the order of those float additions, and with it the last bits of the right-hand side and so of
 the solution, varies from run to run. The port (`Mvs/PoissonRecon/PoissonFemConstraints.cs`,
-`PoissonMultigrid.cs`, `PoissonSystem.cs`) makes those adds in sorted node order, which is what
+`PoissonMultigrid.cs`, `PoissonSystem.cs`, `PoissonSparseMatrix.cs`) makes those adds in
+sorted node (or row) order, which is what
 PoissonRecon does with one thread (`ThreadPool::NONE`). The multi-colored Gauss-Seidel
 relaxation (`PoissonSystem.GaussSeidel.cs`) is not affected: two rows of one color never share
 an unknown, so their order cannot change the result, and the port relaxes them in index order.
@@ -2550,5 +2553,5 @@ entry 106 for splatting).
 
 **Evidence.** `PoissonTreeOracleTests.SystemConstraints_MatchHarness` (system3, system5,
 system6, system8) matches a single-threaded run of the vendored C++ bit for bit: the FEM and
-interpolation constraints, the restricted interpolation constraints, and the Gauss-Seidel
-solutions.
+interpolation constraints, the restricted interpolation constraints, the Gauss-Seidel
+solutions and the base-depth multigrid solve.

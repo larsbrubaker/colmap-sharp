@@ -7,7 +7,8 @@
 // point-constraint transfers (_setPointValuesFromProlongedSolution,
 // _updateRestrictedInterpolationConstraints) and the sliced Gauss-Seidel relaxation
 // (_solveSystemGS), and the base-depth multigrid's sparse algebra (downSampleMatrix, transpose,
-// multiply, setDiagonalR, the Galerkin products R * M * P). Built and run by
+// multiply, setDiagonalR, the Galerkin products R * M * P) and its solve (_solveRegularMG).
+// Built and run by
 // oracle/fixture_poisson_tree.py, which writes ColmapSharp.Tests/TestData/oracle/poisson_system.json
 // (read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests.System.cs). Not part of any
 // build. The shared set-up and output format are in oracle/poisson_harness.h; the stages up to
@@ -288,6 +289,20 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input) {
       }
       PrintI(name + "/galerkinshape", galerkinShape);
       PrintF(name + "/galerkinentries", galerkinEntries);
+
+      // _solveRegularMG from a zero solution against the constraints above: Solve's call (one
+      // V-cycle, 8 sweeps, cgAccuracy = the float 1e-3) and one with two V-cycles, 3 sweeps and
+      // no sweeps at the base depth (maxSolveDepth = baseDepth - 1). Dumps the base level.
+      auto regularMG = [&](const std::string& caseName, int maxSolveDepth, int vCycles, int iters) {
+        std::vector<Real> x(tree._sNodesEnd(tree._maxDepth), (Real)0);
+        typename FEMTree<Dim, Real>::_SolverStats stats;
+        tree._solveRegularMG(Sigs(), S, bsData, maxSolveDepth, &x[0], (const Real*)constraints(), [](Real v, Real w) { return v * w; }, vCycles, iters, stats, false, (double)(Real)1e-3, std::make_tuple(iInfo));
+        std::vector<double> out;
+        for (node_index_type i = tree._sNodesBegin(tree._baseDepth); i < tree._sNodesEnd(tree._baseDepth); i++) out.push_back(x[i]);
+        PrintF(name + "/" + caseName, out);
+      };
+      regularMG("regularmg", tree._baseDepth, 1, 8);
+      regularMG("regularmgshallow", tree._baseDepth - 1, 2, 3);
     }
   }
 

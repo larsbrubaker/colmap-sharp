@@ -250,4 +250,140 @@ public sealed class PoissonSparseMatrix
 			}
 		}
 	}
+
+	/// <summary>
+	/// One multi-colored Gauss-Seidel sweep with a reciprocal diagonal: per color (in order, or
+	/// reversed), x[j] += ( b[j] - row j . x ) * diagonal[j]. Port of <c>gsIteration(
+	/// multiColorIndices , diagonal , b , x , forward , dReciprocal = true )</c> (rows of one color
+	/// never share an unknown, so the C++'s parallel order within a color does not matter).
+	/// </summary>
+	public void GsIteration(List<int>[] colors, float[] diagonal, float[] b, int bOffset, float[] x, int xOffset, bool forward)
+	{
+		for (int c = 0; c < colors.Length; c++)
+		{
+			List<int> indices = colors[forward ? c : colors.Length - 1 - c];
+			for (int k = 0; k < indices.Count; k++)
+			{
+				int jj = indices[k];
+				float residual = b[bOffset + jj];
+				int[] cols = columns[jj];
+				float[] vals = values[jj];
+				for (int e = 0; e < rowSizes[jj]; e++)
+				{
+					residual -= x[xOffset + cols[e]] * vals[e];
+				}
+
+				x[xOffset + jj] += residual * diagonal[jj];
+			}
+		}
+	}
+
+	/// <summary>
+	/// Conjugate gradients on this matrix (plus, with <paramref name="addDCTerm"/>, the mean of
+	/// the input added to every output, pinning the constant), from x, for at most
+	/// <paramref name="iters"/> iterations or until the squared residual falls below
+	/// eps^2 times its start. Scalars are float as in the C++'s SolveCG&lt; SPDFunctor , float ,
+	/// float &gt; (Dot is v * w), compared against the double eps. Every 50th iteration recomputes
+	/// the residual from x. Returns the iterations run. Port of LinearSolvers' <c>SolveCG( M , dim
+	/// , b , iters , x , eps , Dot )</c> (SparseMatrixInterface.inl) with FEMTree's SPDFunctor.
+	/// </summary>
+	public int SolveCG(bool addDCTerm, float[] b, int bOffset, int iters, float[] x, int xOffset, double eps)
+	{
+		int dim = Rows;
+		eps *= eps;
+		var r = new float[dim];
+		var d = new float[dim];
+		var q = new float[dim];
+		float deltaNew = 0;
+		Apply(addDCTerm, x, xOffset, r);
+		float scratch = 0;
+		for (int i = 0; i < dim; i++)
+		{
+			d[i] = r[i] = b[bOffset + i] - r[i];
+			scratch += r[i] * r[i];
+		}
+
+		deltaNew += scratch;
+		float delta0 = deltaNew;
+		if (deltaNew <= eps)
+		{
+			return 0;
+		}
+
+		int ii;
+		for (ii = 0; ii < iters && deltaNew > eps * delta0; ii++)
+		{
+			Apply(addDCTerm, d, 0, q);
+			scratch = 0;
+			for (int i = 0; i < dim; i++)
+			{
+				scratch += d[i] * q[i];
+			}
+
+			float dDotQ = 0;
+			dDotQ += scratch;
+			if (dDotQ == 0)
+			{
+				break;
+			}
+
+			float alpha = deltaNew / dDotQ;
+			float deltaOld = deltaNew;
+			deltaNew = 0;
+			scratch = 0;
+			if ((ii % 50) == (50 - 1))
+			{
+				for (int i = 0; i < dim; i++)
+				{
+					x[xOffset + i] += d[i] * alpha;
+				}
+
+				Apply(addDCTerm, x, xOffset, r);
+				for (int i = 0; i < dim; i++)
+				{
+					r[i] = b[bOffset + i] - r[i];
+					scratch += r[i] * r[i];
+					x[xOffset + i] += d[i] * alpha;
+				}
+			}
+			else
+			{
+				for (int i = 0; i < dim; i++)
+				{
+					r[i] -= q[i] * alpha;
+					scratch += r[i] * r[i];
+					x[xOffset + i] += d[i] * alpha;
+				}
+			}
+
+			deltaNew += scratch;
+			float beta = deltaNew / deltaOld;
+			for (int i = 0; i < dim; i++)
+			{
+				d[i] = r[i] + d[i] * beta;
+			}
+		}
+
+		return ii;
+	}
+
+	// FEMTree's SPDFunctor: out = M * in, plus the mean of in on every entry with the DC term.
+	private void Apply(bool addDCTerm, float[] input, int inOffset, float[] output)
+	{
+		Multiply(input, inOffset, output, 0);
+		if (addDCTerm)
+		{
+			float average = 0;
+			for (int i = 0; i < Rows; i++)
+			{
+				average += input[inOffset + i];
+			}
+
+			average /= Rows;
+			for (int i = 0; i < Rows; i++)
+			{
+				output[i] += average;
+			}
+		}
+	}
 }
