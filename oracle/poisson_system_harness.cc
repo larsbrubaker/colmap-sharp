@@ -7,7 +7,7 @@
 // point-constraint transfers (_setPointValuesFromProlongedSolution,
 // _updateRestrictedInterpolationConstraints) and the sliced Gauss-Seidel relaxation
 // (_solveSystemGS), and the base-depth multigrid's sparse algebra (downSampleMatrix, transpose,
-// multiply, setDiagonalR). Built and run by
+// multiply, setDiagonalR, the Galerkin products R * M * P). Built and run by
 // oracle/fixture_poisson_tree.py, which writes ColmapSharp.Tests/TestData/oracle/poisson_system.json
 // (read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests.System.cs). Not part of any
 // build. The shared set-up and output format are in oracle/poisson_harness.h; the stages up to
@@ -270,6 +270,24 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input) {
       PrintF(name + "/sparseentries", entries);
       PrintF(name + "/sparseproducts", products);
       PrintF(name + "/sparsediagonals", diagonals);
+
+      // _solveRegularMG's Galerkin chain: M[baseDepth] = systemMatrix( baseDepth ), then
+      // M[d-1] = R[d-1] * M[d] * P[d-1], each row in the unordered_map order it was built in.
+      std::vector<long long> galerkinShape{tree._baseDepth};
+      std::vector<double> galerkinEntries;
+      Matrix M = tree.systemMatrix(Sigs(), S, tree._baseDepth, std::make_tuple(iInfo));
+      for (int d = tree._baseDepth; d > 0; d--) {
+        Matrix R = tree.downSampleMatrix(Sigs(), d);
+        Matrix P = R.transpose(M.rows());
+        M = R * M * P;
+        galerkinShape.push_back((long long)M.rows());
+        for (size_t i = 0; i < M.rows(); i++) {
+          galerkinShape.push_back((long long)M.rowSize(i));
+          for (size_t j = 0; j < M.rowSize(i); j++) galerkinShape.push_back(M[i][j].N), galerkinEntries.push_back(M[i][j].Value);
+        }
+      }
+      PrintI(name + "/galerkinshape", galerkinShape);
+      PrintF(name + "/galerkinentries", galerkinEntries);
     }
   }
 

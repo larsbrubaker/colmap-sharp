@@ -5,7 +5,8 @@
 // (thirdparty/PoissonRecon/SparseMatrix.h/.inl, SparseMatrixInterface.inl), the general sparse
 // matrix of the base-depth multigrid (_solveRegularMG): the restriction matrices
 // (PoissonMultigrid.DownSampleMatrix), their transposes (the prolongations), the Galerkin
-// products R * M * P, matrix-vector products and the reciprocal diagonal. Each row keeps its
+// products R * M * P (whose row order follows libc++'s unordered_map, LibcxxUnorderedMap),
+// matrix-vector products and the reciprocal diagonal. Each row keeps its
 // entries in the order they were set, since that order reaches every float sum (products and
 // Gauss-Seidel residuals). PoissonSystemMatrix is the fixed-stride counterpart for the
 // per-slice system rows.
@@ -134,6 +135,69 @@ public sealed class PoissonSparseMatrix
 		}
 
 		return a;
+	}
+
+	/// <summary>
+	/// The product this * <paramref name="b"/>: each output row sums a(i, k) * b(k, j) per
+	/// column j in a's then b's entry order, and lists its columns in the iteration order of the
+	/// libc++ std::unordered_map&lt;int, float&gt; it was gathered in (LibcxxUnorderedMap), which
+	/// later sums depend on. Port of <c>SparseMatrix::operator*( const SparseMatrix&amp; )</c>.
+	/// </summary>
+	public PoissonSparseMatrix Multiply(PoissonSparseMatrix b)
+	{
+		int aCols = 0;
+		for (int i = 0; i < Rows; i++)
+		{
+			for (int j = 0; j < rowSizes[i]; j++)
+			{
+				if (aCols <= columns[i][j])
+				{
+					aCols = columns[i][j] + 1;
+				}
+			}
+		}
+
+		if (b.Rows < aCols)
+		{
+			throw new InvalidOperationException($"Matrix sizes do not support multiplication {Rows} x {aCols} * {b.Rows}");
+		}
+
+		var result = new PoissonSparseMatrix();
+		result.Resize(Rows);
+		var row = new ColmapSharp.Util.LibcxxUnorderedMap<float>();
+		for (int i = 0; i < Rows; i++)
+		{
+			row.Reset();
+			for (int j = 0; j < rowSizes[i]; j++)
+			{
+				int idx1 = columns[i][j];
+				float aValue = values[i][j];
+				for (int k = 0; k < b.rowSizes[idx1]; k++)
+				{
+					int idx2 = b.columns[idx1][k];
+					float bValue = b.values[idx1][k];
+					int node = row.Find(idx2);
+					if (node == -1)
+					{
+						row.Insert(idx2, aValue * bValue);
+					}
+					else
+					{
+						row.Value(node) += aValue * bValue;
+					}
+				}
+			}
+
+			result.SetRowSize(i, row.Count);
+			int count = 0;
+			for (int node = row.First; node != -1; node = row.Next(node))
+			{
+				result.columns[i][count] = row.Key(node);
+				result.values[i][count++] = row.Value(node);
+			}
+		}
+
+		return result;
 	}
 
 	/// <summary>

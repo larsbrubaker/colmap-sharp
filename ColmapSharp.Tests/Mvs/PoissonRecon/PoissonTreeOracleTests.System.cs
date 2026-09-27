@@ -252,6 +252,31 @@ public partial class PoissonTreeOracleTests
 		produced.F("sparseentries", entries);
 		produced.F("sparseproducts", products);
 		produced.F("sparsediagonals", diagonals);
+
+		// _solveRegularMG's Galerkin chain from systemMatrix( baseDepth ).
+		var galerkinShape = new List<double> { baseDepth };
+		var galerkinEntries = new List<double>();
+		f.Init(baseDepth);
+		system.GetSliceMatrixAndProlongationConstraints(sliceMatrix, null, baseDepth, PoissonMultigrid.Begin(tree, sorted, baseDepth), PoissonMultigrid.End(tree, sorted, baseDepth), null, null, f.SetStencil(), f.SetParentChildStencils());
+		PoissonSparseMatrix m = PoissonSparseMatrix.From(sliceMatrix);
+		for (int d = baseDepth; d > 0; d--)
+		{
+			PoissonSparseMatrix r = PoissonMultigrid.DownSampleMatrix(tree, sorted, PoissonFemConstraints.TestSignature, d, baseDepth);
+			m = r.Multiply(m).Multiply(r.Transpose(m.Rows));
+			galerkinShape.Add(m.Rows);
+			for (int i = 0; i < m.Rows; i++)
+			{
+				galerkinShape.Add(m.RowSize(i));
+				for (int j = 0; j < m.RowSize(i); j++)
+				{
+					galerkinShape.Add(m.Column(i, j));
+					galerkinEntries.Add(m.Value(i, j));
+				}
+			}
+		}
+
+		produced.I("galerkinshape", galerkinShape);
+		produced.F("galerkinentries", galerkinEntries);
 	}
 
 	// The harness's Run up to and including finalizeForMultigrid, emitting its sorted slices.
