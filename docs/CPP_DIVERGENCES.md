@@ -2807,3 +2807,31 @@ stage and textures the model; with `Texture` off it reports nothing past the den
 textures nothing; over a zero-byte mesh it re-meshes from the untouched `fused.ply` and
 textures; cancelling during Poisson meshing leaves no `meshed-poisson.ply`; and a Poisson run
 whose trim empties the mesh still ends texturing progress at 1000 of 1000.
+
+## 137. AutomaticReconstructionController reseeds the PRNG before Delaunay meshing
+
+**What differs.** `CreateSubSampledDelaunayTriangulation` inserts the points in the order of a
+`Shuffle` drawn from the calling thread's PRNG (`Mvs/DelaunayMeshingInput.cs`, unchanged). COLMAP's
+controller calls `DenseDelaunayMeshing` on its own thread without seeding, so the shuffle starts
+from whatever that thread drew before: after a fresh sparse reconstruction, the state the mapper's
+RANSAC left (`RANSAC` calls `SetPRNGSeed(random_seed)` and then samples on the controller thread,
+since `mapper->Run()` runs inline); on a resume that reads `sparse/` back, a fresh thread; and for
+model `i > 0`, whatever model `i - 1`'s meshing left, or not, if that model was skipped. The port's
+controller calls `RandomUtils.SetPRNGSeed()` (seed `DefaultPRNGSeed`, 0, what a fresh COLMAP thread
+uses) right before each model's Delaunay meshing (`Controllers/AutomaticReconstruction.Dense.cs`),
+so a model's mesh depends only on its undistorted sparse model, `fused.ply` and `fused.ply.vis`.
+Here the dependence was worse than in COLMAP: the controller runs synchronously on the host's
+thread, often a reused pool thread, so the state also depended on unrelated earlier work in the
+process.
+
+**Why.** A resumed workspace that re-meshes a model must give the same mesh as the run that built
+it, and the same inputs must give the same mesh whatever ran before in the process. The seed
+matches COLMAP's resumed-run behavior, so only the first-run case changes.
+
+**Evidence.** In `AutomaticReconstructionTests.CSharpOnly_ResumeReusesDenseResultsAndRecoversPartialMesh`
+the first run and the resume that re-meshes over a zero-byte mesh fed Delaunay meshing identical
+inputs (instrumented: same hash over every point position, visibility count, image pose float and
+point index; 1882 points, 4 images) but different shuffles (first eight indices
+`1420,1170,73,1630,...` vs `1061,1594,1533,740,...`), so `meshed-delaunay.ply` differed while
+`fused.ply`, `fused.ply.vis` and the depth/normal maps were byte-identical. The test now asserts
+the re-mesh is byte-identical to the first run's mesh, and fails without the reseed.

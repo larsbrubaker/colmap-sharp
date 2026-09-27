@@ -9,6 +9,7 @@
 // - A mesh file that is not a PLY mesh (the zero-byte file an interrupted Poisson run leaves,
 //   since PoissonMeshing.Run creates it before reconstructing) counts as missing, so the model
 //   is re-meshed from its fused.ply instead of aborting every resume.
+//   The re-mesh is byte-identical to the first run's mesh (docs/CPP_DIVERGENCES.md entry 137).
 // - Cancelling during meshing leaves no partial mesh behind.
 // - Texturing progress ends at 100% even for an empty mesh.
 // One first run (the textured scene of AutomaticReconstructionTests.CSharpOnly.cs, Delaunay
@@ -72,6 +73,7 @@ public partial class AutomaticReconstructionTests
 		int firstTextured = RunController(Options(resume: false)).Controller.TexturedMeshes.Count;
 		(long, DateTime) fusedStamp = Stamp(fusedPath);
 		(long, DateTime) meshStamp = Stamp(meshPath);
+		byte[] firstMeshBytes = File.ReadAllBytes(meshPath);
 
 		// A resume with Texture on: dense results untouched, the model textured again.
 		(AutomaticReconstructionController textureResume, ReportLog textureLog) = RunController(Options(resume: true));
@@ -96,6 +98,7 @@ public partial class AutomaticReconstructionTests
 		(AutomaticReconstructionController remeshResume, ReportLog remeshLog) = RunController(Options(resume: true));
 		bool remeshKeptFused = Stamp(fusedPath) == fusedStamp;
 		long remeshMeshLength = new FileInfo(meshPath).Length;
+		bool remeshMatchesFirstRun = File.ReadAllBytes(meshPath).AsSpan().SequenceEqual(firstMeshBytes);
 		int remeshFaces = Ply.ReadPlyMesh(meshPath).Mesh.Faces.Count;
 		int remeshTextured = remeshResume.TexturedMeshes.Count;
 		string remeshStages = string.Join(" | ", remeshLog.Stages());
@@ -172,6 +175,7 @@ public partial class AutomaticReconstructionTests
 
 		await Assert.That(remeshKeptFused).IsTrue();
 		await Assert.That(remeshMeshLength).IsGreaterThan(0);
+		await Assert.That(remeshMatchesFirstRun).IsTrue();
 		await Assert.That(remeshFaces).IsGreaterThan(0);
 		await Assert.That(remeshTextured).IsEqualTo(1);
 		await Assert.That(remeshStages).IsEqualTo(string.Join(" | ", new[]

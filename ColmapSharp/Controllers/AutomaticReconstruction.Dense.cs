@@ -23,8 +23,11 @@
 // - The undistorted images stay in memory (InMemoryBitmapStore) rather than as files under
 //   dense/<i>/images, so a model is undistorted again when its images are not in the store
 //   (e.g. in a new controller over an existing workspace), not only when dense/<i> is missing.
+// - Delaunay meshing reseeds the thread's PRNG first, so a resumed workspace re-meshes to the
+//   same bytes as the run that built it (docs/CPP_DIVERGENCES.md entry 137).
 
 using ColmapSharp.ImageProcessing;
+using ColmapSharp.Mathematics;
 using ColmapSharp.Mvs;
 using ColmapSharp.Scene;
 using ColmapSharp.Sensor;
@@ -226,6 +229,12 @@ public sealed partial class AutomaticReconstructionController
 		reconstruction.Read(Path.Combine(densePath, "sparse"));
 		List<PlyPoint> plyPoints = Ply.ReadPly(fusedPath);
 		List<List<int>> visibility = StereoFusion.ReadPointsVisibility(fusedPath + ".vis", plyPoints.Count);
+
+		// Delaunay meshing shuffles its points with the thread's PRNG. COLMAP leaves that
+		// where the sparse mapper's RANSAC (or an earlier model's meshing) left it, so a
+		// resumed workspace meshes differently from the run that built it. Reseed so each
+		// model's mesh depends only on its inputs (docs/CPP_DIVERGENCES.md entry 137).
+		RandomUtils.SetPRNGSeed();
 		PlyMesh mesh = DelaunayMeshing.DenseDelaunayMeshing(
 			optionManager.DelaunayMeshing, reconstruction, plyPoints, visibility, progress, CancellationToken);
 		Ply.WriteBinaryPlyMesh(meshingPath, new PlyTexturedMesh(mesh));
