@@ -11,7 +11,9 @@
 // converted to the input PLY's uchar as PlyFile.inl's get_stored_item (PLY_FLOAT) and
 // write_binary_item (PLY_UCHAR) convert it. Output per run: unitCubeToModel, the vertex and
 // triangle counts, the positions, values, color bytes and triangles ("levelset3" in full,
-// poisson_harness.h's KeepFull; the others as checksums); then those two PLY functions alone on
+// poisson_harness.h's KeepFull; the others as checksums), and for the crafted "vertexpairs*"
+// runs, which reach the level set's vertex-pair branches, their input first (the other runs'
+// inputs are poisson_levelset.json's); then those two PLY functions alone on
 // crafted floats ("plycolor"), outside [0, 256) included. Built and run by
 // oracle/fixture_poisson_tree.py, which writes ColmapSharp.Tests/TestData/oracle/poisson_extract.json
 // (read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests.Extract.cs). Not part of
@@ -63,7 +65,18 @@ long long PlyUChar(Real value) {
   return (long long)byte;
 }
 
-void Run(const std::string& name, int depth, const std::vector<Sample>& input) {
+void Run(const std::string& name, int depth, const std::vector<Sample>& input, bool printInput = false) {
+  if (printInput) {
+    std::vector<double> flat;
+    for (const Sample& s : input)
+      for (int k = 0; k < 3; k++) flat.push_back(s.p[k]);
+    for (const Sample& s : input)
+      for (int k = 0; k < 3; k++) flat.push_back(s.n[k]);
+    for (const Sample& s : input)
+      for (int k = 0; k < 3; k++) flat.push_back(s.c[k]);
+    PrintF(name + "/input", flat);
+  }
+
   PoissonRun run;
   run.Prepare(depth, input);
   DenseNodeData<Real, Sigs> solution = run.SolveSystem();
@@ -123,6 +136,62 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input) {
   PrintI(name + "/mesh/triangles", triangles);
 }
 
+// The "vertexpairs*" inputs: where a coarse leaf's edge borders finer leaves and the surface
+// crosses both of its halves, the two iso-vertices are paired and the leaf's loop walks from
+// one to the other. Each input restarts the generator (the seed is part of the input), and
+// each reaches different pair branches (see PoissonTreeOracleTests.Extract.cs); the colors
+// are a function of the index so they draw nothing from it.
+Color IndexColor(size_t i) { return Color((float)(i * 37 % 256), (float)(i * 101 % 256), (float)(i * 199 % 256)); }
+
+// A few samples on each of three small spheres outside the shell.
+void AddSphere(std::vector<Sample>& samples, float cx, float cy, float cz, float r, int count) {
+  for (int i = 0; i < count; i++) {
+    Sample s;
+    float u = NextUnit() * 6.2831853f, v = NextUnit() * 3.1415927f;
+    s.n = Point<Real, Dim>(std::cos(u) * std::sin(v), std::sin(u) * std::sin(v), std::cos(v));
+    s.p = Point<Real, Dim>(cx, cy, cz) + s.n * r;
+    s.c = IndexColor(samples.size());
+    samples.push_back(s);
+  }
+}
+
+// Two parallel sheets 2 * halfGap apart, facing away from each other.
+void AddSheets(std::vector<Sample>& samples, float z, float halfGap, int count) {
+  for (int i = 0; i < count; i++) {
+    Sample s;
+    float x = 1.5f + 3.f * NextUnit(), y = -1.9f + 1.8f * NextUnit();
+    bool top = NextUnit() < 0.5f;
+    s.p = Point<Real, Dim>(x, y, top ? z + halfGap : z - halfGap);
+    s.n = Point<Real, Dim>(0.f, 0.f, top ? 1.f : -1.f);
+    s.c = IndexColor(samples.size());
+    samples.push_back(s);
+  }
+}
+
+// The shell alone, denser than the leaves at depth 6 resolve.
+std::vector<Sample> MakeVertexPairShell() {
+  lcg = 1177u;
+  return MakeInput(400);
+}
+
+// The shell with three small spheres, 60 samples each.
+std::vector<Sample> MakeVertexPairSpheres() {
+  lcg = 1059u;
+  std::vector<Sample> samples = MakeInput(150);
+  AddSphere(samples, 1.6f, -1.8f, 1.0f, 0.03f, 60);
+  AddSphere(samples, 4.4f, -0.2f, 1.0f, 0.03f, 60);
+  AddSphere(samples, 4.5f, -1.9f, 0.0f, 0.03f, 60);
+  return samples;
+}
+
+// A thin slab: two sheets 0.02 apart.
+std::vector<Sample> MakeVertexPairSheets() {
+  lcg = 955u;
+  std::vector<Sample> samples;
+  AddSheets(samples, 0.5f, 0.01f, 400);
+  return samples;
+}
+
 // The PLY uchar conversion on crafted floats: in range, fractions, 256 and above (the low byte
 // of the unsigned int), negative (0 on arm64, where the unsigned conversion saturates) and at or
 // beyond 2^32 (saturating to 255 there).
@@ -143,6 +212,9 @@ int main() {
   Run("levelset5", 5, MakeInput(300));
   Run("levelset6", 6, MakeInput(600));
   Run("levelset8", 8, MakeInput(500));
+  Run("vertexpairs1", 6, MakeVertexPairShell(), true);
+  Run("vertexpairs2", 7, MakeVertexPairSpheres(), true);
+  Run("vertexpairs3", 7, MakeVertexPairSheets(), true);
   RunPlyColor();
   return 0;
 }

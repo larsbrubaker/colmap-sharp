@@ -10,6 +10,15 @@
 // identical integers and bit-identical floats. Each run solves as PostSolveStages_MatchHarness
 // does and extracts at Solve's iso-value with the density and the per-level-scaled color field,
 // as COLMAP's --density and --colors do. Also pins Extract's cancellation and progress.
+//
+// The "vertexpairs*" runs are crafted inputs (stored in the extract fixture itself) where a
+// coarse leaf borders finer ones and the surface crosses both halves of a shared edge, which
+// the other runs do not reach. Counted with temporary instrumentation when they were added:
+// vertexpairs1 (the shell at depth 6) walks loops across the back and front slices' pair maps;
+// vertexpairs2 (the shell plus three small spheres, depth 7) makes pairs on slices and slabs
+// and pushes both to coarser slices; vertexpairs3 (a thin slab of two sheets, depth 7) walks
+// across the slab's pair map. All three reach the pushed-up face-edge map fallbacks, on
+// slices and on cross faces, with non-empty iso-edges.
 
 using System.Text.Json;
 
@@ -30,10 +39,16 @@ public partial class PoissonTreeOracleTests
 	[Arguments("levelset5", 5)]
 	[Arguments("levelset6", 6)]
 	[Arguments("levelset8", 8)]
+	[Arguments("vertexpairs1", 6)]
+	[Arguments("vertexpairs2", 7)]
+	[Arguments("vertexpairs3", 7)]
 	public async Task LevelSetExtractMesh_MatchesHarness(string name, int depth)
 	{
 		JsonElement cases = OracleFixture.Load(ExtractFixture).GetProperty("cases");
-		JsonElement input = OracleFixture.Load(LevelSetFixture).GetProperty("cases");
+
+		// The "vertexpairs" run's input is in the extract fixture itself; the others share
+		// poisson_levelset.json's.
+		JsonElement input = cases.TryGetProperty(name + "/input", out _) ? cases : OracleFixture.Load(LevelSetFixture).GetProperty("cases");
 		var produced = new Cases(name);
 		(FemTree tree, SortedTreeNodes sorted, Prepared p, float[] solution) = SolveAsSolveDoes(input, name, depth);
 		float isoValue = new PoissonImplicitEvaluator(tree, sorted, PoissonFemConstraints.TestSignature, solution).IsoValue(p.Set).Value;

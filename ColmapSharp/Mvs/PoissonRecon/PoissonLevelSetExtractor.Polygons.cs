@@ -11,7 +11,9 @@
 // addIsoEdges, setVertexPair and setEdgeVertex. Loops of more than three vertices are split by
 // MinimalAreaTriangulation (MAT.h), unless two non-adjacent vertices share a coordinate, in
 // which case they are fanned around their barycenter, a new vertex written to Vertices. Tier A
-// against oracle/poisson_levelset6_harness.cc.
+// against oracle/poisson_levelset6_harness.cc; the walk across a vertex pair (through the back
+// slice's, the front slice's and the slab's pair maps) and the face-edge map fallbacks with
+// pushed-up iso-edges are reached by oracle/poisson_extract_harness.cc's "vertexpairs*" runs.
 //
 // COLMAP's settings, the only branch ported: PoissonRecon.cpp's Execute passes
 // forceManifold = !--nonManifold (true, COLMAP never passes it) to Extract's addBarycenter
@@ -42,6 +44,12 @@ namespace ColmapSharp.Mvs.PoissonRecon;
 public sealed partial class PoissonLevelSetExtractor
 {
 	private readonly List<LevelSetIsoEdge> loopEdges = [];
+
+	// SetLevelSet's loops, reused across leaves: every loop's keys back to back, where each
+	// loop ends in loopKeys, and one loop's vertex indices at a time.
+	private readonly List<LevelSetKey> loopKeys = [];
+	private readonly List<int> loopEnds = [];
+	private int[] polygonBuffer = new int[16];
 
 	/// <summary>
 	/// The triangles in output order, each three indices into <see cref="Vertices"/>. Port of
@@ -85,7 +93,6 @@ public sealed partial class PoissonLevelSetExtractor
 		int globalDepth = depth + tree.DepthOffset;
 		int res = 1 << depth;
 		List<LevelSetIsoEdge> edges = loopEdges;
-		var loops = new List<List<LevelSetKey>>();
 		int end = sorted.End(globalDepth, offset + tree.LocalInset(depth));
 		for (int i = sorted.Begin(globalDepth, offset + tree.LocalInset(depth)); i < end; i++)
 		{
@@ -146,11 +153,10 @@ public sealed partial class PoissonLevelSetExtractor
 			}
 
 			// Get the edge loops
-			loops.Clear();
+			loopKeys.Clear();
+			loopEnds.Clear();
 			while (edges.Count > 0)
 			{
-				var loop = new List<LevelSetKey>();
-				loops.Add(loop);
 				LevelSetIsoEdge edge = edges[^1];
 				edges.RemoveAt(edges.Count - 1);
 				LevelSetKey start = edge.First, current = edge.Second;
@@ -172,7 +178,7 @@ public sealed partial class PoissonLevelSetExtractor
 							|| fValues.VertexPairMap.TryGetValue(current, out pair)
 							|| xValues.VertexPairMap.TryGetValue(current, out pair))
 						{
-							loop.Add(current);
+							loopKeys.Add(current);
 							current = pair;
 						}
 						else
@@ -182,23 +188,31 @@ public sealed partial class PoissonLevelSetExtractor
 					}
 					else
 					{
-						loop.Add(current);
+						loopKeys.Add(current);
 						current = edges[idx].Second;
 						edges[idx] = edges[^1];
 						edges.RemoveAt(edges.Count - 1);
 					}
 				}
 
-				loop.Add(start);
+				loopKeys.Add(start);
+				loopEnds.Add(loopKeys.Count);
 			}
 
 			// Add the loops to the mesh
-			foreach (List<LevelSetKey> loop in loops)
+			int loopStart = 0;
+			foreach (int loopEnd in loopEnds)
 			{
-				var polygon = new int[loop.Count];
-				for (int k = 0; k < loop.Count; k++)
+				int n = loopEnd - loopStart;
+				if (polygonBuffer.Length < n)
 				{
-					LevelSetKey key = loop[k];
+					polygonBuffer = new int[Math.Max(n, 2 * polygonBuffer.Length)];
+				}
+
+				int[] polygon = polygonBuffer;
+				for (int k = 0; k < n; k++)
+				{
+					LevelSetKey key = loopKeys[loopStart + k];
 
 					// setEdgeVertex on the back and front slices, then the slab's edgeVertexMap.
 					if (!bValues.EdgeVertexMap.TryGetValue(key, out polygon[k])
@@ -209,7 +223,8 @@ public sealed partial class PoissonLevelSetExtractor
 					}
 				}
 
-				AddIsoPolygons(polygon);
+				AddIsoPolygons(polygon.AsSpan(0, n));
+				loopStart = loopEnd;
 			}
 		}
 	}
@@ -267,7 +282,7 @@ public sealed partial class PoissonLevelSetExtractor
 
 	// AddIsoPolygons( ... , polygon , polygonMesh = false , addBarycenter = true ): each loop
 	// (vertex indices) as triangles, winding reversed.
-	private void AddIsoPolygons(int[] polygon)
+	private void AddIsoPolygons(ReadOnlySpan<int> polygon)
 	{
 		int n = polygon.Length;
 		if (n > 3)
@@ -329,7 +344,7 @@ public sealed partial class PoissonLevelSetExtractor
 
 	// The loop's barycenter: c *= 0, c += each vertex in loop order, c /= (float)count, per
 	// component (position, gradient, depth, data), in float.
-	private LevelSetVertex Barycenter(int[] polygon)
+	private LevelSetVertex Barycenter(ReadOnlySpan<int> polygon)
 	{
 		// depth = 0f where upstream's is uninitialized (undefined behavior; see the header and
 		// docs/CPP_DIVERGENCES.md, entry 125).

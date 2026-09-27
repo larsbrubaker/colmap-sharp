@@ -21,9 +21,11 @@
 //   by face, to the coarser slices or slabs whose face contains this one, stopping at the first
 //   ancestor whose neighbor across the face is finer.
 // The polygon step that reads them (SetLevelSet, IsoSurface) is
-// PoissonLevelSetExtractor.Polygons.cs. Tier A against oracle/poisson_levelset5_harness.cc;
-// none of its runs reaches a vertex pair (both halves of a coarse edge crossed), so the pair
-// branches are pinned only by reading.
+// PoissonLevelSetExtractor.Polygons.cs. Tier A against oracle/poisson_levelset5_harness.cc
+// per slice and slab. The vertex pairs (both halves of a coarse edge crossed) on slices and
+// slabs, their push to the coarser slices, and the finalize that maps them are pinned end to
+// end by oracle/poisson_extract_harness.cc's crafted "vertexpairs*" runs
+// (PoissonTreeOracleTests.Extract.cs), which reach each of those branches.
 //
 // Translation notes:
 // - Upstream runs each step in a ThreadPool::ParallelFor over the leaves, with per-thread key
@@ -324,7 +326,7 @@ public sealed partial class PoissonLevelSetExtractor
 
 			int mcIndex = sValues.McIndices[i - sValues.CellIndices.NodeOffset];
 			int count = MarchingSquares.AddEdgeIndices(mcIndex, isoEdges);
-			var edges = new LevelSetIsoEdge[count];
+			LevelSetIsoEdge[] edges = count == 0 ? Array.Empty<LevelSetIsoEdge>() : new LevelSetIsoEdge[count];
 			for (int j = 0; j < count; j++)
 			{
 				edges[j] = new LevelSetIsoEdge(SliceEdgeKey(sValues, leafIndex, isoEdges[2 * j], slice, zDir, depth), SliceEdgeKey(sValues, leafIndex, isoEdges[(2 * j) + 1], slice, zDir, depth));
@@ -397,7 +399,7 @@ public sealed partial class PoissonLevelSetExtractor
 				}
 
 				int count = MarchingSquares.AddEdgeIndices(faceMcIndex, isoEdges);
-				var edges = new LevelSetIsoEdge[count];
+				LevelSetIsoEdge[] edges = count == 0 ? Array.Empty<LevelSetIsoEdge>() : new LevelSetIsoEdge[count];
 				for (int j = 0; j < count; j++)
 				{
 					LevelSetKey k0 = CrossFaceEdgeKey(bValues, fValues, xValues, i, leafIndex, f, isoEdges[2 * j], slab, depth);
