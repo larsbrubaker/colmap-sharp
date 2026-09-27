@@ -13,6 +13,7 @@ using ColmapSharp.Compute;
 using ColmapSharp.Mvs;
 
 using TUnit.Assertions;
+using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
@@ -92,7 +93,7 @@ public class PatchMatchGpuPlanTests
 			(PatchMatchGpuBufferRole.BandUniforms, ComputeBufferKind.Uniform, 16, 94 + 91),
 		];
 		var actual = plan!.Buffers.Select(b => (b.Role, b.Kind, b.Size, b.Count)).ToArray();
-		await Assert.That(actual).IsEquivalentTo(expected);
+		await Assert.That(actual).IsEquivalentTo(expected, CollectionOrdering.Matching);
 		await Assert.That(plan.SweepCount).IsEqualTo(20);
 		await Assert.That(plan.BandCount(0)).IsEqualTo(94);
 		await Assert.That(plan.BandCount(1)).IsEqualTo(91);
@@ -121,7 +122,7 @@ public class PatchMatchGpuPlanTests
 		await Assert.That(fits).IsFalse();
 		await Assert.That(plan).IsNull();
 		await Assert.That(reason).IsEqualTo(
-			"The GPU can bind at most 128 MiB per buffer; this image's matching costs of all source images need 147 MiB. Using the CPU.");
+			"The GPU can bind at most 128 MiB per buffer; this image's matching costs of all source images need 147 MiB. Try fewer source images or a smaller maximum image size. Using the CPU.");
 	}
 
 	[Test]
@@ -130,7 +131,7 @@ public class PatchMatchGpuPlanTests
 		var (fits, _, reason) = Plan(Shape(2400, 1800, 20), true, ComputeDeviceLimits.Defaults);
 		await Assert.That(fits).IsFalse();
 		await Assert.That(reason).IsEqualTo(
-			"The GPU can hold at most 256 MiB in one buffer; this image's matching costs of all source images need 330 MiB. Using the CPU.");
+			"The GPU can hold at most 256 MiB in one buffer; this image's matching costs of all source images need 330 MiB. Try fewer source images or a smaller maximum image size. Using the CPU.");
 	}
 
 	[Test]
@@ -139,7 +140,7 @@ public class PatchMatchGpuPlanTests
 		var (fits, _, reason) = Plan(Shape(2400, 1800, 20), true, M5Limits, budget: 1L << 30);
 		await Assert.That(fits).IsFalse();
 		await Assert.That(reason).IsEqualTo(
-			"This image needs 1,632 MiB of GPU memory, more than the 1,024 MiB available. Using the CPU.");
+			"This image needs 1,632 MiB of GPU memory, more than the 1,024 MiB available. Try fewer source images or a smaller maximum image size. Using the CPU.");
 
 		// A budget of exactly the total fits.
 		var (fitsExactly, _, _) = Plan(Shape(2400, 1800, 20), true, M5Limits, budget: 1_711_224_448);
@@ -187,7 +188,7 @@ public class PatchMatchGpuPlanTests
 		var (fits, _, reason) = Plan(Shape(100, 80, 96), false, ComputeDeviceLimits.Defaults);
 		await Assert.That(fits).IsFalse();
 		await Assert.That(reason).IsEqualTo(
-			"The GPU can bind at most 64 KiB of uniform data per buffer; the camera poses of the source images need 65 KiB. Using the CPU.");
+			"The GPU can bind at most 64 KiB of uniform data per buffer; the camera poses of the source images need 65 KiB. Try fewer source images. Using the CPU.");
 
 		// 95 sources (16 x (8 + 43 x 95) = 65,488 bytes) still fit.
 		var (fits95, plan95, _) = Plan(Shape(100, 80, 95), false, ComputeDeviceLimits.Defaults);
@@ -202,7 +203,7 @@ public class PatchMatchGpuPlanTests
 		var (fits, _, reason) = Plan(Shape(1000, 750, 4), false, ComputeDeviceLimits.Defaults with { MaxComputeWorkgroupsPerDimension = 16 });
 		await Assert.That(fits).IsFalse();
 		await Assert.That(reason).IsEqualTo(
-			"The GPU can run at most 16 x 16 workgroups at once; this image's init_random step needs 11,719. Using the CPU.");
+			"This image is too large for the GPU to process in one pass: it needs 750,000 work items, and the GPU runs at most 16,384. Try fewer source images or a smaller maximum image size. Using the CPU.");
 	}
 
 	[Test]
@@ -225,6 +226,31 @@ public class PatchMatchGpuPlanTests
 	}
 
 	[Test]
+	public async Task DispatchElementCounts()
+	{
+		// Photometric with filtering, 1000 x 750, S = 4: backward_messages runs per (column,
+		// source) of the wider orientation, rotate_planes copies a whole source map.
+		var (_, plan, _) = Plan(Shape(1000, 750, 4), false, ComputeDeviceLimits.Defaults);
+		(string, long)[] expected =
+		[
+			("init_random", 750_000),
+			("initial_cost", 3_000_000),
+			("backward_messages", 4_000),
+			("sweep_band", 1_000),
+			("filter", 750_000),
+			("rotate_planes", 3_000_000),
+			("rotate_normals", 750_000),
+		];
+		await Assert.That(plan!.Dispatches.Select(d => (d.Kernel, d.Elements)).ToArray())
+			.IsEquivalentTo(expected, CollectionOrdering.Matching);
+
+		// With fewer than 3 sources the three reference planes are the widest copy.
+		var (_, twoSources, _) = Plan(Shape(100, 80, 2), false, ComputeDeviceLimits.Defaults);
+		await Assert.That(twoSources!.Dispatches.Single(d => d.Kernel == "rotate_planes").Elements).IsEqualTo(24_000L);
+		await Assert.That(twoSources.Dispatches.Single(d => d.Kernel == "backward_messages").Elements).IsEqualTo(200L);
+	}
+
+	[Test]
 	public async Task SourceImagesPastIndexRange()
 	{
 		// 20 layers of 20,000 x 6,000 bytes = 2.4e9, past i32 byte indexing, while M5's
@@ -233,7 +259,7 @@ public class PatchMatchGpuPlanTests
 		var (fits, _, reason) = Plan(shape, false, M5Limits);
 		await Assert.That(fits).IsFalse();
 		await Assert.That(reason).IsEqualTo(
-			"This image is too large for the GPU: its source images need more than 2,147,483,647 values in one buffer. Using the CPU.");
+			"This image is too large for the GPU: its source images need 2,289 MiB, more than the GPU can address in one buffer. Try fewer source images or a smaller maximum image size. Using the CPU.");
 	}
 
 	[Test]

@@ -27,16 +27,24 @@
 //   cost map, and only exists on the last sweep, whose cost map is never read again (the
 //   filter reads the selection map and depth/normal, not the costs). So the filter writes the
 //   mask into the cost buffer, and after the selection map has been rotated into the previous
-//   buffer the mask is rotated into the old selection buffer.
+//   buffer the mask is rotated into the old selection buffer. Because that buffer still holds
+//   float cost bits, the filter must write 0 or 1 to EVERY (source, pixel) entry, including
+//   filtered pixels; the CPU can write only the 1s because its mask starts zeroed.
 // - Source images, S x L bytes packed four per u32 (patch_match_textures.wgsl); source depth
 //   maps, S x L floats when geometric consistency is on, else a 4-byte dummy (WGSL resolves
 //   every declared name, so a photometric kernel still binds one).
 // - Uniforms: the byte / 255 table (1024 bytes); the pose table, array<vec4<f32>, 8 + 43S>
 //   as patch_match_geometry.wgsl reads it (floats [8r, 8r + 4) RefK(r), [8r + 4, 8r + 8)
 //   RefInvK(r) for rotations r = 0..3, then source s of rotation r at float
-//   32 + 43 (r S + s), unpadded; 4 x 43 S floats is always whole vec4s); one problem uniform, one uniform per sweep and one per band per orientation, all created
-//   with their data up front so nothing is written while dispatches are being recorded.
+//   32 + 43 (r S + s), unpadded; 4 x 43 S floats is always whole vec4s); one problem
+//   uniform, one uniform per sweep and one per band per orientation, all created with their
+//   data up front so nothing is written while dispatches are being recorded.
 // Every storage buffer is bound whole, so a buffer's size is also its binding size.
+//
+// Dispatches are 1D workgroups of 64, folded into two dimensions when the workgroup count
+// passes the device's per-dimension limit (PatchMatchGpuDispatch). A kernel computes its
+// index (group.y * X + group.x) * 64 + local, and compares it with the element count, in u32:
+// every count the plan accepts is below 2^31, but i32 intermediates could still wrap.
 
 using System.Globalization;
 
@@ -99,8 +107,8 @@ internal readonly record struct PatchMatchGpuBuffer(
 /// <paramref name="X"/> x <paramref name="Y"/> workgroups of
 /// <see cref="PatchMatchGpuPlan.WorkgroupSize"/>. The linear index is folded into two
 /// dimensions when one would exceed the device limit; the kernel recovers it as
-/// <c>(group.y * X + group.x) * WorkgroupSize + local</c> and skips indices at or past
-/// <paramref name="Elements"/>.
+/// <c>(group.y * X + group.x) * WorkgroupSize + local</c>, in u32, and skips indices at or
+/// past <paramref name="Elements"/> (compared in u32 too).
 /// </summary>
 internal readonly record struct PatchMatchGpuDispatch(string Kernel, long Elements, uint X, uint Y);
 
@@ -302,8 +310,7 @@ internal sealed class PatchMatchGpuPlan
 		bool geometric = options.GeomConsistency;
 		bool filter = options.Filter;
 
-		int perAxis = (2 * options.WindowRadius) / options.WindowStep + 1;
-		int windowCount = perAxis * perAxis;
+		int windowCount = PatchMatchPhotoConsistency.WindowCountFor(options.WindowRadius, options.WindowStep);
 		long samplesPerPixel = windowCount * (NewHypotheses * (long)options.NumSamples + s);
 
 		// Orientation 0 sweeps w columns down h rows; orientation 1, h columns down w rows.
@@ -395,7 +402,7 @@ internal sealed class PatchMatchGpuPlan
 			long elements = buffer.Role == PatchMatchGpuBufferRole.SourceImages ? buffer.Size : buffer.Size / 4;
 			if (buffer.Kind == ComputeBufferKind.Storage && elements > int.MaxValue)
 			{
-				return $"This image is too large for the GPU: its {buffer.Description} need more than {int.MaxValue.ToString("N0", CultureInfo.InvariantCulture)} values in one buffer. Using the CPU.";
+				return $"This image is too large for the GPU: its {buffer.Description} need {Need(buffer.Size)}, more than the GPU can address in one buffer. {TrySmaller} Using the CPU.";
 			}
 		}
 
@@ -403,7 +410,7 @@ internal sealed class PatchMatchGpuPlan
 		{
 			if (buffer.Size > limits.MaxBufferSize)
 			{
-				return $"The GPU can hold at most {Limit(limits.MaxBufferSize)} in one buffer; this image's {buffer.Description} need {Need(buffer.Size)}. Using the CPU.";
+				return $"The GPU can hold at most {Limit(limits.MaxBufferSize)} in one buffer; this image's {buffer.Description} need {Need(buffer.Size)}. {TrySmaller} Using the CPU.";
 			}
 		}
 
@@ -411,12 +418,12 @@ internal sealed class PatchMatchGpuPlan
 		{
 			if (buffer.Kind == ComputeBufferKind.Storage && buffer.Size > limits.MaxStorageBufferBindingSize)
 			{
-				return $"The GPU can bind at most {Limit(limits.MaxStorageBufferBindingSize)} per buffer; this image's {buffer.Description} need {Need(buffer.Size)}. Using the CPU.";
+				return $"The GPU can bind at most {Limit(limits.MaxStorageBufferBindingSize)} per buffer; this image's {buffer.Description} need {Need(buffer.Size)}. {TrySmaller} Using the CPU.";
 			}
 
 			if (buffer.Kind == ComputeBufferKind.Uniform && buffer.Size > limits.MaxUniformBufferBindingSize)
 			{
-				return $"The GPU can bind at most {Limit(limits.MaxUniformBufferBindingSize)} of uniform data per buffer; the {buffer.Description} need {Need(buffer.Size)}. Using the CPU.";
+				return $"The GPU can bind at most {Limit(limits.MaxUniformBufferBindingSize)} of uniform data per buffer; the {buffer.Description} need {Need(buffer.Size)}. {TryFewerSources} Using the CPU.";
 			}
 		}
 
@@ -424,18 +431,27 @@ internal sealed class PatchMatchGpuPlan
 		{
 			if (d.Y > limits.MaxComputeWorkgroupsPerDimension)
 			{
-				long groups = CeilDiv(d.Elements, WorkgroupSize);
-				return $"The GPU can run at most {limits.MaxComputeWorkgroupsPerDimension.ToString("N0", CultureInfo.InvariantCulture)} x {limits.MaxComputeWorkgroupsPerDimension.ToString("N0", CultureInfo.InvariantCulture)} workgroups at once; this image's {d.Kernel} step needs {groups.ToString("N0", CultureInfo.InvariantCulture)}. Using the CPU.";
+				// Speak in work items (invocations), not kernels or workgroups.
+				long capacity = (long)limits.MaxComputeWorkgroupsPerDimension * limits.MaxComputeWorkgroupsPerDimension * WorkgroupSize;
+				return $"This image is too large for the GPU to process in one pass: it needs {d.Elements.ToString("N0", CultureInfo.InvariantCulture)} work items, and the GPU runs at most {capacity.ToString("N0", CultureInfo.InvariantCulture)}. {TrySmaller} Using the CPU.";
 			}
 		}
 
 		if (memoryBudget is long budget && plan.TotalBytes > budget)
 		{
-			return $"This image needs {Need(plan.TotalBytes)} of GPU memory, more than the {Limit(budget)} available. Using the CPU.";
+			return $"This image needs {Need(plan.TotalBytes)} of GPU memory, more than the {Limit(budget)} available. {TrySmaller} Using the CPU.";
 		}
 
 		return null;
 	}
+
+	// What a user can change to fit: every size and dispatch the plan checks grows with the
+	// source image count or the image size (PatchMatchOptions.MaxImageSize).
+	private const string TrySmaller = "Try fewer source images or a smaller maximum image size.";
+
+	// The only uniform that grows with the problem is the pose table, which the image size
+	// does not affect.
+	private const string TryFewerSources = "Try fewer source images.";
 
 	private static long CeilDiv(long a, long b) => (a + b - 1) / b;
 

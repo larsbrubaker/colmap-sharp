@@ -80,13 +80,16 @@ public sealed partial class PatchMatchPhotoConsistency
 	public PatchMatchFrame Frame => frame;
 
 	/// <summary>Number of samples in the (strided) window: the size of a <see cref="PrepareWindow"/> buffer.</summary>
-	public int WindowCount
+	public int WindowCount => WindowCountFor(windowRadius, windowStep);
+
+	/// <summary>
+	/// Samples in a window of <paramref name="windowRadius"/> and <paramref name="windowStep"/>:
+	/// <see cref="WindowCount"/> without a problem, for PatchMatchGpuPlan's cost model.
+	/// </summary>
+	internal static int WindowCountFor(int windowRadius, int windowStep)
 	{
-		get
-		{
-			int perAxis = (2 * windowRadius) / windowStep + 1;
-			return perAxis * perAxis;
-		}
+		int perAxis = (2 * windowRadius) / windowStep + 1;
+		return perAxis * perAxis;
 	}
 
 	/// <summary>
