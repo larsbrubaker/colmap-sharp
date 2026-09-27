@@ -8,7 +8,9 @@
 // (not a fixed ../../.. from this file), scripts (.py, .sh) and the oracle's C/C++ harnesses
 // (.c, .cc, .cpp, .h) are measured as well as .cs, and the excluded trees are this repo's:
 // build output, the C++ reference checkout and the oracle's Python venv. It also fails on
-// git conflict markers left in any text file (a merge once let them slip into a doc).
+// git conflict markers left in any text file (a merge once let them slip into a doc), and
+// checks the WGSL shader header convention (see WgslHeaderProblem). WGSL shaders
+// (ColmapSharp/Mvs/Shaders/*.wgsl) are measured against the same 800-line limit.
 
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -80,6 +82,7 @@ public class FileComplianceTests
 		".cc",
 		".cpp",
 		".h",
+		".wgsl",
 	};
 
 	/// <summary>
@@ -162,6 +165,78 @@ public class FileComplianceTests
 		}
 
 		await Assert.That(violations.Count).IsEqualTo(0);
+	}
+
+	/// <summary>
+	/// Every WGSL shader carries the header CLAUDE.md asks of every file, in the WGSL form
+	/// ColmapSharp/Mvs/PatchMatchShaders.cs defines: a leading `//` block that starts with the
+	/// copyright line and names what the file mirrors and ports.
+	/// </summary>
+	[Test]
+	public async Task WgslFilesHaveTheHeader()
+	{
+		var projectRoot = ResolveProjectRoot();
+		var shaders = GetAllProjectFiles(projectRoot).Where(f => Path.GetExtension(f).Equals(".wgsl", StringComparison.OrdinalIgnoreCase)).ToList();
+		var violations = new List<string>();
+		foreach (var filePath in shaders)
+		{
+			var problem = WgslHeaderProblem(File.ReadAllLines(filePath));
+			if (problem != null)
+			{
+				violations.Add($"  {GetRelativePath(projectRoot, filePath)}: {problem}");
+			}
+		}
+
+		if (violations.Count > 0)
+		{
+			Assert.Fail("WGSL files without the header:" + Environment.NewLine + string.Join(Environment.NewLine, violations));
+		}
+
+		await Assert.That(shaders.Count).IsGreaterThan(0);
+	}
+
+	[Test]
+	public async Task WgslHeaderCheckFindsEachMissingPart()
+	{
+		string[] good = ["// Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).", "//", "// k.wgsl: a kernel.", "// Mirrors: A.cs", "// Ports: nothing", "", "fn f() {}"];
+
+		using (Assert.Multiple())
+		{
+			await Assert.That(WgslHeaderProblem(good)).IsNull();
+			await Assert.That(WgslHeaderProblem(good.Skip(1).ToArray())).IsNotNull();
+			await Assert.That(WgslHeaderProblem(good.Where(l => !l.StartsWith("// Mirrors:", StringComparison.Ordinal)).ToArray())).IsNotNull();
+			await Assert.That(WgslHeaderProblem(good.Where(l => !l.StartsWith("// Ports:", StringComparison.Ordinal)).ToArray())).IsNotNull();
+
+			// A Mirrors line after the leading comment block does not count.
+			string[] late = [good[0], good[1], good[2], good[4], "", good[3]];
+			await Assert.That(WgslHeaderProblem(late)).IsNotNull();
+		}
+	}
+
+	/// <summary>
+	/// Null when <paramref name="lines"/> start with the WGSL header: a block of `//` lines
+	/// whose first is the copyright line naming Lars Brubaker and which holds a `// Mirrors:`
+	/// and a `// Ports:` line; otherwise what is missing.
+	/// </summary>
+	private static string? WgslHeaderProblem(string[] lines)
+	{
+		var header = lines.TakeWhile(l => l.StartsWith("//", StringComparison.Ordinal)).ToList();
+		if (header.Count == 0 || !header[0].StartsWith("// Copyright (c)", StringComparison.Ordinal) || !header[0].Contains("Lars Brubaker", StringComparison.Ordinal))
+		{
+			return "the first line must be the copyright line (// Copyright (c) <year>, Lars Brubaker. ...)";
+		}
+
+		if (!header.Any(l => l.StartsWith("// Mirrors:", StringComparison.Ordinal)))
+		{
+			return "the header needs a '// Mirrors:' line naming the C# file(s) the shader must agree with";
+		}
+
+		if (!header.Any(l => l.StartsWith("// Ports:", StringComparison.Ordinal)))
+		{
+			return "the header needs a '// Ports:' line naming the COLMAP source it replaces (or why none)";
+		}
+
+		return null;
 	}
 
 	[Test]
@@ -259,6 +334,7 @@ public class FileComplianceTests
 			WriteSourceFile(Path.Combine(root, "oracle", "Harness.h"));
 			WriteSourceFile(Path.Combine(root, "oracle", "Harness.c"));
 			WriteSourceFile(Path.Combine(root, "oracle", "Harness.cpp"));
+			WriteSourceFile(Path.Combine(root, "ColmapSharp", "Mvs", "Shaders", "Kernel.wgsl"));
 			WriteSourceFile(Path.Combine(root, "cpp-reference", "src", "Reference.cc"));
 			WriteSourceFile(Path.Combine(root, "docs", "NotMeasured.md"));
 			WriteSourceFile(Path.Combine(root, "cpp-reference", "src", "Reference.cs"));
@@ -268,7 +344,7 @@ public class FileComplianceTests
 			var files = GetAllProjectFiles(root);
 
 			await Assert.That(files.Select(f => Path.GetFileName(f)).OrderBy(f => f, StringComparer.Ordinal).ToList())
-				.IsEquivalentTo(new List<string> { "Harness.c", "Harness.cc", "Harness.cpp", "Harness.h", "Kept.cs", "Kept.py" });
+				.IsEquivalentTo(new List<string> { "Harness.c", "Harness.cc", "Harness.cpp", "Harness.h", "Kept.cs", "Kept.py", "Kernel.wgsl" });
 		}
 		finally
 		{

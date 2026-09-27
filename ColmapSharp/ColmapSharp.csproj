@@ -55,6 +55,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- GPU PatchMatch's WGSL, loaded by Mvs/PatchMatchShaders.cs under these fixed names
+         (not the default ones, which depend on the folder layout). -->
+    <EmbeddedResource Include="Mvs/Shaders/*.wgsl" LogicalName="ColmapSharp.Mvs.Shaders.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- COLMAP's tests are in-tree and see its internals; ported helpers that are not
          public API here are internal, and the 1:1 test port needs to reach them. -->
     <InternalsVisibleTo Include="ColmapSharp.Tests" />
