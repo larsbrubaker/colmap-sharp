@@ -1,8 +1,8 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // PoissonTreeOracleTests.LevelSet5 (C#-only, not a COLMAP test): the level-set extractor's
-// iso-edges (PoissonLevelSetExtractor.IsoEdges) with the iso-vertices they follow, run as
-// Extract runs them (everything but the polygons) - for each finalized slice and slab: the
+// iso-edges (PoissonLevelSetExtractor.IsoEdges) with the iso-vertices they follow, run by
+// PoissonLevelSetExtractor.Extract stopped before the polygons - for each finalized slice and slab: the
 // edge keys that are set (own vertices and keys copied from finer edges), the iso-edges of
 // each face that is set, the face-edge map and the vertex-pair map (sorted by key), plus the
 // vertex count - against the "levelset*" runs of oracle/poisson_levelset5_harness.cc
@@ -42,11 +42,11 @@ public partial class PoissonTreeOracleTests
 
 		var slices = new IsoEdgeDumps();
 		var slabs = new IsoEdgeDumps();
-		int step = 0;
 
+		// The harness's step: 0 for the first slice, then slab + 1 for each slab's slice and slab.
 		void FinalizeSlice(int sliceAtMaxDepth)
 		{
-			extractor.FinalizeSlice(sliceAtMaxDepth);
+			int step = sliceAtMaxDepth;
 			for (int d = extractor.MaxDepth, o = sliceAtMaxDepth; d >= extractor.FullDepth; d--, o >>= 1)
 			{
 				LevelSetSliceValues v = extractor.SlabValues[d].SliceValues(o);
@@ -60,7 +60,7 @@ public partial class PoissonTreeOracleTests
 
 		void FinalizeSlab(int slabAtMaxDepth)
 		{
-			extractor.FinalizeSlab(slabAtMaxDepth);
+			int step = slabAtMaxDepth + 1;
 			for (int d = extractor.MaxDepth, o = slabAtMaxDepth; d >= extractor.FullDepth; d--, o >>= 1)
 			{
 				LevelSetXSliceValues v = extractor.SlabValues[d].XSliceValues(o);
@@ -73,30 +73,12 @@ public partial class PoissonTreeOracleTests
 		}
 
 		// Extract's slab loop, without IsoSurface (the polygons).
-		extractor.InitSlice(0);
-		extractor.InitSlab(0, true);
-		extractor.SetSliceValues(0);
-		extractor.SetSliceIsoVertices(0);
-		extractor.SetSliceIsoEdges(0);
-		FinalizeSlice(0);
-		step++;
-		for (int slab = 0; slab < 1 << extractor.MaxDepth; slab++)
+		extractor.Extract(CancellationToken.None, null, new LevelSetExtractHooks
 		{
-			extractor.InitSlice(slab + 1);
-			if (slab != 0)
-			{
-				extractor.InitSlab(slab, false);
-			}
-
-			extractor.SetSliceValues(slab + 1);
-			extractor.SetSlabIsoVertices(slab);
-			extractor.SetSliceIsoVertices(slab + 1);
-			extractor.SetSliceIsoEdges(slab + 1);
-			extractor.SetSlabIsoEdges(slab);
-			FinalizeSlice(slab + 1);
-			FinalizeSlab(slab);
-			step++;
-		}
+			Stages = LevelSetExtractStages.IsoEdges,
+			SliceFinalized = FinalizeSlice,
+			SlabFinalized = FinalizeSlab,
+		});
 
 		produced.I("vertexcount", [extractor.Vertices.Count]);
 		produced.I("isoedges/slicekeys", slices.Keys);

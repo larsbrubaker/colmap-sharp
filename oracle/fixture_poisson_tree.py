@@ -29,6 +29,10 @@
 #   poisson_levelset6.json oracle/poisson_levelset6_harness.cc: the polygons (triangles and
 #                       barycenter vertices) in write order (PoissonLevelSetExtractor.Polygons,
 #                       MinimalAreaTriangulation)
+#   poisson_extract.json oracle/poisson_extract_harness.cc: upstream's Extract end to end,
+#                       transformed by unitCubeToModel, and the output vertices (position,
+#                       density value, PLY uchar colors) and triangles
+#                       (PoissonLevelSetExtractor.Extract, PoissonMeshOutput)
 #   poisson_libm.json   oracle/poisson_libm_harness.cc: libm's pow( x , 1./3 ) and logf
 # Tier A, bit-exact. Read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests*.cs.
 #
@@ -78,6 +82,7 @@ HARNESSES = [
     ("poisson_levelset5_harness.cc", "poisson_levelset5.json", None),
     ("poisson_isoroot_harness.cc", "poisson_isoroot.json", None),
     ("poisson_levelset6_harness.cc", "poisson_levelset6.json", None),
+    ("poisson_extract_harness.cc", "poisson_extract.json", None),
 ]
 
 if __name__ == "__main__":

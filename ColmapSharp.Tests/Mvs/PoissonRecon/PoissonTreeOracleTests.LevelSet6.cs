@@ -2,7 +2,7 @@
 //
 // PoissonTreeOracleTests.LevelSet6 (C#-only, not a COLMAP test): the level-set extractor's
 // polygons (PoissonLevelSetExtractor.Polygons, MinimalAreaTriangulation), run through
-// Extract's whole slab loop - the total vertex count, every triangle in write order and each
+// Extract's whole slab loop (PoissonLevelSetExtractor.Extract) - the total vertex count, every triangle in write order and each
 // barycenter vertex AddIsoPolygons writes (index, position, gradient, depth, color) - against
 // the "levelset*" runs of oracle/poisson_levelset6_harness.cc
 // (TestData/oracle/poisson_levelset6.json; "levelset3" is stored in full, the rest as
@@ -39,42 +39,15 @@ public partial class PoissonTreeOracleTests
 		produced.F("isovalue", [isoValue]);
 		var extractor = new PoissonLevelSetExtractor(tree, sorted, PoissonFemConstraints.TestSignature, solution, isoValue, p.Density, p.Colors);
 
-		// The vertices written while IsoSurface runs are the barycenters.
+		// The vertices written while IsoSurface runs (after the slab is finalized) are the
+		// barycenters.
 		var barycenters = new List<int>();
-		void IsoSurface(int slab)
+		int before = 0;
+		extractor.Extract(CancellationToken.None, null, new LevelSetExtractHooks
 		{
-			int before = extractor.Vertices.Count;
-			extractor.IsoSurface(slab);
-			for (int v = before; v < extractor.Vertices.Count; v++)
-			{
-				barycenters.Add(v);
-			}
-		}
-
-		// Extract's slab loop.
-		extractor.InitSlice(0);
-		extractor.InitSlab(0, true);
-		extractor.SetSliceValues(0);
-		extractor.SetSliceIsoVertices(0);
-		extractor.SetSliceIsoEdges(0);
-		extractor.FinalizeSlice(0);
-		for (int slab = 0; slab < 1 << extractor.MaxDepth; slab++)
-		{
-			extractor.InitSlice(slab + 1);
-			if (slab != 0)
-			{
-				extractor.InitSlab(slab, false);
-			}
-
-			extractor.SetSliceValues(slab + 1);
-			extractor.SetSlabIsoVertices(slab);
-			extractor.SetSliceIsoVertices(slab + 1);
-			extractor.SetSliceIsoEdges(slab + 1);
-			extractor.SetSlabIsoEdges(slab);
-			extractor.FinalizeSlice(slab + 1);
-			extractor.FinalizeSlab(slab);
-			IsoSurface(slab);
-		}
+			SlabFinalized = _ => before = extractor.Vertices.Count,
+			SlabExtracted = _ => barycenters.AddRange(Enumerable.Range(before, extractor.Vertices.Count - before)),
+		});
 
 		var triangles = new List<double>();
 		foreach (int[] polygon in extractor.Polygons)

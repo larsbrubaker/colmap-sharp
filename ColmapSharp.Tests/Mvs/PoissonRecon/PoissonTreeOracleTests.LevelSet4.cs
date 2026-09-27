@@ -3,7 +3,8 @@
 // PoissonTreeOracleTests.LevelSet4 (C#-only, not a COLMAP test): every iso-vertex of the
 // level-set extractor, on slice edges (PoissonLevelSetExtractor.IsoVertices) and on cross-slice
 // edges (PoissonLevelSetExtractor.XSliceIsoVertices), interleaved as Extract runs them (a
-// slab's cross-edge vertices before the next slice's edge vertices) - every vertex in write
+// slab's cross-edge vertices before the next slice's edge vertices; PoissonLevelSetExtractor.Extract
+// stopped after the iso-vertices) - every vertex in write
 // order (position, gradient, density depth, color), the colors alone in full for the smaller
 // runs, each finalized slice's and slab's edge-vertex map, and the bad-root count - against the
 // "levelset*" runs of oracle/poisson_levelset4_harness.cc (TestData/oracle/poisson_levelset4.json).
@@ -122,10 +123,10 @@ public partial class PoissonTreeOracleTests
 	{
 		var edgeMaps = new List<double>();
 		var slabMaps = new List<double>();
-		int step = 0;
 
-		// A key map sorted by key (the harness sorts upstream's unordered_map the same way).
-		void DumpMap(Dictionary<LevelSetKey, int> map, int d, int o, List<double> output)
+		// A key map sorted by key (the harness sorts upstream's unordered_map the same way). The
+		// harness's step: 0 for the first slice, then slab + 1 for each slab's slice and slab.
+		void DumpMap(int step, Dictionary<LevelSetKey, int> map, int d, int o, List<double> output)
 		{
 			var entries = map.Select(kv => (kv.Key.X, kv.Key.Y, kv.Key.Z, kv.Value)).Order().ToList();
 			output.AddRange([step, d, o, entries.Count]);
@@ -137,10 +138,9 @@ public partial class PoissonTreeOracleTests
 
 		void FinalizeSlice(int sliceAtMaxDepth)
 		{
-			extractor.FinalizeSliceEdges(sliceAtMaxDepth);
 			for (int d = extractor.MaxDepth, o = sliceAtMaxDepth; d >= extractor.FullDepth; d--, o >>= 1)
 			{
-				DumpMap(extractor.SlabValues[d].SliceValues(o).EdgeVertexMap, d, o, edgeMaps);
+				DumpMap(sliceAtMaxDepth, extractor.SlabValues[d].SliceValues(o).EdgeVertexMap, d, o, edgeMaps);
 				if ((o & 1) != 0)
 				{
 					break;
@@ -150,10 +150,9 @@ public partial class PoissonTreeOracleTests
 
 		void FinalizeSlab(int slabAtMaxDepth)
 		{
-			extractor.FinalizeSlabEdges(slabAtMaxDepth);
 			for (int d = extractor.MaxDepth, o = slabAtMaxDepth; d >= extractor.FullDepth; d--, o >>= 1)
 			{
-				DumpMap(extractor.SlabValues[d].XSliceValues(o).EdgeVertexMap, d, o, slabMaps);
+				DumpMap(slabAtMaxDepth + 1, extractor.SlabValues[d].XSliceValues(o).EdgeVertexMap, d, o, slabMaps);
 				if ((o & 1) == 0)
 				{
 					break;
@@ -162,27 +161,12 @@ public partial class PoissonTreeOracleTests
 		}
 
 		// Extract's slab loop, without the iso-edges and the polygons.
-		extractor.InitSlice(0);
-		extractor.InitSlab(0, true);
-		extractor.SetSliceValues(0);
-		extractor.SetSliceIsoVertices(0);
-		FinalizeSlice(0);
-		step++;
-		for (int slab = 0; slab < 1 << extractor.MaxDepth; slab++)
+		extractor.Extract(CancellationToken.None, null, new LevelSetExtractHooks
 		{
-			extractor.InitSlice(slab + 1);
-			if (slab != 0)
-			{
-				extractor.InitSlab(slab, false);
-			}
-
-			extractor.SetSliceValues(slab + 1);
-			extractor.SetSlabIsoVertices(slab);
-			extractor.SetSliceIsoVertices(slab + 1);
-			FinalizeSlice(slab + 1);
-			FinalizeSlab(slab);
-			step++;
-		}
+			Stages = LevelSetExtractStages.IsoVertices,
+			SliceFinalized = FinalizeSlice,
+			SlabFinalized = FinalizeSlab,
+		});
 
 		var vertices = new List<double>();
 		var colors = new List<double>();

@@ -28,6 +28,8 @@ struct PoissonRun {
   SparseNodeData<Point<Real, Dim>, NormalSigs>* normalInfo = nullptr;
   SparseNodeData<ProjectiveData<InternalAuxData, Real>, IsotropicUIntPack<Dim, DataSig>> auxData;
   InterpolationInfo* iInfo = nullptr;
+  // Solve's implicit.unitCubeToModel.
+  XForm<Real, Dim + 1> unitCubeToModel = XForm<Real, Dim + 1>::Identity();
 
   PoissonRun() : tree(MEMORY_ALLOCATOR_BLOCK_SIZE) {}
   ~PoissonRun() {
@@ -48,7 +50,8 @@ struct PoissonRun {
     pointStream.reset();
     modelToUnitCube = PointExtent::GetXForm<Real, Dim, true, Point<Real, Dim>, Color>(pointStream, Point<Real, Dim>(), Color(), params.scale, params.alignDir) * modelToUnitCube;
     pointStream.reset();
-    params.template testAndSet<Dim>(modelToUnitCube.inverse());
+    unitCubeToModel = modelToUnitCube.inverse();
+    params.template testAndSet<Dim>(unitCubeToModel);
     {
       Reconstructor::TransformedInputOrientedSampleStream<Real, Dim, Color> _pointStream(modelToUnitCube, pointStream);
       std::vector<node_index_type> nodeToIndexMap;

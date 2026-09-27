@@ -7,7 +7,8 @@
 // _LevelSetExtractor< ... , 3 , ... >::Extract set-up (the full depth, the coarse coefficients,
 // SlabValues per depth) and its InitSlice, InitSlab and SetSliceValues steps with
 // SetSliceCornerValuesAndMCIndices, and FEMTree.inl's sliced getFullDepth. The driver loop
-// (slab by slab at the finest depth) calls them in Extract's order. The iso-vertices on slice
+// (slab by slab at the finest depth, PoissonLevelSetExtractor.Extract.cs) calls them in
+// Extract's order. The iso-vertices on slice
 // edges are in PoissonLevelSetExtractor.IsoVertices.cs and those on cross-slice (slab) edges in
 // PoissonLevelSetExtractor.XSliceIsoVertices.cs, the iso-edges in
 // PoissonLevelSetExtractor.IsoEdges.cs, the polygons (IsoSurface) in
