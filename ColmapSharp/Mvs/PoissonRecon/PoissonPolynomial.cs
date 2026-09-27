@@ -337,15 +337,24 @@ public sealed class PoissonPolynomial
 	/// many there are. Port of <c>Polynomial&lt;1&gt;::getSolutions</c> and
 	/// <c>Polynomial&lt;2&gt;::getSolutions</c> with Factor.h's <c>Factor</c>.
 	/// </summary>
-	public int GetSolutions(double c, Span<double> roots, double eps)
+	public int GetSolutions(double c, Span<double> roots, double eps) => GetSolutions(Coefficients, c, roots, eps);
+
+	/// <summary>
+	/// <see cref="GetSolutions(double, Span{double}, double)"/> for the polynomial whose
+	/// coefficients (lowest power first) are <paramref name="coefficients"/>, so a caller that
+	/// solves one small polynomial per vertex (the level-set extractor's Hermite root) need not
+	/// allocate one.
+	/// </summary>
+	internal static int GetSolutions(ReadOnlySpan<double> coefficients, double c, Span<double> roots, double eps)
 	{
 		Span<double> real = stackalloc double[2];
 		Span<double> imaginary = stackalloc double[2];
-		int factorCount = Degree switch
+		int degree = coefficients.Length - 1;
+		int factorCount = degree switch
 		{
-			1 => FactorLinear(Coefficients[1], Coefficients[0] - c, real, imaginary, eps),
-			2 => FactorQuadratic(Coefficients[2], Coefficients[1], Coefficients[0] - c, real, imaginary, eps),
-			_ => throw new NotSupportedException($"Can't solve polynomial of degree: {Degree}"),
+			1 => FactorLinear(coefficients[1], coefficients[0] - c, real, imaginary, eps),
+			2 => FactorQuadratic(coefficients[2], coefficients[1], coefficients[0] - c, real, imaginary, eps),
+			_ => throw new NotSupportedException($"Can't solve polynomial of degree: {degree}"),
 		};
 		int count = 0;
 		for (int i = 0; i < factorCount; i++)

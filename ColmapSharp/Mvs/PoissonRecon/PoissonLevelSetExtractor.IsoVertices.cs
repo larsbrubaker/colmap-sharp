@@ -12,7 +12,10 @@
 // (slab) edges' vertices are in PoissonLevelSetExtractor.XSliceIsoVertices.cs; the Hermite
 // root (AverageRoot), the push-down test (IsNeeded) and the color evaluation (DataAt) here are
 // shared by both GetIsoVertex forms. Tier A against oracle/poisson_levelset3_harness.cc and,
-// interleaved with the slab vertices as Extract runs them, oracle/poisson_levelset4_harness.cc.
+// interleaved with the slab vertices as Extract runs them, oracle/poisson_levelset4_harness.cc
+// (whose "crafted5" run reaches the clamped root, the zeroData color and the pushes below the
+// full depth); AverageRoot's rarer branches (two roots, linear Hermite, linear fallback, throw)
+// against oracle/poisson_isoroot_harness.cc.
 //
 // Translation notes:
 // - COLMAP runs Extract with nonLinearFit on (it never passes --linearFit) and gradientNormals
@@ -47,7 +50,6 @@ public sealed partial class PoissonLevelSetExtractor
 	private readonly PoissonPointEvaluator? dataEvaluator;
 	private readonly float[] vertexPosition = new float[3];
 	private readonly float[] cellStart = new float[3];
-	private readonly double[] roots = new double[2];
 
 	/// <summary>The edge and face key generator at the finest depth. Port of Extract's <c>keyGenerator</c>.</summary>
 	public LevelSetKeyGenerator KeyGenerator { get; }
@@ -287,11 +289,29 @@ public sealed partial class PoissonLevelSetExtractor
 		return new LevelSetVertex(position[0], position[1], position[2], gradient, gradient, gradient, depth, dataValue);
 	}
 
-	// Both GetIsoVertex forms' root: the Hermite quadratic through the edge's end values x0, x1
-	// with end derivatives dx0, dx1 (the corner gradients times the edge length), its roots in
-	// [0, 1] averaged, falling back to the linear root, then clamped to [0, 1] (counted as bad
-	// when it lands on or outside an end).
+	// Both GetIsoVertex forms' root, counting a bad root on the extractor.
 	private double AverageRoot(float x0, float x1, double dx0, double dx1)
+	{
+		double averageRoot = AverageRoot(isoValue, x0, x1, dx0, dx1, out bool badRoot);
+		if (badRoot)
+		{
+			BadRootCount++;
+		}
+
+		return averageRoot;
+	}
+
+	/// <summary>
+	/// Both GetIsoVertex forms' root: the Hermite quadratic through the edge's end values
+	/// <paramref name="x0"/>, <paramref name="x1"/> with end derivatives <paramref name="dx0"/>,
+	/// <paramref name="dx1"/> (the corner gradients times the edge length), its roots in [0, 1]
+	/// averaged, falling back to the linear root, then clamped to [0, 1];
+	/// <paramref name="badRoot"/> says it landed on or outside an end (upstream's
+	/// <c>_BadRootCount++</c>). Throws when the ends are equal and no quadratic root lies in
+	/// [0, 1]. The float/double mix is upstream's: x1-x0 is a float difference and the linear
+	/// root a float quotient.
+	/// </summary>
+	internal static double AverageRoot(float isoValue, float x0, float x1, double dx0, double dx1, out bool badRoot)
 	{
 		double averageRoot;
 		bool rootFound = false;
@@ -302,12 +322,10 @@ public sealed partial class PoissonLevelSetExtractor
 			dx1 *= scl;
 
 			// Hermite Spline
-			var p = new PoissonPolynomial(2);
-			p.Coefficients[0] = x0;
-			p.Coefficients[1] = dx0;
-			p.Coefficients[2] = (3 * (x1 - x0)) - dx1 - (2 * dx0);
+			Span<double> p = [x0, dx0, (3 * (x1 - x0)) - dx1 - (2 * dx0)];
+			Span<double> roots = stackalloc double[2];
 			int rCount = 0;
-			int rootCount = p.GetSolutions(isoValue, roots, 0);
+			int rootCount = PoissonPolynomial.GetSolutions(p, isoValue, roots, 0);
 			averageRoot = 0;
 			for (int i = 0; i < rootCount; i++)
 			{
@@ -339,9 +357,9 @@ public sealed partial class PoissonLevelSetExtractor
 			averageRoot = (isoValue - x0) / (x1 - x0);
 		}
 
-		if (averageRoot <= 0 || averageRoot >= 1)
+		badRoot = averageRoot <= 0 || averageRoot >= 1;
+		if (badRoot)
 		{
-			BadRootCount++;
 			if (averageRoot < 0)
 			{
 				averageRoot = 0;

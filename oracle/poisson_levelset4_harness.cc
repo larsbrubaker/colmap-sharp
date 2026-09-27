@@ -11,7 +11,8 @@
 // level as Solve does. Output: every vertex in write order (position, gradient, depth, color),
 // the colors alone in full for the smaller runs (so a mismatch can be located without the
 // checksum), each finalized slice's and slab's edge-vertex map sorted by key, and the bad-root
-// count. Built and run by oracle/fixture_poisson_tree.py, which writes
+// count. A "crafted" run (see Run) reaches the branches the others miss: zeroData colors, a
+// clamped root, and pushes below the full depth. Built and run by oracle/fixture_poisson_tree.py, which writes
 // ColmapSharp.Tests/TestData/oracle/poisson_levelset4.json (read by
 // ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests.LevelSet4.cs). Not part of any
 // build. The set-up and the solve are oracle/poisson_solve.h's PoissonRun.
@@ -31,7 +32,23 @@ struct VertexSink {
   }
 };
 
-void Run(const std::string& name, int depth, const std::vector<Sample>& input, bool fullColors) {
+template <typename KeyValues>
+void DumpKeyValues(const KeyValues& lists, std::vector<long long>& out) {
+  for (size_t t = 0; t < lists.size(); t++)
+    for (const auto& kv : lists[t]) {
+      for (int k = 0; k < 3; k++) out.push_back(kv.first.idx[k]);
+      out.push_back(kv.second.first);
+    }
+}
+
+// crafted: the run that reaches the rarer branches of GetIsoVertex and of the vertex push-down.
+// Only the even node indices keep their color (the others are zeroed, so some vertices have no
+// color weight and take zeroData, which is non-zero here); the level is the median of the
+// corner values set on slice 0 at the full depth, so the level set meets the domain's z = 0
+// face (whose edges push their vertices below the full depth) and passes exactly through
+// corners (roots on an edge end, clamped and counted as bad); and the edge keys pushed below
+// the full depth, which Extract never reads back, are dumped at the end.
+void Run(const std::string& name, int depth, const std::vector<Sample>& input, bool fullColors, bool crafted = false) {
   PoissonRun run;
   run.Prepare(depth, input);
   DenseNodeData<Real, Sigs> solution = run.SolveSystem();
@@ -42,6 +59,7 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input, b
   tree.tree().processNodes([&](const FEMTreeNode* n) {
     ProjectiveData<InternalAuxData, Real>* clr = run.auxData(n);
     if (clr) (*clr) *= (Real)pow((Real)perLevelDataScaleFactor, tree.depth(n));
+    if (clr && crafted && (n->nodeData.nodeIndex & 1)) *clr = ProjectiveData<InternalAuxData, Real>();
   });
 
   // Solve's iso-value, single-threaded.
@@ -57,8 +75,7 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input, b
       }
     }
   }
-  const Real isoValue = (Real)(valueSum / weightSum);
-  PrintF(name + "/isovalue", {isoValue});
+  Real isoValue = (Real)(valueSum / weightSum);
 
   // Extract's set-up.
   tree._setFEM1ValidityFlags(Sigs());
@@ -78,7 +95,7 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input, b
   for (int d = 0; d <= tree._maxDepth; d++) evaluators[d].set(tree._maxDepth);
   std::vector<typename Extractor::SlabValues> slabValues(tree._maxDepth + 1);
   typename FEMIntegrator::template PointEvaluator<IsotropicUIntPack<Dim, DataSig>, ZeroUIntPack<Dim>> pointEvaluator(tree._maxDepth);
-  const InternalAuxData zeroData = InternalAuxData(Color());
+  const InternalAuxData zeroData = crafted ? InternalAuxData(Color(0.25f, 0.5f, 0.75f)) : InternalAuxData(Color());
   VertexSink sink;
   const size_t badRootsBefore = Extractor::_BadRootCount;  // A static counter: count this run's.
 
@@ -159,6 +176,20 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input, b
     }
   };
 
+  if (crafted) {
+    // The corner values do not depend on the level; the loop below re-initializes slice 0.
+    InitSlice(0);
+    InitSlab(0, true);
+    SetSliceValues(0);
+    auto& values = slabValues[fullDepth].sliceValues(0);
+    std::vector<Real> corners;
+    for (size_t i = 0; i < values.cellIndices.counts[0]; i++)
+      if (slabValues[fullDepth].sliceScratch(0).cSet[i]) corners.push_back(values.cornerValues[i]);
+    std::sort(corners.begin(), corners.end());
+    isoValue = corners[corners.size() / 2];
+  }
+  PrintF(name + "/isovalue", {isoValue});
+
   // Extract's slab loop, without the iso-edges and the polygons.
   InitSlice(0);
   InitSlab(0, true);
@@ -195,6 +226,21 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input, b
   PrintI(name + "/edgemaps", edgeMaps);
   PrintI(name + "/slabmaps", slabMaps);
   PrintI(name + "/badroots", {(long long)(Extractor::_BadRootCount - badRootsBefore)});
+  if (crafted) {
+    // Every key pushed below the full depth, in recording order: depth and parity, then the
+    // slice keys and the slab keys (each a count, then key and vertex per entry).
+    std::vector<long long> coarseKeys;
+    for (int d = fullDepth - 1; d >= 0; d--)
+      for (int parity = 0; parity < 2; parity++) {
+        std::vector<long long> sliceKeys, slabKeys;
+        DumpKeyValues(slabValues[d].sliceScratch(parity).eKeyValues, sliceKeys);
+        DumpKeyValues(slabValues[d].xSliceScratch(parity).eKeyValues, slabKeys);
+        coarseKeys.push_back(d), coarseKeys.push_back(parity);
+        coarseKeys.push_back(sliceKeys.size() / 4), coarseKeys.insert(coarseKeys.end(), sliceKeys.begin(), sliceKeys.end());
+        coarseKeys.push_back(slabKeys.size() / 4), coarseKeys.insert(coarseKeys.end(), slabKeys.begin(), slabKeys.end());
+      }
+    PrintI(name + "/coarsekeys", coarseKeys);
+  }
 }
 
 }  // namespace
@@ -202,8 +248,11 @@ void Run(const std::string& name, int depth, const std::vector<Sample>& input, b
 int main() {
   ThreadPool::ParallelizationType = ThreadPool::NONE;
   Run("levelset3", 3, MakeInput(100), true);
-  Run("levelset5", 5, MakeInput(300), true);
+  // MakeInput draws from one running generator, so levelset5's points are kept for crafted5.
+  const std::vector<Sample> input5 = MakeInput(300);
+  Run("levelset5", 5, input5, true);
   Run("levelset6", 6, MakeInput(600), true);
   Run("levelset8", 8, MakeInput(500), false);
+  Run("crafted5", 5, input5, true, true);
   return 0;
 }

@@ -59,11 +59,14 @@ public sealed partial class PoissonLevelSetExtractor
 		this.isoValue = isoValue;
 		this.density = density;
 		this.data = data;
-		this.zeroData = zeroData ?? new float[data == null ? 0 : data.Width - 1];
-		if (data != null && this.zeroData.Length != data.Width - 1)
+		// Copied, so a caller reusing its array cannot change the fallback mid-extraction.
+		int channels = data == null ? 0 : data.Width - 1;
+		if (zeroData != null && zeroData.Length != channels)
 		{
-			throw new ArgumentException($"zeroData has {this.zeroData.Length} entries; the data has {data.Width - 1}.", nameof(zeroData));
+			throw new ArgumentException($"zeroData has {zeroData.Length} entries; the data has {channels} (none without data).", nameof(zeroData));
 		}
+
+		this.zeroData = zeroData == null ? new float[channels] : (float[])zeroData.Clone();
 		PoissonMultigrid.SetFem1ValidityFlags(tree, sorted, signature);
 		MaxDepth = PoissonMultigrid.MaxDepth(tree);
 		FullDepth = GetFullDepth(tree, FemSignature.Degree(signature), 0, 0, 1);
