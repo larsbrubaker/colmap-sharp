@@ -28,9 +28,10 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
 
 ### Phase 12 — Dense reconstruction (MVS)
 - `poisson_meshing` (PoissonRecon port, `Mvs/PoissonRecon/`). Everything through the linear
-  solve, the iso-value and the level set's iso-vertices, iso-edges and polygons is done and
-  bit-exact against the vendored C++ (harnesses `oracle/poisson_levelset{,2,3,4,5,6}_harness.cc`,
-  built at `-O1`). Remaining, in order (each bit-exact through a harness fixture, ≤ ~1 MB):
+  solve, the iso-value, the level set's iso-vertices, iso-edges and polygons, the Extract
+  driver and model-space output (`PoissonMeshOutput`) is done and bit-exact against the
+  vendored C++ (harnesses `oracle/poisson_levelset{,2,3,4,5,6}_harness.cc` and
+  `poisson_extract_harness.cc`, built at `-O1`). Remaining, in order (each bit-exact through a harness fixture, ≤ ~1 MB):
   1. Coverage: no fixture produces an iso-edge vertex pair, so the pair branches, the polygon
      loop walk across a pair and the pushed-up `faceEdgeMap` fallbacks are pinned by reading
      only (needs a crafted input with leaves coarser than `FullDepth` beside finer ones).
@@ -39,10 +40,14 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
   2. Root-cause why the levelset harnesses at `-O0` change some triangle connectivity
      checksums (levelset5/6/8) versus `-O1`; `-O2` only changes barycenter depths
      (divergence 125). If it is another upstream uninitialized read, document it.
-  3. Extract's slab driver (no boundaries; CancellationToken and IProgress per slab),
-     `unitCubeToModel`, output vertices (position, RGB, density value when trimming).
-  4. SurfaceTrimmer, the public in-memory `PoissonMeshing` API plus the file wrapper, and
-     `poisson_meshing_test.cc` 1:1, with a Tier C pycolmap fixture.
+  3. SurfaceTrimmer (SurfaceTrimmer.cpp, bit-exact via a harness on `PoissonMeshOutput`).
+  4. The public in-memory `PoissonMeshing` API plus the file wrapper, and
+     `poisson_meshing_test.cc` 1:1, with a Tier C pycolmap fixture. Colors follow the input's
+     extra PLY properties, not `options.color` (PoissonRecon ignores `--colors` for .ply).
+     Review items: `PoissonMeshOutput.FromLevelSet` must throw unless `Extract` completed
+     (cancelled or never-run extractors now give a partial/empty mesh), and the extractor's
+     step methods (`InitSlice`, `IsoSurface`, ...) should become internal so `Extract`'s
+     run-once guard can't be bypassed.
 
 ### Verification
 - End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us (also the
