@@ -37,7 +37,7 @@ public class PatchMatchRunTests
 	private static double Texture(double x, double y) =>
 		0.5 + 0.2 * Math.Sin(9 * x + 1) * Math.Cos(8 * y) + 0.15 * Math.Sin(23 * x - 17 * y) + 0.1 * Math.Cos(31 * y + 5 * x);
 
-	private static (List<Image> Images, List<DepthMap> DepthMaps, List<NormalMap> NormalMaps) Scene(int width, int height)
+	internal static (List<Image> Images, List<DepthMap> DepthMaps, List<NormalMap> NormalMaps) Scene(int width, int height)
 	{
 		float cx = width / 2.0f - 0.5f;
 		float cy = height / 2.0f - 0.5f;
@@ -78,7 +78,7 @@ public class PatchMatchRunTests
 		return (images, depthMaps, normalMaps);
 	}
 
-	private static PatchMatchOptions Options(int numIterations, bool geomConsistency, bool filter, int numThreads = -1) => new()
+	internal static PatchMatchOptions Options(int numIterations, bool geomConsistency, bool filter, int numThreads = -1) => new()
 	{
 		DepthMin = 2,
 		DepthMax = 8,
@@ -91,7 +91,7 @@ public class PatchMatchRunTests
 		NumThreads = numThreads,
 	};
 
-	private static PatchMatch.Problem Problem(List<Image> images, List<DepthMap>? depthMaps = null, List<NormalMap>? normalMaps = null) => new()
+	internal static PatchMatch.Problem Problem(List<Image> images, List<DepthMap>? depthMaps = null, List<NormalMap>? normalMaps = null) => new()
 	{
 		RefImageIdx = 0,
 		SrcImageIdxs = [1, 2],

@@ -18,7 +18,11 @@
 // - GpuMat buffers become Mat planes; each rotation writes into a second buffer that is then
 //   swapped in, as COLMAP's Rotate does with freshly allocated GpuMats.
 // - The per-column global workspace (forward messages and sampling probabilities) becomes a
-//   scratch array per worker thread, which every column fully initializes before use.
+//   column state (forward messages, previous depth and normal) plus per-row scratch, which
+//   every column fully initializes before use; the state lives in a per-worker array when a
+//   column is swept in one go, or in one array over all columns when it is swept in bands.
+// - The last sweep filters in a separate pass after the rows are swept, not per row
+//   (PatchMatchCpu.Sweep.cs explains why that gives the same result).
 // - The CUDA timers and logging are not ported; progress goes to an IProgress<double> (the
 //   fraction of sweeps done) and cancellation is checked between sweeps and inside them.
 
@@ -56,6 +60,13 @@ internal sealed partial class PatchMatchCpu
 	private Mat<float> prevSelProbMap;
 	private Mat<float> costMap;
 	private Mat<byte> consistencyMask = new(0, 0, 0);
+
+	/// <summary>
+	/// Rows per band of a column sweep; 0 (the default) or anything at least the height
+	/// sweeps each column in one go. Only tests set it, to pin that the banded schedule the
+	/// GPU runs gives the same result (PatchMatchSweepBandTests).
+	/// </summary>
+	internal int SweepBandHeight { get; init; }
 
 	/// <summary>
 	/// Sets up <paramref name="problem"/> (already checked by PatchMatch.Check) under
@@ -227,23 +238,65 @@ internal sealed partial class PatchMatchCpu
 		return consistentImageIdxs;
 	}
 
+	/// <summary>
+	/// One sweep: per column the backward messages, then the rows in bands of
+	/// SweepBandHeight, then (last sweep only) the filter pass. With the default band - the
+	/// whole height - each column runs start to finish on one worker, the cache-friendly
+	/// order; with smaller bands every column finishes a band before any starts the next, the
+	/// order the GPU runs. Both give the same result, since columns are independent.
+	/// </summary>
 	private void RunSweep(SweepOptions sweepOptions, CancellationToken cancellationToken)
 	{
 		PatchMatchPhotoConsistency pcc = NewPhotoConsistency();
-		int scratchSize = 2 * costMap.GetDepth() + 2 * pcc.WindowCount;
+		int width = costMap.GetWidth();
+		int height = costMap.GetHeight();
+		int stateSize = ColumnStateSize(costMap.GetDepth());
+		int rowScratchSize = RowScratchSize(costMap.GetDepth(), pcc.WindowCount);
+		int bandHeight = SweepBandHeight <= 0 ? height : SweepBandHeight;
 		ParallelOptions parallelOptions = Mat<float>.ParallelOptionsFor(options.NumThreads);
 		parallelOptions.CancellationToken = cancellationToken;
-		Parallel.For(
-			0,
-			costMap.GetWidth(),
-			parallelOptions,
-			() => new float[scratchSize],
-			(col, _, scratch) =>
+		if (bandHeight >= height)
+		{
+			Parallel.For(
+				0,
+				width,
+				parallelOptions,
+				() => new float[stateSize + rowScratchSize],
+				(col, _, scratch) =>
+				{
+					Span<float> columnState = scratch.AsSpan(0, stateSize);
+					BackwardMessages(col, columnState);
+					SweepRows(col, 0, height, sweepOptions, pcc, columnState, scratch.AsSpan(stateSize));
+					return scratch;
+				},
+				_ => { });
+		}
+		else
+		{
+			float[] columnStates = new float[width * stateSize];
+			Parallel.For(0, width, parallelOptions, col => BackwardMessages(col, columnStates.AsSpan(col * stateSize, stateSize)));
+			for (int rowStart = 0; rowStart < height; rowStart += bandHeight)
 			{
-				SweepColumn(col, sweepOptions, pcc, scratch);
-				return scratch;
-			},
-			_ => { });
+				int bandStart = rowStart;
+				int bandEnd = Math.Min(height, rowStart + bandHeight);
+				Parallel.For(
+					0,
+					width,
+					parallelOptions,
+					() => new float[rowScratchSize],
+					(col, _, rowScratch) =>
+					{
+						SweepRows(col, bandStart, bandEnd, sweepOptions, pcc, columnStates.AsSpan(col * stateSize, stateSize), rowScratch);
+						return rowScratch;
+					},
+					_ => { });
+			}
+		}
+
+		if (sweepOptions.FilterPhotoConsistency || sweepOptions.FilterGeomConsistency)
+		{
+			FilterPixels(sweepOptions, cancellationToken);
+		}
 	}
 
 	private PatchMatchPhotoConsistency NewPhotoConsistency() =>

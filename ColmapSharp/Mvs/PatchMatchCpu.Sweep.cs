@@ -2,12 +2,13 @@
 // Ported from COLMAP (BSD-3-Clause, see THIRD_PARTY_NOTICES.md).
 //
 // PatchMatchCpu.Sweep: the SweepFromTopToBottom kernel of patch_match_cuda.cu on the CPU -
-// one top-to-bottom pass over a column of the (rotated) reference image that computes the
-// backward messages, then per row proposes five depth/normal hypotheses (current,
+// one top-to-bottom pass over a column of the (rotated) reference image. BackwardMessages
+// computes the backward messages bottom to top and initializes the column's carried state;
+// SweepRows then, per row of a band, proposes five depth/normal hypotheses (current,
 // propagated from the row above, random, and the two mixes), scores them against source
-// images drawn by Monte Carlo sampling from the selection probabilities, keeps the best,
-// updates costs, forward messages and selection probabilities, and on the last sweep
-// optionally filters the pixel and records its consistent source images.
+// images drawn by Monte Carlo sampling from the selection probabilities, keeps the best, and
+// updates costs, forward messages and selection probabilities. On the last sweep FilterPixels
+// then filters every pixel and records its consistent source images.
 // PatchMatchCpu.cs owns the maps and the schedule; the helpers are in
 // PatchMatchKernel.Geometry.cs, PatchMatchKernel.Photometric.cs and PatchMatchLikelihood.cs.
 //
@@ -17,6 +18,17 @@
 // the original reference image and the sweep (docs/CPP_DIVERGENCES.md, entry 86).
 // Hypotheses 1-4 of each Monte Carlo sample are scored together by
 // PatchMatchPhotoConsistency.ComputeFour (SIMD lanes, bit-identical to four scalar calls).
+//
+// Why the sweep is split into BackwardMessages + SweepRows bands + FilterPixels (the CUDA
+// kernel does all three in one per-column loop): the GPU port (PORTING_PLAN.md Phase 13) runs
+// each piece as its own dispatch, bands of rows across all columns, so no dispatch runs long.
+// Everything a column carries from row to row - the forward message per source image, the
+// previous row's best depth and normal - lives in an explicit column state
+// (ColumnStateSize floats), so a band can stop and the next one resume bit-identically.
+// Filtering moved out of the row loop because on the last sweep it reads only the pixel's
+// final selection probabilities and best depth/normal, and the next row propagates from the
+// carried best depth and normal rather than the (possibly zeroed) maps, so filtering after
+// the sweep gives the same result (pinned by PatchMatchSweepBandTests).
 
 namespace ColmapSharp.Mvs;
 
@@ -42,25 +54,28 @@ internal sealed partial class PatchMatchCpu
 	// FLT_EPSILON.
 	private const float FloatEpsilon = 1.1920929e-07f;
 
-	private void SweepColumn(int col, in SweepOptions sweep, PatchMatchPhotoConsistency pcc, float[] scratch)
+	// Layout of a column's carried state: the forward message per source image, then the
+	// previous row's best depth and normal.
+	private static int ColumnStateSize(int numImages) => numImages + 4;
+
+	// Per-row scratch: sampling probabilities per source image, then the reference window's
+	// colors and weights.
+	private static int RowScratchSize(int numImages, int windowCount) => numImages + 2 * windowCount;
+
+	/// <summary>
+	/// The backward message pass of SweepFromTopToBottom for column <paramref name="col"/>:
+	/// runs bottom to top, storing each message in the selection probability map, and
+	/// initializes <paramref name="columnState"/> for the first row (forward messages 0.5, the
+	/// top pixel's depth and normal as the previous ones).
+	/// </summary>
+	private void BackwardMessages(int col, Span<float> columnState)
 	{
 		int width = costMap.GetWidth();
 		int height = costMap.GetHeight();
 		int numImages = costMap.GetDepth();
 		int planeSize = width * height;
 		float[] costs = costMap.Data;
-		float[] depths = depthMap.Data;
-		float[] normals = normalMap.Data;
 		float[] selProbs = selProbMap.Data;
-		float[] prevSelProbs = prevSelProbMap.Data;
-		float[] poses = transforms.Poses(rotation);
-		PatchMatchFrame frame = pcc.Frame;
-
-		Span<float> forwardMessage = scratch.AsSpan(0, numImages);
-		Span<float> samplingProbs = scratch.AsSpan(numImages, numImages);
-		int windowCount = pcc.WindowCount;
-		Span<float> refColors = scratch.AsSpan(2 * numImages, windowCount);
-		Span<float> windowWeights = scratch.AsSpan(2 * numImages + windowCount, windowCount);
 
 		// Compute backward message for all rows. Note that the backward messages are
 		// temporarily stored in the sel_prob_map and replaced row by row as the updated
@@ -76,11 +91,45 @@ internal sealed partial class PatchMatchCpu
 			}
 
 			// Initialize forward message.
-			forwardMessage[imageIdx] = UniformProb;
+			columnState[imageIdx] = UniformProb;
 		}
 
+		// Parameters for first row in column.
+		columnState[numImages] = depthMap.Data[col];
+		ReadNormal(normalMap.Data, planeSize, col, columnState.Slice(numImages + 1, 3));
+	}
+
+	/// <summary>
+	/// The row loop of SweepFromTopToBottom for rows [<paramref name="rowStart"/>,
+	/// <paramref name="rowEnd"/>) of column <paramref name="col"/>, resuming from and updating
+	/// <paramref name="columnState"/> (see ColumnStateSize). BackwardMessages must have run for
+	/// the column in this sweep, and the column's bands must run in order.
+	/// </summary>
+	private void SweepRows(
+		int col, int rowStart, int rowEnd, in SweepOptions sweep, PatchMatchPhotoConsistency pcc,
+		Span<float> columnState, Span<float> rowScratch)
+	{
+		int width = costMap.GetWidth();
+		int height = costMap.GetHeight();
+		int numImages = costMap.GetDepth();
+		int planeSize = width * height;
+		float[] costs = costMap.Data;
+		float[] depths = depthMap.Data;
+		float[] normals = normalMap.Data;
+		float[] selProbs = selProbMap.Data;
+		float[] prevSelProbs = prevSelProbMap.Data;
+		float[] poses = transforms.Poses(rotation);
+		PatchMatchFrame frame = pcc.Frame;
+
+		Span<float> forwardMessage = columnState[..numImages];
+		Span<float> prevNormal = columnState.Slice(numImages + 1, 3);
+		Span<float> samplingProbs = rowScratch[..numImages];
+		int windowCount = pcc.WindowCount;
+		Span<float> refColors = rowScratch.Slice(numImages, windowCount);
+		Span<float> windowWeights = rowScratch.Slice(numImages + windowCount, windowCount);
+
 		// Parameters of previous, current and randomly sampled pixel states.
-		Span<float> prevNormal = stackalloc float[3];
+		float prevDepth = columnState[numImages];
 		Span<float> currNormal = stackalloc float[3];
 		Span<float> randNormal = stackalloc float[3];
 		Span<float> point = stackalloc float[3];
@@ -93,11 +142,7 @@ internal sealed partial class PatchMatchCpu
 		Span<float> fourNormals = stackalloc float[12];
 		Span<float> fourCosts = stackalloc float[4];
 
-		// Parameters for first row in column.
-		float prevDepth = depths[col];
-		ReadNormal(normals, planeSize, col, prevNormal);
-
-		for (int row = 0; row < height; ++row)
+		for (int row = rowStart; row < rowEnd; ++row)
 		{
 			int pixel = row * width + col;
 			(int origRow, int origCol) = PatchMatchTransforms.ToOriginalPixel(rotation, row, col, refWidth, refHeight);
@@ -236,15 +281,38 @@ internal sealed partial class PatchMatchCpu
 				selProbs[idx] = prob;
 			}
 
-			if (sweep.FilterPhotoConsistency || sweep.FilterGeomConsistency)
-			{
-				FilterPixel(sweep, poses, frame, row, col, bestDepth, bestNormal);
-			}
-
 			// Update previous depth for next row.
 			prevDepth = bestDepth;
 			bestNormal.CopyTo(prevNormal);
 		}
+
+		columnState[numImages] = prevDepth;
+	}
+
+	/// <summary>
+	/// The filtering step of the last sweep, run over every pixel after all rows are swept
+	/// (see the file header for why that equals filtering inside the row loop).
+	/// </summary>
+	private void FilterPixels(SweepOptions sweep, CancellationToken cancellationToken)
+	{
+		int width = costMap.GetWidth();
+		int planeSize = width * costMap.GetHeight();
+		float[] depths = depthMap.Data;
+		float[] normals = normalMap.Data;
+		float[] poses = transforms.Poses(rotation);
+		var frame = new PatchMatchFrame(transforms, rotation);
+		ParallelOptions parallelOptions = Mat<float>.ParallelOptionsFor(options.NumThreads);
+		parallelOptions.CancellationToken = cancellationToken;
+		Parallel.For(0, costMap.GetHeight(), parallelOptions, row =>
+		{
+			Span<float> bestNormal = stackalloc float[3];
+			for (int col = 0; col < width; ++col)
+			{
+				int pixel = row * width + col;
+				ReadNormal(normals, planeSize, pixel, bestNormal);
+				FilterPixel(sweep, poses, frame, row, col, depths[pixel], bestNormal);
+			}
+		});
 	}
 
 	/// <summary>
