@@ -24,16 +24,30 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
 
 ### Phase 11 — Pipeline controllers
 `automatic_reconstruction` (minus CGAL/GPU branches), including the step that turns
-`MeshTextureMapping`'s result into a textured mesh.
+`MeshTextureMapping`'s result into a textured mesh. Starts once `poisson_meshing` is done.
 
 ### Phase 12 — Dense reconstruction (MVS)
-- `poisson_meshing`: PoissonRecon port in progress. Done: B-splines, octree, density,
-  splatting, finalize, interpolation info, FEM constraint/system integrators and
-  restriction/prolongation, FEM and interpolation constraints, system matrix rows, point-constraint transfers and the
-  sliced Gauss-Seidel, and the whole linear solve (`_solveRegularMG`, SolveCG, cascadic
-  solveSystem). iso-value, level-set corner evaluation. HyperCube tables, slice/slab cell indices and
-  corner values/MC indices. Remaining: level-set extraction (iso-vertices, iso-edges/polygons, driver and output), the trimmer, the
-  public API and `poisson_meshing_test.cc`.
+- `poisson_meshing` (PoissonRecon port, `Mvs/PoissonRecon/`). Everything through the linear
+  solve, the iso-value and the level set's corner values/MC indices is done and bit-exact
+  against the vendored C++. Remaining, in order (each bit-exact through a new
+  `oracle/poisson_levelset3_harness.cc` fixture, each fixture file ≤ ~1 MB):
+  1. Iso-vertices (FEMTree.LevelSet.3D.inl ~1007-1140, 1679-1800):
+     `Polynomial<2>::getSolutions` (Factor.h quadratic) in `PoissonPolynomial.cs`;
+     `GetIsoVertex` for slice and cross-slice edges with the exact float/double mix, roots
+     averaged in [0,1], the `_BadRootCount` clamp, the linear fallback, zero vertex gradient
+     (gradientNormals is off); density via a weight key and `PoissonSplat.GetSampleDepthAndWeight`;
+     color via `_addEvaluation` (FEMTree.Evaluation.inl 566-600) of the aux field with the
+     zeroData fallback; `SetSliceIsoVertices`/`SetXSliceIsoVertices` with eSet/fSet scratch,
+     edgeKeys, eKeyValues and the push-down to coarser/X slices; `setFromScratch`; a vertex
+     sink. Vertex numbering follows `vertexStream.write` order — confirm no hash-map order
+     reaches it; multi-thread order goes in divergence 123.
+  2. Iso-edges and polygons: `CopyFiner(X)SliceIsoEdgeKeys`, `Set(X)SliceIsoEdges`,
+     `SetLevelSet`, `AddIsoPolygons` with addBarycenter (and `MinimalAreaTriangulation`,
+     MAT.h), winding reversed (`2-j`).
+  3. Extract's slab driver (no boundaries; CancellationToken and IProgress per slab),
+     `unitCubeToModel`, output vertices (position, RGB, density value when trimming).
+  4. SurfaceTrimmer, the public in-memory `PoissonMeshing` API plus the file wrapper, and
+     `poisson_meshing_test.cc` 1:1, with a Tier C pycolmap fixture.
 
 ### Verification
 - End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us (also the

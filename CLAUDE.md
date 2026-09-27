@@ -148,3 +148,18 @@ the `fix-test-failures` agent, which treats every failure as a real bug.
 Brief each implementer with one deliverable and a 25-minute budget; a run over 30 minutes is an
 error. A deliverable is one coherent slice of a `PORTING_PLAN.md` phase together with its ported
 tests. Implementers that may run concurrently get `isolation: "worktree"`.
+
+Working conventions that every brief repeats:
+- A new worktree starts with `git reset --hard main`. `cpp-reference/` and `oracle/.venv` are
+  git-ignored, so worktrees read them from the main checkout. On a fresh machine run
+  `scripts/fetch-reference.sh` and `oracle/setup.sh` first.
+- Implementers commit on their own branch and never push or edit `PORTING_PLAN.md`; they list
+  what their change makes stale, and the orchestrator prunes the plan when it merges.
+- Divergence entry numbers are stable and never reused. Hand each concurrent implementer its own
+  range, and take the next free number above the highest in `docs/CPP_DIVERGENCES.md`. When
+  merging that file, merge it entry by entry rather than by text hunks, then check that no
+  conflict marker is left (`FileComplianceTests` also rejects them).
+- Keep headers, comments and divergence entries true to the final code in the same commit.
+- PoissonRecon stages are ported bit-exact against the vendored C++ through the clang harnesses
+  in `oracle/poisson_*_harness.cc` (`oracle/fixture_poisson_tree.py` writes the fixtures);
+  follow those tests' pattern for new stages.
