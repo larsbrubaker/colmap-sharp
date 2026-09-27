@@ -29,8 +29,8 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
 ### Phase 12 — Dense reconstruction (MVS)
 - `poisson_meshing`: PoissonRecon port in progress. Done: B-splines, octree, density,
   splatting, finalize, interpolation info, FEM constraint/system integrators and
-  restriction/prolongation, FEM and interpolation constraints. Remaining: system
-  matrix rows with prolongation, the multigrid solver, level-set extraction, the trimmer, the
+  restriction/prolongation, FEM and interpolation constraints, system matrix rows and point-constraint transfers.
+  Remaining: the multigrid solver, level-set extraction, the trimmer, the
   public API and `poisson_meshing_test.cc`.
 
 ### Verification
