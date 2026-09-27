@@ -349,6 +349,21 @@ public sealed class FemTree
 	}
 
 	/// <summary>
+	/// The node's cell corner and width in the unit cube's frame (local depth and offset), in
+	/// float. Port of <c>FEMTree::_startAndWidth</c>; the same as <see cref="StartAndWidth"/>
+	/// inside a <see cref="ExtractSubTree"/> scope, where the depth offset is 0.
+	/// </summary>
+	public void LocalStartAndWidth(int node, Span<float> start, out float width)
+	{
+		int localDepth = LocalDepth(node);
+		width = localDepth >= 0 ? (float)(1.0 / (1 << localDepth)) : (float)(1.0 * (1 << -localDepth));
+		for (int d = 0; d < 3; d++)
+		{
+			start[d] = (float)LocalOffset(node, d) * width;
+		}
+	}
+
+	/// <summary>
 	/// Makes <paramref name="node"/> look like a root until the returned scope is disposed: no
 	/// parent, depth 0, offset 0, its subtree renumbered to match, and a depth offset of 0. Port of
 	/// <c>FEMTree::SubTreeExtractor</c> (and <c>RegularTreeNode::SubTreeExtractor</c>), which

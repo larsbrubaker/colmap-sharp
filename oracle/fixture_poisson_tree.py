@@ -16,6 +16,8 @@
 #   poisson_levelset2.json oracle/poisson_levelset2_harness.cc: the extractor's slice and
 #                       slab cell indices, corner values and MC indices
 #                       (LevelSetCellIndices, PoissonLevelSetExtractor)
+#   poisson_levelset3.json oracle/poisson_levelset3_harness.cc: the extractor's iso-vertices
+#                       on slice edges (PoissonLevelSetExtractor.IsoVertices)
 #   poisson_libm.json   oracle/poisson_libm_harness.cc: libm's pow( x , 1./3 ) and logf
 # Tier A, bit-exact. Read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests*.cs.
 #
@@ -60,6 +62,7 @@ HARNESSES = [
     ("poisson_levelset_harness.cc", "poisson_levelset.json", None),
     ("poisson_hypercube_harness.cc", "poisson_hypercube.json", None),
     ("poisson_levelset2_harness.cc", "poisson_levelset2.json", None),
+    ("poisson_levelset3_harness.cc", "poisson_levelset3.json", None),
 ]
 
 if __name__ == "__main__":

@@ -21,7 +21,9 @@
 // - Polynomial<0>::derivative returns a degree-0 zero polynomial, not a degree -1 one.
 // - The degree-0/1/2 operator() specializations are the general Horner loop written out,
 //   so one loop serves all degrees with the same operation order.
-// - getSolutions (Factor.h) is used only by level-set extraction and lands with it.
+// - getSolutions (with Factor.h's linear and quadratic Factor) is ported for degrees 1 and 2,
+//   the only ones level-set extraction solves; like the C++ generic template, other degrees
+//   throw. Factor's complex roots are kept as (real, imaginary) pairs.
 
 namespace ColmapSharp.Mvs.PoissonRecon;
 
@@ -327,6 +329,77 @@ public sealed class PoissonPolynomial
 		}
 
 		coefficients[degree] = 1;
+	}
+
+	/// <summary>
+	/// Writes the real solutions t of p(t) = <paramref name="c"/> (roots whose imaginary part is
+	/// at most <paramref name="eps"/> in magnitude) to <paramref name="roots"/> and returns how
+	/// many there are. Port of <c>Polynomial&lt;1&gt;::getSolutions</c> and
+	/// <c>Polynomial&lt;2&gt;::getSolutions</c> with Factor.h's <c>Factor</c>.
+	/// </summary>
+	public int GetSolutions(double c, Span<double> roots, double eps)
+	{
+		Span<double> real = stackalloc double[2];
+		Span<double> imaginary = stackalloc double[2];
+		int factorCount = Degree switch
+		{
+			1 => FactorLinear(Coefficients[1], Coefficients[0] - c, real, imaginary, eps),
+			2 => FactorQuadratic(Coefficients[2], Coefficients[1], Coefficients[0] - c, real, imaginary, eps),
+			_ => throw new NotSupportedException($"Can't solve polynomial of degree: {Degree}"),
+		};
+		int count = 0;
+		for (int i = 0; i < factorCount; i++)
+		{
+			if (Math.Abs(imaginary[i]) <= eps)
+			{
+				roots[count++] = real[i];
+			}
+		}
+
+		return count;
+	}
+
+	// Factor( a1 , a0 , roots , EPS ).
+	private static int FactorLinear(double a1, double a0, Span<double> real, Span<double> imaginary, double eps)
+	{
+		if (Math.Abs(a1) <= eps)
+		{
+			return 0;
+		}
+
+		real[0] = -a0 / a1;
+		imaginary[0] = 0;
+		return 1;
+	}
+
+	// Factor( a2 , a1 , a0 , roots , EPS ).
+	private static int FactorQuadratic(double a2, double a1, double a0, Span<double> real, Span<double> imaginary, double eps)
+	{
+		if (Math.Abs(a2) <= eps)
+		{
+			return FactorLinear(a1, a0, real, imaginary, eps);
+		}
+
+		double d = (a1 * a1) - (4 * a0 * a2);
+		a1 /= 2 * a2;
+		if (d < 0)
+		{
+			d = Math.Sqrt(-d) / (2 * a2);
+			real[0] = -a1;
+			imaginary[0] = -d;
+			real[1] = -a1;
+			imaginary[1] = d;
+		}
+		else
+		{
+			d = Math.Sqrt(d) / (2 * a2);
+			real[0] = -a1 - d;
+			imaginary[0] = 0;
+			real[1] = -a1 + d;
+			imaginary[1] = 0;
+		}
+
+		return 2;
 	}
 
 	private void RequireSameDegree(PoissonPolynomial p)

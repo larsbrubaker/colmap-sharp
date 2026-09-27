@@ -213,7 +213,7 @@ public static class PoissonSplat
 		int[] neighbors = weightKey.GetNeighbors(node);
 		Span<double> values = stackalloc double[3 * size];
 		Span<float> start = stackalloc float[3];
-		tree.StartAndWidth(node, start, out float w);
+		tree.LocalStartAndWidth(node, start, out float w);
 		for (int dim = 0; dim < 3; dim++)
 		{
 			PoissonPolynomial.BSplineComponentValues(density.Degree, (position[dim] - start[dim]) / w, values.Slice(dim * size, size));
@@ -251,7 +251,7 @@ public static class PoissonSplat
 	internal static (float Depth, float Weight) GetSampleDepthAndWeight(FemTree tree, DensityEstimator density, int node, ReadOnlySpan<float> position, NeighborKey weightKey)
 	{
 		int temp = node;
-		while (tree.Depth(temp) > density.KernelDepth)
+		while (tree.LocalDepth(temp) > density.KernelDepth)
 		{
 			temp = tree.Parent(temp);
 		}
@@ -260,13 +260,13 @@ public static class PoissonSplat
 		float samplesPerNode = GetSamplesPerNode(tree, density, temp, position, weightKey);
 		if (samplesPerNode >= density.SamplesPerNode)
 		{
-			depth = (float)(tree.Depth(temp) + LogF(samplesPerNode / density.SamplesPerNode) / (Math.Log(2.0) * (3 - density.CoDimension)));
+			depth = (float)(tree.LocalDepth(temp) + LogF(samplesPerNode / density.SamplesPerNode) / (Math.Log(2.0) * (3 - density.CoDimension)));
 		}
 		else
 		{
 			float fineSamplesPerNode = samplesPerNode;
 			float coarseSamplesPerNode = samplesPerNode;
-			while (coarseSamplesPerNode < density.SamplesPerNode && tree.Depth(temp) != 0)
+			while (coarseSamplesPerNode < density.SamplesPerNode && tree.LocalDepth(temp) != 0)
 			{
 				temp = tree.Parent(temp);
 				fineSamplesPerNode = coarseSamplesPerNode;
@@ -275,11 +275,11 @@ public static class PoissonSplat
 
 			// Rather than assuming that the number of samples per node scales by a factor of 2^(Dim-CoDim),
 			// use the fact that between the coarse and fine levels the samples per node scaled by coarseSamplesPerNode / fineSamplesPerNode
-			depth = tree.Depth(temp) + (LogF(coarseSamplesPerNode / density.SamplesPerNode) / LogF(coarseSamplesPerNode / fineSamplesPerNode));
+			depth = tree.LocalDepth(temp) + (LogF(coarseSamplesPerNode / density.SamplesPerNode) / LogF(coarseSamplesPerNode / fineSamplesPerNode));
 			samplesPerNode = coarseSamplesPerNode;
 		}
 
-		float nodeWidth = (float)(1.0 / (1 << tree.Depth(temp)));
+		float nodeWidth = (float)(1.0 / (1 << tree.LocalDepth(temp)));
 		float weight = (float)Math.Pow(nodeWidth, 3 - density.CoDimension) / samplesPerNode;
 		return (depth, weight);
 	}

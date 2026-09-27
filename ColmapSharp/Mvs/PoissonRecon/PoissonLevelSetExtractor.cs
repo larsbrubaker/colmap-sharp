@@ -7,10 +7,12 @@
 // _LevelSetExtractor< ... , 3 , ... >::Extract set-up (the full depth, the coarse coefficients,
 // SlabValues per depth) and its InitSlice, InitSlab and SetSliceValues steps with
 // SetSliceCornerValuesAndMCIndices, and FEMTree.inl's sliced getFullDepth. The driver loop
-// (slab by slab at the finest depth) calls them in Extract's order; the iso-vertex, iso-edge
-// and polygon steps are not ported yet. SetMCIndices and OverwriteCornerValues run only for
-// slab boundaries, which COLMAP never passes, so they are not ported. Corner values come from
-// PoissonCornerEvaluator. Tier A against oracle/poisson_levelset2_harness.cc.
+// (slab by slab at the finest depth) calls them in Extract's order. The iso-vertices on slice
+// edges are in PoissonLevelSetExtractor.IsoVertices.cs; the cross-slice (slab) iso-vertices,
+// the iso-edge and the polygon steps are not ported yet. SetMCIndices and
+// OverwriteCornerValues run only for slab boundaries, which COLMAP never passes, so they are
+// not ported. Corner values come from PoissonCornerEvaluator. Tier A against
+// oracle/poisson_levelset2_harness.cc and oracle/poisson_levelset3_harness.cc.
 //
 // Translation notes: depths here are local unless named global. Upstream sets the corner
 // values in parallel; a corner's value does not depend on which leaf computes it first.
@@ -21,7 +23,7 @@ namespace ColmapSharp.Mvs.PoissonRecon;
 /// The level-set extractor's corner and cell-index state. Port of PoissonRecon's
 /// <c>_LevelSetExtractor&lt; HasData , Real , 3 , Data &gt;</c> (the steps listed in the file header).
 /// </summary>
-public sealed class PoissonLevelSetExtractor
+public sealed partial class PoissonLevelSetExtractor
 {
 	private readonly FemTree tree;
 	private readonly SortedTreeNodes sorted;
@@ -35,19 +37,39 @@ public sealed class PoissonLevelSetExtractor
 	/// <summary>
 	/// Sets up the extraction of the <paramref name="isoValue"/> level set of
 	/// <paramref name="coefficients"/> (basis <paramref name="signature"/>, indexed by node index).
-	/// Port of Extract's set-up with slabDepth 0 and slab [0, 1).
+	/// Port of Extract's set-up with slabDepth 0 and slab [0, 1). The iso-vertices carry a
+	/// density from <paramref name="density"/> (Extract's densityWeights, when COLMAP trims) and
+	/// auxiliary data (colors) from <paramref name="data"/> (entries: data..., weight; Extract's
+	/// data), falling back to <paramref name="zeroData"/> where the data has no weight.
 	/// </summary>
-	public PoissonLevelSetExtractor(FemTree tree, SortedTreeNodes sorted, int signature, float[] coefficients, float isoValue)
+	public PoissonLevelSetExtractor(
+		FemTree tree,
+		SortedTreeNodes sorted,
+		int signature,
+		float[] coefficients,
+		float isoValue,
+		DensityEstimator? density = null,
+		SparseNodeData? data = null,
+		float[]? zeroData = null)
 	{
 		this.tree = tree;
 		this.sorted = sorted;
 		this.coefficients = coefficients;
 		this.isoValue = isoValue;
+		this.density = density;
+		this.data = data;
+		this.zeroData = zeroData ?? new float[data == null ? 0 : data.Width - 1];
+		if (data != null && this.zeroData.Length != data.Width - 1)
+		{
+			throw new ArgumentException($"zeroData has {this.zeroData.Length} entries; the data has {data.Width - 1}.", nameof(zeroData));
+		}
 		PoissonMultigrid.SetFem1ValidityFlags(tree, sorted, signature);
 		MaxDepth = PoissonMultigrid.MaxDepth(tree);
 		FullDepth = GetFullDepth(tree, FemSignature.Degree(signature), 0, 0, 1);
 		coarseCoefficients = PoissonImplicitEvaluator.CoarseCoefficients(tree, sorted, signature, coefficients);
 		cornerEvaluator = new PoissonCornerEvaluator(tree, signature);
+		dataEvaluator = data == null ? null : new PoissonPointEvaluator(DataSignature, 0, MaxDepth);
+		KeyGenerator = new LevelSetKeyGenerator(MaxDepth);
 		SlabValues = new LevelSetSlabValues[MaxDepth + 1];
 		for (int d = 0; d <= MaxDepth; d++)
 		{
