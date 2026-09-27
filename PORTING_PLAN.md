@@ -30,7 +30,8 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
 - `poisson_meshing`: PoissonRecon port in progress. Done: B-splines, octree, density,
   splatting, finalize, interpolation info, FEM constraint/system integrators and
   restriction/prolongation, FEM and interpolation constraints, system matrix rows, point-constraint transfers and the
-  sliced Gauss-Seidel. Remaining: `_solveRegularMG` (with SolveCG) and the cascadic solve loop, level-set extraction, the trimmer, the
+  sliced Gauss-Seidel, and the whole linear solve (`_solveRegularMG`, SolveCG, cascadic
+  solveSystem). Remaining: iso-value evaluation, level-set extraction, the trimmer, the
   public API and `poisson_meshing_test.cc`.
 
 ### Verification
