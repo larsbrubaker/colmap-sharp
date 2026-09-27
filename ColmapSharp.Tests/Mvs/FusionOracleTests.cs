@@ -176,6 +176,67 @@ public class FusionOracleTests
 		}
 	}
 
+	[Test]
+	public async Task CSharpOnly_FusedOutputIsBitIdenticalForAnyThreadCount()
+	{
+		// C#-only: pins the exact bits of the fused output on both fixtures (positions,
+		// normals, colors, visibility), so that parallelizing fusion (entry 87) can never
+		// change a result. The hashes are the output of the one-thread traversal. Each fixture
+		// runs with one thread, with four, with all cores, and through the cached workspace.
+		foreach ((string name, string expectedHash) in new[]
+		{
+			("stereo_fusion", "EB769835871BF9D42B521EFD3837CA1D9CF9BD8F5A0A3505BCC78E5C223A0EDA"),
+			("stereo_fusion_options", "840475B5A09FD93614B56F0D4616B998470B8812A83ADC974460F321F828A39B"),
+		})
+		{
+			string workspacePath = OracleFixture.PathOf(name);
+			foreach ((int numThreads, bool useCache) in new[] { (1, false), (4, false), (-1, false), (1, true) })
+			{
+				StereoFusionOptions options = name == "stereo_fusion"
+					? new StereoFusionOptions { MinNumPixels = 3, CheckNumImages = 10 }
+					: OptionsFixtureOptions(workspacePath);
+				options.NumThreads = numThreads;
+				options.UseCache = useCache;
+				var fusion = new StereoFusion(
+					options, workspacePath, "COLMAP", "", "geometric",
+					FixtureBitmaps(workspacePath, name == "stereo_fusion" ? null : options.MaskPath));
+				fusion.Run();
+
+				await Assert.That(FusedOutputHash(fusion)).IsEqualTo(expectedHash);
+			}
+		}
+	}
+
+	private static string FusedOutputHash(StereoFusion fusion)
+	{
+		using var stream = new MemoryStream();
+		using var writer = new BinaryWriter(stream);
+		foreach (PlyPoint p in fusion.GetFusedPoints())
+		{
+			writer.Write(p.X);
+			writer.Write(p.Y);
+			writer.Write(p.Z);
+			writer.Write(p.Nx);
+			writer.Write(p.Ny);
+			writer.Write(p.Nz);
+			writer.Write(p.R);
+			writer.Write(p.G);
+			writer.Write(p.B);
+		}
+
+		foreach (List<int> visibility in fusion.GetFusedPointsVisibility())
+		{
+			writer.Write(visibility.Count);
+			foreach (int imageIdx in visibility)
+			{
+				writer.Write(imageIdx);
+			}
+		}
+
+		writer.Flush();
+		return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(stream.ToArray()));
+	}
+
 	// Progress<T> posts to the thread pool; this records the reports in order on the caller.
 	private sealed class SynchronousProgress(List<StereoFusionProgress> reports) : IProgress<StereoFusionProgress>
 	{
