@@ -21,6 +21,8 @@
 #   poisson_levelset4.json oracle/poisson_levelset4_harness.cc: every iso-vertex, on slice
 #                       and slab edges, in Extract's write order
 #                       (PoissonLevelSetExtractor.XSliceIsoVertices)
+#   poisson_levelset5.json oracle/poisson_levelset5_harness.cc: the iso-edges, per finalized
+#                       slice and slab (PoissonLevelSetExtractor.IsoEdges)
 #   poisson_libm.json   oracle/poisson_libm_harness.cc: libm's pow( x , 1./3 ) and logf
 # Tier A, bit-exact. Read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests*.cs.
 #
@@ -67,6 +69,7 @@ HARNESSES = [
     ("poisson_levelset2_harness.cc", "poisson_levelset2.json", None),
     ("poisson_levelset3_harness.cc", "poisson_levelset3.json", None),
     ("poisson_levelset4_harness.cc", "poisson_levelset4.json", None),
+    ("poisson_levelset5_harness.cc", "poisson_levelset5.json", None),
 ]
 
 if __name__ == "__main__":

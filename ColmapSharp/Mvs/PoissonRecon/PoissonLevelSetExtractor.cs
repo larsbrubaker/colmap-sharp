@@ -9,12 +9,11 @@
 // SetSliceCornerValuesAndMCIndices, and FEMTree.inl's sliced getFullDepth. The driver loop
 // (slab by slab at the finest depth) calls them in Extract's order. The iso-vertices on slice
 // edges are in PoissonLevelSetExtractor.IsoVertices.cs and those on cross-slice (slab) edges in
-// PoissonLevelSetExtractor.XSliceIsoVertices.cs; the iso-edge and the polygon steps are not
-// ported yet. SetMCIndices and
+// PoissonLevelSetExtractor.XSliceIsoVertices.cs, the iso-edges in
+// PoissonLevelSetExtractor.IsoEdges.cs; the polygon step is not ported yet. SetMCIndices and
 // OverwriteCornerValues run only for slab boundaries, which COLMAP never passes, so they are
 // not ported. Corner values come from PoissonCornerEvaluator. Tier A against
-// oracle/poisson_levelset2_harness.cc, oracle/poisson_levelset3_harness.cc and
-// oracle/poisson_levelset4_harness.cc.
+// oracle/poisson_levelset2_harness.cc through oracle/poisson_levelset5_harness.cc.
 //
 // Translation notes: depths here are local unless named global. Upstream sets the corner
 // values in parallel; a corner's value does not depend on which leaf computes it first.

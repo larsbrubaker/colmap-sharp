@@ -2565,7 +2565,10 @@ edges, `PoissonLevelSetExtractor.XSliceIsoVertices.cs` for slab edges) are the s
 numbering rather than sums: upstream sets a slice's or slab's vertices in a `ParallelFor` over
 its leaves, numbers them with the vertex stream's atomic counter and keeps per-thread key lists,
 so the vertex order varies with threads; the port visits the leaves in sorted order with one
-list, as a single-threaded run does.
+list, as a single-threaded run does. The iso-edges (`PoissonLevelSetExtractor.IsoEdges.cs`) keep
+per-thread lists too (the vertex pairs and the face iso-edges pushed to coarser slices and
+slabs), merged in thread order at finalize, so the order of the iso-edges inside one face-edge
+map entry varies with threads; the port records them in leaf order with one list.
 
 **Why.** CLAUDE.md requires deterministic results, and there is no fixed multi-threaded order
 to match. The single-threaded order is the one reproducible reference (the same choice as
@@ -2577,7 +2580,8 @@ interpolation constraints, the restricted interpolation constraints, the Gauss-S
 solutions and the base-depth multigrid solve; `PoissonTreeOracleTests.PostSolveStages_MatchHarness`
 (levelset3, levelset5, levelset6, levelset8) does the same for the iso-value sums, and
 `PoissonTreeOracleTests.LevelSetSliceIsoVertices_MatchHarness` and
-`PoissonTreeOracleTests.LevelSetIsoVertices_MatchHarness` for the vertex order.
+`PoissonTreeOracleTests.LevelSetIsoVertices_MatchHarness` for the vertex order, and
+`PoissonTreeOracleTests.LevelSetIsoEdges_MatchHarness` for the iso-edge lists.
 ## 124. LO-RANSAC can start its local optimization from a different five-point solution
 
 **What differs.** The five-point solver returns up to ten essential matrices per minimal

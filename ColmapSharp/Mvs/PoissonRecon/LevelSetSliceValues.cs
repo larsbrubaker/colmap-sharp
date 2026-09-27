@@ -4,21 +4,26 @@
 // LevelSetSliceValues: what the level-set extractor keeps per slice (a plane z = slice at one
 // depth): its cell indices (LevelSetCellIndices), the implicit function's value and gradient at
 // each distinct corner, each leaf's marching-squares index on the slice, the key of each edge
-// that got an iso-vertex, the edge-key to vertex map, and the scratch flags and key/vertex
-// lists the vertex pass fills. Ports the corner and edge-vertex parts of
-// FEMTree.LevelSet.3D.inl's _LevelSetExtractor< ... , 3 , ... >::SliceValues (reset,
-// cornerValues, cornerGradients, mcIndices, edgeKeys, edgeVertexMap, setFromScratch(
-// EKeyValues )) and SliceValues::Scratch (reset, cSet, eSet, eKeyValues); LevelSetXSliceValues
-// ports the same for a slab (the edges crossing it): XSliceValues' cellIndices, reset,
-// edgeKeys, edgeVertexMap and setFromScratch( EKeyValues ), and XSliceValues::Scratch's reset,
-// eSet and eKeyValues. LevelSetSlabValues pairs them as SlabValues does (two of each, by
-// parity). Filled by PoissonLevelSetExtractor. Like upstream, the value arrays grow but never
-// shrink or clear on reuse: a corner or edge entry is read only once its flag is set.
+// that got an iso-vertex, the edge-key to vertex map, the iso-edges of each face and the
+// face-key to iso-edge and vertex-pair maps, and the scratch flags and lists the vertex and
+// iso-edge passes fill. Ports FEMTree.LevelSet.3D.inl's _LevelSetExtractor< ... , 3 , ...
+// >::SliceValues (reset, cornerValues, cornerGradients, mcIndices, edgeKeys, faceEdges,
+// edgeVertexMap, faceEdgeMap, vertexPairMap and the three setFromScratch) and
+// SliceValues::Scratch (reset, cSet, eSet, fSet, eKeyValues, fKeyValues, vKeyValues);
+// LevelSetXSliceValues ports the same for a slab (the edges and faces crossing it):
+// XSliceValues and XSliceValues::Scratch. LevelSetSlabValues pairs them as SlabValues does (two
+// of each, by parity). Filled by PoissonLevelSetExtractor (the vertices in .IsoVertices.cs and
+// .XSliceIsoVertices.cs, the iso-edges and vertex pairs in .IsoEdges.cs). Like upstream, the
+// value arrays grow but never shrink or clear on reuse: a corner, edge or face entry is read
+// only once its flag is set. The lookups the polygon step makes (addIsoEdges, setVertexPair,
+// setEdgeVertex) are not ported yet.
 //
 // Translation notes: the key/vertex lists hold the vertex's index in the output stream rather
 // than a copy of the vertex (upstream pairs both); the vertex is the sink's entry at that
 // index. Upstream keeps one list per thread and merges them in thread order; the port runs
-// single-threaded, so there is one list (docs/CPP_DIVERGENCES.md, entry 123).
+// single-threaded, so there is one list (docs/CPP_DIVERGENCES.md, entry 123). The maps are only
+// looked up, never iterated, so their (unordered) iteration order reaches no output; the order
+// of the iso-edges inside one face-edge map entry is the recording order.
 
 namespace ColmapSharp.Mvs.PoissonRecon;
 
@@ -61,6 +66,30 @@ public sealed class LevelSetSliceValues
 	/// <summary>The vertex index of each edge key on the slice. Port of <c>edgeVertexMap</c>.</summary>
 	public Dictionary<LevelSetKey, int> EdgeVertexMap { get; } = [];
 
+	/// <summary>Whether each face's iso-edges have been set. Port of <c>Scratch::fSet</c>.</summary>
+	public byte[] FaceSet { get; private set; } = [];
+
+	/// <summary>The iso-edges of each face this slice set, by face index. Port of <c>faceEdges</c>.</summary>
+	public LevelSetFaceEdges[] FaceEdges { get; private set; } = [];
+
+	/// <summary>
+	/// The face keys and iso-edges pushed to this slice from finer leaves since the last
+	/// finalize, in recording order. Port of <c>Scratch::fKeyValues</c>.
+	/// </summary>
+	public List<(LevelSetKey Key, LevelSetIsoEdge[] Edges)> FaceKeyValues { get; } = [];
+
+	/// <summary>
+	/// The pairs of edge keys whose vertices a coarser edge joins, recorded since the last
+	/// finalize, in recording order. Port of <c>Scratch::vKeyValues</c>.
+	/// </summary>
+	public List<(LevelSetKey First, LevelSetKey Second)> VertexPairKeyValues { get; } = [];
+
+	/// <summary>The iso-edges of each face key on the slice. Port of <c>faceEdgeMap</c>.</summary>
+	public Dictionary<LevelSetKey, List<LevelSetIsoEdge>> FaceEdgeMap { get; } = [];
+
+	/// <summary>Each edge key's partner across a coarser edge (both directions). Port of <c>vertexPairMap</c>.</summary>
+	public Dictionary<LevelSetKey, LevelSetKey> VertexPairMap { get; } = [];
+
 	/// <summary>
 	/// Starts slice <paramref name="slice"/> after <see cref="CellIndices"/> is set. Port of
 	/// <c>SliceValues::reset( slice , computeGradients )</c> followed by
@@ -69,7 +98,9 @@ public sealed class LevelSetSliceValues
 	public void Reset(int slice, bool computeGradients)
 	{
 		Slice = slice;
+		FaceEdgeMap.Clear();
 		EdgeVertexMap.Clear();
+		VertexPairMap.Clear();
 		if (McIndices.Length < CellIndices.Size)
 		{
 			McIndices = new byte[CellIndices.Size];
@@ -90,10 +121,21 @@ public sealed class LevelSetSliceValues
 			Array.Fill(EdgeKeys, LevelSetKey.Unset);
 		}
 
-		// Scratch::reset: fresh, zeroed flags per corner and edge, and no recorded keys.
+		int faces = CellIndices.Count(2);
+		if (FaceEdges.Length < faces)
+		{
+			// NewPointer< FaceEdges >: default-constructed (count -1) entries.
+			FaceEdges = new LevelSetFaceEdges[faces];
+			Array.Fill(FaceEdges, LevelSetFaceEdges.Unset);
+		}
+
+		// Scratch::reset: fresh, zeroed flags per corner, edge and face, and no recorded keys.
 		CornerSet = new byte[corners];
 		EdgeSet = new byte[edges];
+		FaceSet = new byte[faces];
 		EdgeKeyValues.Clear();
+		FaceKeyValues.Clear();
+		VertexPairKeyValues.Clear();
 	}
 
 	/// <summary>
@@ -109,6 +151,19 @@ public sealed class LevelSetSliceValues
 
 		EdgeKeyValues.Clear();
 	}
+
+	/// <summary>
+	/// Moves the recorded vertex pairs into <see cref="VertexPairMap"/>, each in both directions
+	/// (a later entry for the same key wins), and clears them. Port of
+	/// <c>setFromScratch( Scratch::VKeyValues )</c>.
+	/// </summary>
+	public void SetVertexPairsFromScratch() => LevelSetScratch.SetVertexPairs(VertexPairKeyValues, VertexPairMap);
+
+	/// <summary>
+	/// Appends the recorded face iso-edges to <see cref="FaceEdgeMap"/>'s entry for each key
+	/// and clears them. Port of <c>setFromScratch( Scratch::FKeyValues )</c>.
+	/// </summary>
+	public void SetFacesFromScratch() => LevelSetScratch.SetFaces(FaceKeyValues, FaceEdgeMap);
 }
 
 /// <summary>
@@ -140,6 +195,30 @@ public sealed class LevelSetXSliceValues
 	/// <summary>The vertex index of each edge key in the slab. Port of <c>edgeVertexMap</c>.</summary>
 	public Dictionary<LevelSetKey, int> EdgeVertexMap { get; } = [];
 
+	/// <summary>Whether each cross face's iso-edges have been set. Port of <c>Scratch::fSet</c>.</summary>
+	public byte[] FaceSet { get; private set; } = [];
+
+	/// <summary>The iso-edges of each cross face this slab set, by face index. Port of <c>faceEdges</c>.</summary>
+	public LevelSetFaceEdges[] FaceEdges { get; private set; } = [];
+
+	/// <summary>
+	/// The face keys and iso-edges pushed to this slab from finer leaves since the last
+	/// finalize, in recording order. Port of <c>Scratch::fKeyValues</c>.
+	/// </summary>
+	public List<(LevelSetKey Key, LevelSetIsoEdge[] Edges)> FaceKeyValues { get; } = [];
+
+	/// <summary>
+	/// The pairs of edge keys whose vertices a coarser cross edge joins, recorded since the last
+	/// finalize, in recording order. Port of <c>Scratch::vKeyValues</c>.
+	/// </summary>
+	public List<(LevelSetKey First, LevelSetKey Second)> VertexPairKeyValues { get; } = [];
+
+	/// <summary>The iso-edges of each face key in the slab. Port of <c>faceEdgeMap</c>.</summary>
+	public Dictionary<LevelSetKey, List<LevelSetIsoEdge>> FaceEdgeMap { get; } = [];
+
+	/// <summary>Each edge key's partner across a coarser cross edge (both directions). Port of <c>vertexPairMap</c>.</summary>
+	public Dictionary<LevelSetKey, LevelSetKey> VertexPairMap { get; } = [];
+
 	/// <summary>
 	/// Starts slab <paramref name="slab"/> after <see cref="CellIndices"/> is set. Port of
 	/// <c>XSliceValues::reset( slab )</c> followed by <c>Scratch::reset( cellIndices )</c>'s
@@ -148,7 +227,9 @@ public sealed class LevelSetXSliceValues
 	public void Reset(int slab)
 	{
 		Slab = slab;
+		FaceEdgeMap.Clear();
 		EdgeVertexMap.Clear();
+		VertexPairMap.Clear();
 		int edges = CellIndices.Count(0);
 		if (EdgeKeys.Length < edges)
 		{
@@ -156,8 +237,18 @@ public sealed class LevelSetXSliceValues
 			Array.Fill(EdgeKeys, LevelSetKey.Unset);
 		}
 
+		int faces = CellIndices.Count(1);
+		if (FaceEdges.Length < faces)
+		{
+			FaceEdges = new LevelSetFaceEdges[faces];
+			Array.Fill(FaceEdges, LevelSetFaceEdges.Unset);
+		}
+
 		EdgeSet = new byte[edges];
+		FaceSet = new byte[faces];
 		EdgeKeyValues.Clear();
+		FaceKeyValues.Clear();
+		VertexPairKeyValues.Clear();
 	}
 
 	/// <summary>
@@ -173,6 +264,19 @@ public sealed class LevelSetXSliceValues
 
 		EdgeKeyValues.Clear();
 	}
+
+	/// <summary>
+	/// Moves the recorded vertex pairs into <see cref="VertexPairMap"/>, each in both directions
+	/// (a later entry for the same key wins), and clears them. Port of
+	/// <c>XSliceValues::setFromScratch( Scratch::VKeyValues )</c>.
+	/// </summary>
+	public void SetVertexPairsFromScratch() => LevelSetScratch.SetVertexPairs(VertexPairKeyValues, VertexPairMap);
+
+	/// <summary>
+	/// Appends the recorded face iso-edges to <see cref="FaceEdgeMap"/>'s entry for each key
+	/// and clears them. Port of <c>XSliceValues::setFromScratch( Scratch::FKeyValues )</c>.
+	/// </summary>
+	public void SetFacesFromScratch() => LevelSetScratch.SetFaces(FaceKeyValues, FaceEdgeMap);
 }
 
 /// <summary>
@@ -207,4 +311,37 @@ public sealed class LevelSetSlabValues
 	/// <c>XSliceValues::reset( slab )</c> and <c>XSliceValues::Scratch::reset</c>.
 	/// </summary>
 	public void ResetSlab(int slab) => xSlices[slab & 1].Reset(slab);
+}
+
+// The setFromScratch bodies shared by SliceValues and XSliceValues (XSliceValues' FKeyValues
+// form finds then assigns or appends, which has the same effect as SliceValues' operator[] and
+// append).
+internal static class LevelSetScratch
+{
+	public static void SetVertexPairs(List<(LevelSetKey First, LevelSetKey Second)> scratch, Dictionary<LevelSetKey, LevelSetKey> map)
+	{
+		foreach ((LevelSetKey first, LevelSetKey second) in scratch)
+		{
+			map[first] = second;
+			map[second] = first;
+		}
+
+		scratch.Clear();
+	}
+
+	public static void SetFaces(List<(LevelSetKey Key, LevelSetIsoEdge[] Edges)> scratch, Dictionary<LevelSetKey, List<LevelSetIsoEdge>> map)
+	{
+		foreach ((LevelSetKey key, LevelSetIsoEdge[] edges) in scratch)
+		{
+			if (!map.TryGetValue(key, out List<LevelSetIsoEdge>? faceEdges))
+			{
+				faceEdges = [];
+				map[key] = faceEdges;
+			}
+
+			faceEdges.AddRange(edges);
+		}
+
+		scratch.Clear();
+	}
 }
