@@ -127,6 +127,35 @@ Every COLMAP test not ported, with the reason.
 - `Bitmap.Rescale` is Tier B (managed resampler within 1 grey level of OIIO); porting OIIO's
   resize (Apache-2.0) would make it exact if a fixture ever needs that.
 
+### Phase 13 — GPU PatchMatch (WebGPU through a host-supplied compute seam)
+colmap-sharp owns a small `ColmapSharp/Compute/IComputeDevice` (buffers, WGSL kernels, bind
+groups, recorded dispatches, `FlushAsync`, `ReadBufferAsync`; `WriteBuffer` is ordered against
+flushes, not dispatches) and ships the WGSL as embedded resources; the host adapts agg-sharp's
+`IRenderDevice` compute. Scheme v1 is COLMAP's column-per-thread serial-row sweep, banded so
+each dispatch stays short, with physical rotation and 3-way ping-pong of the (source × pixel)
+maps; RNG (`PatchMatchRandom`) is ported bit-exactly on u32 pairs; everything else is Tier C
+(f32 builtins, possible contraction, NaN/subnormal guards). Divergence 136 when it lands.
+Steps, in order (A = colmap-sharp, B = agg-sharp, C = MatterCAD test/wiring, D = perf):
+- A1 band-able CPU sweep (`BackwardMessages`, `SweepRows` with per-column state, filter as a
+  post-sweep pass), bit-identical for any band size.
+- A2 compute seam + `Compute/Testing/RecordingComputeDevice`.
+- A3 WGSL plumbing: embedded `.wgsl`, composition with a constants header, binding-consistency
+  checker, `.wgsl` under FileComplianceTests; `patch_match_common.wgsl` (RNG, cuda_min/max,
+  guards, byte table, sampling).
+- A4 WGSL geometry + likelihood helpers. A5 NCC, geometric cost and the kernels (init_random,
+  initial_cost, backward_messages, sweep_band, filter, rotate_planes, rotate_normals).
+- A6 `PatchMatchGpuPlan` (buffers, band size, limits/budget, fallback reasons).
+- A7 `PatchMatchGpu` orchestrator on the recording device. A8 `ReferenceComputeDevice` CPU twin:
+  `PatchMatchGpu` on it bit-identical to `PatchMatchCpu`.
+- A9 public API (`PatchMatch.RunAsync`, `Backend`/`FallbackReason`, controller and
+  `AutomaticReconstructionOptions.ComputeDevice`), divergence 136, update 86/122/134.
+  A9b async dense stage for the browser. A10 `PatchMatchGpuConformance` kit in the library.
+- B1 agg-sharp opt-in raised compute limits (unlocks MEDIUM/HIGH on desktop).
+- C1 adapter `IComputeDevice` over `IRenderDevice` and C2 real-GPU conformance tests, in a
+  MatterCAD test-only location. C3 app wiring and C4 browser smoke check wait for Phase 14
+  (Lars decides where MatterCAD references ColmapSharp).
+- D1 cooperative workgroup-per-column kernel; D2 source-chunked maps only if measured need.
+
 ### Phase 14 — MatterCAD integration (not started; needs Lars)
 Reference `ColmapSharp` from MatterCAD, host-side image decoding into the library's pixel
 buffer, a "photos → mesh" design operation with progress and cancel.
