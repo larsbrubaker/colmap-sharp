@@ -63,8 +63,12 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
   `CSharpOnly_FusedOutputIsBitIdenticalForAnyThreadCount` pins the output hash. A per-image
   precompute of world points/normals was measured and gives nothing (the per-pixel math is
   <100 ms of a ~3.3 s traversal at 10×1600×1200) for 24 B/pixel, so don't retry it. Profile
-  the traversal's bookkeeping (queue, medians, visibility lists, bitmap lookups, GC) first;
-  the structural fix is a speculative band-parallel traversal with in-order commit.
+  of that run: medians (`MathUtils.NthElement`, branch mispredicts on short lists) ~30%, the
+  pixel walk ~70% (~145M queue entries, memory-bound). Tried and not faster: array queue,
+  skipping already-fused pushes, sort-based medians. Open levers: a branchless
+  `Vector128` rank-count median (~0.6 s; needs the lane-rule test, falls back to quickselect
+  on ±0/NaN), and the structural fix, a speculative band-parallel traversal with in-order
+  commit.
 - Optional: Vector128 lanes in `Jet` (allowed under CLAUDE.md's lane rule).
 - Evaluate a faithful port of libc++ `std::sort` (sort3/4/5, insertion sort below 24, pdqsort
   above) so tie-sensitive sorts match COLMAP instead of carrying divergence entries.
