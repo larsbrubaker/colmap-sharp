@@ -46,13 +46,16 @@ public enum LinearSolverType
 /// <summary>
 /// The LinearSolver::Options that choose and configure a solver: the Schur solvers eliminate
 /// the first <paramref name="NumEliminateBlocks"/> column blocks (Ceres' elimination_groups[0]).
+/// <paramref name="NumThreads"/> is Ceres' num_threads; the Schur solvers give the same result
+/// for every value.
 /// </summary>
 internal readonly record struct LinearSolverOptions(
 	LinearSolverType Type,
 	PreconditionerType PreconditionerType = PreconditionerType.Jacobi,
 	int NumEliminateBlocks = 0,
 	int MinNumIterations = 1,
-	int MaxNumIterations = 1);
+	int MaxNumIterations = 1,
+	int NumThreads = 1);
 
 /// <summary>ceres::internal::LinearSolverTerminationType.</summary>
 internal enum LinearSolverTerminationType
@@ -89,10 +92,10 @@ internal abstract class LinearSolver
 		LinearSolverType.DenseQr => new DenseQrSolver(),
 		LinearSolverType.DenseNormalCholesky => new DenseNormalCholeskySolver(),
 		LinearSolverType.SparseNormalCholesky => new SparseNormalCholeskySolver(),
-		LinearSolverType.DenseSchur => new DenseSchurComplementSolver(options.NumEliminateBlocks),
-		LinearSolverType.SparseSchur => new SparseSchurComplementSolver(options.NumEliminateBlocks),
+		LinearSolverType.DenseSchur => new DenseSchurComplementSolver(options.NumEliminateBlocks, options.NumThreads),
+		LinearSolverType.SparseSchur => new SparseSchurComplementSolver(options.NumEliminateBlocks, options.NumThreads),
 		LinearSolverType.IterativeSchur => new IterativeSchurComplementSolver(
-			options.NumEliminateBlocks, options.PreconditionerType, options.MinNumIterations, options.MaxNumIterations),
+			options.NumEliminateBlocks, options.PreconditionerType, options.MinNumIterations, options.MaxNumIterations, options.NumThreads),
 		_ => throw new ArgumentOutOfRangeException(nameof(options), options.Type, "Unknown linear solver type."),
 	};
 

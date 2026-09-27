@@ -250,7 +250,7 @@ public enum PreconditionerType
 
 /// <summary>ceres::internal::IterativeSchurComplementSolver.</summary>
 internal sealed class IterativeSchurComplementSolver(
-	int numEliminateBlocks, PreconditionerType preconditionerType, int minNumIterations, int maxNumIterations) : LinearSolver
+	int numEliminateBlocks, PreconditionerType preconditionerType, int minNumIterations, int maxNumIterations, int numThreads = 1) : LinearSolver
 {
 	private ImplicitSchurComplement? schurComplement;
 	private CompressedRowBlockStructure? structure;
@@ -319,7 +319,7 @@ internal sealed class IterativeSchurComplementSolver(
 				if (schurJacobi is null)
 				{
 					schurJacobi = new BlockRandomAccessDiagonalMatrix(SchurEliminator.ReducedBlocks(a.Structure, numEliminateBlocks));
-					schurJacobiEliminator = new SchurEliminator();
+					schurJacobiEliminator = new SchurEliminator(numThreads);
 					schurJacobiEliminator.Init(numEliminateBlocks, a.Structure);
 				}
 

@@ -20,9 +20,9 @@ using ColmapSharp.LinearAlgebra;
 namespace ColmapSharp.Solver;
 
 /// <summary>ceres::internal::SchurComplementSolver: the part shared by DENSE_SCHUR and SPARSE_SCHUR.</summary>
-internal abstract class SchurComplementSolver(int numEliminateBlocks) : LinearSolver
+internal abstract class SchurComplementSolver(int numEliminateBlocks, int numThreads) : LinearSolver
 {
-	private readonly SchurEliminator eliminator = new();
+	private readonly SchurEliminator eliminator = new(numThreads);
 	private CompressedRowBlockStructure? structure;
 
 	/// <summary>Number of leading column blocks eliminated (Ceres' elimination_groups[0]).</summary>
@@ -69,7 +69,7 @@ internal abstract class SchurComplementSolver(int numEliminateBlocks) : LinearSo
 }
 
 /// <summary>ceres::internal::DenseSchurComplementSolver.</summary>
-internal sealed class DenseSchurComplementSolver(int numEliminateBlocks) : SchurComplementSolver(numEliminateBlocks)
+internal sealed class DenseSchurComplementSolver(int numEliminateBlocks, int numThreads = 1) : SchurComplementSolver(numEliminateBlocks, numThreads)
 {
 	/// <inheritdoc/>
 	protected override void InitStorage(CompressedRowBlockStructure bs)
@@ -104,7 +104,7 @@ internal sealed class DenseSchurComplementSolver(int numEliminateBlocks) : Schur
 }
 
 /// <summary>ceres::internal::SparseSchurComplementSolver (the direct factorization; ITERATIVE_SCHUR is IterativeSchurSolver.cs).</summary>
-internal sealed class SparseSchurComplementSolver(int numEliminateBlocks) : SchurComplementSolver(numEliminateBlocks)
+internal sealed class SparseSchurComplementSolver(int numEliminateBlocks, int numThreads = 1) : SchurComplementSolver(numEliminateBlocks, numThreads)
 {
 	private readonly SimplicialCholesky cholesky = new(SimplicialCholeskyKind.LLT, SparseOrdering.Amd, SymmetricPart.Lower);
 	private SparseMatrixCsc? crsLhs;

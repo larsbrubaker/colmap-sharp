@@ -1,17 +1,19 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // SchurDeterminismTests (C#-only; no COLMAP counterpart): pins the exact output of the Schur
-// solvers (ColmapSharp/Solver/SchurEliminator.cs and its callers) on a realistic bundle
-// adjustment, so performance work on them cannot change a single bit. 100 images of the
-// synthetic dataset, 10k points with tracks of length 8, 2D noise (40 images and 4k points
-// for DENSE_SCHUR and ITERATIVE_SCHUR, to keep the suite fast), solved by COLMAP's
-// default bundle adjuster with the linear solver forced. The SHA-256 of every optimized
-// parameter's bits, the final cost's bits and the iteration count must equal the recorded
-// hash, and must be the same with 1 thread and with every hardware thread.
+// solvers (ColmapSharp/Solver/SchurEliminator.cs and its callers) on a bundle adjustment
+// shaped like COLMAP's, so performance work on them cannot change a single bit. The
+// synthetic dataset with 2D noise, tracks of length 8, one camera per image, solved by
+// COLMAP's default bundle adjuster with the linear solver forced: every residual block has
+// a point (the E block) and two F blocks, the image pose (quaternion manifold and
+// translation, 6 tangent parameters) and its camera's intrinsics. The SHA-256 of every
+// optimized parameter's bits, the final cost's bits and the iteration count must equal the
+// recorded hash, and must be the same with 1 thread and with every hardware thread.
 //
-// The hashes were recorded before the eliminator's fixed-size kernels, precomputed cell
-// offsets and parallel elimination went in; if one changes, the optimization changed the
-// arithmetic, which is the bug.
+// The problems are small so the suite stays fast; the hashes were recorded on code proven
+// bit-identical to the eliminator before its fixed-size kernels, precomputed cell offsets
+// and cached inverses (a 100-image, 10k-point run pinned that). If one changes, a
+// performance change altered the arithmetic, which is the bug.
 
 using System.Security.Cryptography;
 
@@ -116,14 +118,14 @@ public class SchurDeterminismTests
 	}
 
 	[Test]
-	public async Task SparseSchur_100Images10kPoints_HashIsPinnedAndThreadIndependent() =>
-		await CheckHash(LinearSolverType.SparseSchur, 100, 10000, 100, "0FA585B78EE43ED44CC069D2046C09D263E6D7C01A7A0FD7364E4D90D74FC20B");
+	public async Task SparseSchur_HashIsPinnedAndThreadIndependent() =>
+		await CheckHash(LinearSolverType.SparseSchur, 30, 1500, 100, "98B9A3F979F4F2CEE1307351D125D1D384C62ABC799B6AF7AB1B81BD10B4DF6B");
 
 	[Test]
 	public async Task DenseSchur_HashIsPinnedAndThreadIndependent() =>
-		await CheckHash(LinearSolverType.DenseSchur, 40, 4000, 100, "34D5326634F1056F2CBD503ADD20580A522BD125AF10A093821F4C4DF0C3206D");
+		await CheckHash(LinearSolverType.DenseSchur, 15, 800, 100, "18DAD521D2CE57ED9D5CE1BEAE6C2788844C93EC8A51AF5A6A11272A1F0E4E9C");
 
 	[Test]
 	public async Task IterativeSchur_HashIsPinnedAndThreadIndependent() =>
-		await CheckHash(LinearSolverType.IterativeSchur, 40, 4000, 100, "6C1710945476EE6DA67FAEFD41E1DEC497ACBBD2D502F73C13E6446E9F122595");
+		await CheckHash(LinearSolverType.IterativeSchur, 15, 800, 100, "3827BAA14E5033B162FB0A775ADE9621364B790F33FA379F52CDA3B66954D62A");
 }

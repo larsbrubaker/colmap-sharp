@@ -32,8 +32,12 @@
 
 namespace ColmapSharp.Solver;
 
-/// <summary>ceres::internal::SchurEliminator (dynamic block sizes).</summary>
-internal sealed class SchurEliminator
+/// <summary>
+/// ceres::internal::SchurEliminator (dynamic block sizes). With more than one thread the
+/// chunks are eliminated in two phases (SchurEliminator.Parallel.cs) that give the same bits
+/// as the sequential loop.
+/// </summary>
+internal sealed partial class SchurEliminator(int numThreads = 1)
 {
 	private int numEliminateBlocks;
 	private int[] lhsRowLayout = [];
@@ -193,6 +197,7 @@ internal sealed class SchurEliminator
 		g = new double[maxEBlockSize];
 		inverseEteG = new double[maxEBlockSize];
 		sj = new double[maxRowBlockSize];
+		InitParallel(maxEBlockSize, maxRowBlockSize, bufferSize);
 	}
 
 	/// <summary>
@@ -233,6 +238,26 @@ internal sealed class SchurEliminator
 			}
 		}
 
+		if (numThreads > 1)
+		{
+			EliminateChunksInParallel(a, b, d, layout, s, rhs);
+		}
+		else
+		{
+			EliminateChunksSequentially(a, b, d, layout, s, rhs);
+		}
+
+		// For rows with no e_blocks, the Schur complement update reduces to S += F'F.
+		NoEBlockRowsUpdate(a, b, layout, s, rhs);
+	}
+
+	// Ceres' single-threaded chunk loop: the chunks in order, each updating S and rhs.
+	private void EliminateChunksSequentially(
+		BlockSparseMatrix a, ReadOnlySpan<double> b, ReadOnlySpan<double> d, CellLayout layout, double[] s, Span<double> rhs)
+	{
+		CompressedRowBlockStructure bs = a.Structure;
+		Block[] cols = bs.Cols;
+
 		// Eliminate y blocks one chunk at a time. For each chunk, compute the entries of the
 		// normal equations and the gradient vector block corresponding to the y block and
 		// then apply Gaussian elimination to them.
@@ -266,9 +291,6 @@ internal sealed class SchurEliminator
 			// S -= F'E(E'E)^{-1}E'F
 			ChunkOuterProduct(cols, inverse, eBlockSize, chunk.BufferLayout, layout.ChunkPairs[chunkIndex], s);
 		}
-
-		// For rows with no e_blocks, the Schur complement update reduces to S += F'F.
-		NoEBlockRowsUpdate(a, b, layout, s, rhs);
 	}
 
 	/// <summary>
@@ -364,7 +386,7 @@ internal sealed class SchurEliminator
 		for (int c = 0; c < chunks.Length; c++)
 		{
 			(int BlockId, int Offset)[] bufferLayout = chunks[c].BufferLayout;
-			var pairs = new List<CellRef>();
+			var pairs = new List<CellRef>(bufferLayout.Length * (bufferLayout.Length + 1) / 2);
 			for (int p = 0; p < bufferLayout.Length; p++)
 			{
 				for (int q = p; q < bufferLayout.Length; q++)
@@ -381,7 +403,7 @@ internal sealed class SchurEliminator
 		{
 			Cell[] cells = bs.Rows[r].Cells;
 			int first = r < uneliminatedRowBegins ? 1 : 0;
-			var refs = new List<CellRef>();
+			var refs = new List<CellRef>((cells.Length - first) * (cells.Length - first + 1) / 2);
 			for (int i = first; i < cells.Length; i++)
 			{
 				for (int j = i; j < cells.Length; j++)

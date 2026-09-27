@@ -802,7 +802,10 @@ models with point counts 1, 2, 1, 2 and reads back sources 1, 3, 0, 2.
 1. The chunks (one E block's rows) are eliminated one after another in row order. Ceres runs
    them in parallel and serializes the updates of each reduced-camera-matrix cell and
    right-hand-side block with a mutex, so with `num_threads > 1` the order of additions into a
-   cell depends on scheduling. The order here is Ceres' single-threaded order.
+   cell depends on scheduling. The order here is Ceres' single-threaded order, for every
+   thread count: with several threads the elimination runs in two phases that replay each
+   cell's updates in that order (`SchurEliminator.Parallel.cs`, pinned by
+   `SchurEliminatorParallelTests` and `SchurDeterminismTests`).
 2. Only the dynamic-size eliminator is ported. Ceres picks a template specialization from the
    Jacobian's static block sizes (for COLMAP's BA typically `<2, 3, 6>`, and
    `SchurEliminatorForOneFBlock<2, 3, 6>` when there is a single camera block); those use

@@ -191,7 +191,8 @@ public static class LeastSquaresSolver
 			options.PreconditionerType,
 			numEliminateBlocks,
 			options.MinLinearSolverIterations,
-			options.MaxLinearSolverIterations));
+			options.MaxLinearSolverIterations,
+			options.NumThreads));
 		bool dense = type is LinearSolverType.DenseQr or LinearSolverType.DenseNormalCholesky;
 		pp.Evaluator = new ProgramEvaluator(reduced, dense, numEliminateBlocks, options.NumThreads);
 		pp.Jacobian = pp.Evaluator.CreateJacobian();

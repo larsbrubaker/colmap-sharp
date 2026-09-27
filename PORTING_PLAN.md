@@ -41,10 +41,12 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
   synthetic scene triggers).
 
 ### Performance (keep results bit-identical and thread-count independent)
-- Schur solvers (fixed-size kernels, precomputed cell offsets and cached E'E inverses are in;
-  SchurDeterminismTests pins the output hash, which must not change): two-phase parallel
-  elimination (per-chunk E'F and inverse slots, then per-camera block rows replayed in chunk
-  order, in batches of chunks to bound memory), parallel implicit products for
+- Schur solvers (SchurDeterminismTests pins the output hash, which must not change; fixed-size
+  kernels, cell offsets, cached inverses and two-phase parallel elimination are in). The
+  parallel elimination only reaches ~1.8x at 8 threads (phase B does ~2x the sequential CPU
+  work, mostly memory traffic over the E'F slots). One-time setup per structure
+  (SparseSchurComplementSolver.InitStorage's SortedSet, GetCellLayout's lists) costs about as
+  much as ten eliminations at 200 cams/20k pts. Still open: parallel implicit products for
   ITERATIVE_SCHUR, blocked LLT for DENSE_SCHUR.
 - Fusion is single-threaded (divergence 87): per-image parallel precompute of per-pixel
   world points/normals first, then a speculative band-parallel traversal with in-order commit,
