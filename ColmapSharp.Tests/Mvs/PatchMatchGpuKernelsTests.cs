@@ -19,6 +19,7 @@ using ColmapSharp.Compute;
 using ColmapSharp.Mvs;
 
 using TUnit.Assertions;
+using TUnit.Assertions.Enums;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
@@ -211,19 +212,19 @@ public class PatchMatchGpuKernelsTests
 			"lk", "seed", "depth_min", "depth_max", "geom_consistency_regularizer", "geom_consistency_max_cost",
 			"filter_min_ncc_prob", "filter_cos_min_triangulation_angle", "filter_geom_consistency_max_cost",
 			"filter_min_num_consistent", "spatial_normalization", "color_normalization",
-		});
+		}, CollectionOrdering.Matching);
 		await Assert.That(UniformSize(layout, "PmProblem")).IsEqualTo(PatchMatchGpuKernels.ProblemUniformSize);
 		await Assert.That(StructFields(layout, "PmSweep")).IsEquivalentTo(new[]
 		{
 			"rotation", "phase", "perturbation", "normal_perturbation", "prev_sel_prob_weight",
 			"filter_photo_consistency", "filter_geom_consistency", "pad0",
-		});
+		}, CollectionOrdering.Matching);
 		await Assert.That(UniformSize(layout, "PmSweep")).IsEqualTo(PatchMatchGpuKernels.SweepUniformSize);
 		await Assert.That(UniformSize(layout, "PmBand")).IsEqualTo(PatchMatchGpuKernels.BandUniformSize);
 		await Assert.That(StructFields(rotate, "PmRotate").Take(5)).IsEquivalentTo(new[]
 		{
 			"src_width", "src_height", "num_planes", "src_offset", "dst_offset",
-		});
+		}, CollectionOrdering.Matching);
 		await Assert.That(UniformSize(rotate, "PmRotate")).IsEqualTo(PatchMatchGpuKernels.RotateUniformSize);
 	}
 
@@ -281,7 +282,7 @@ public class PatchMatchGpuKernelsTests
 		RunFolded((int)rotate.NumPlanes * Width * Height, index => WgslTransliteration.RotatePlanes(rotate, index, src, dst));
 
 		float[] actual = dst.Skip(4).Select(BitConverter.UInt32BitsToSingle).ToArray();
-		await Assert.That(actual).IsEquivalentTo(expected.Data);
+		await Assert.That(actual).IsEquivalentTo(expected.Data, CollectionOrdering.Matching);
 	}
 
 	[Test]
@@ -315,7 +316,7 @@ public class PatchMatchGpuKernelsTests
 		RunFolded(Width * Height, index => WgslTransliteration.RotateNormals(rotate, index, src, dst));
 
 		uint[] expectedBits = expected.Data.Select(BitConverter.SingleToUInt32Bits).ToArray();
-		await Assert.That(dst).IsEquivalentTo(expectedBits);
+		await Assert.That(dst).IsEquivalentTo(expectedBits, CollectionOrdering.Matching);
 	}
 
 	[Test]

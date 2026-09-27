@@ -20,9 +20,11 @@
 // Window cache. Up to PM_WINDOW_CACHE_LIMIT samples, pm_prepare_window stores the window's colors
 // and weights in private arrays, as the CPU's PrepareWindow does; above it (a large radius with
 // step 1) private memory would be too large, so each evaluation recomputes color and weight from
-// the reference plane. Both give the same floats: the values and the weight sum's addition order
-// are the same (PatchMatchKernel.Photometric.cs explains why), provided the GPU's exp returns the
-// same result for the same argument, which a deterministic builtin does.
+// the reference plane. The values and the weight sum's addition order are the same either way
+// (PatchMatchKernel.Photometric.cs explains why), so the two paths give the same floats only if
+// the backend evaluates pm_bilateral_weight identically at both call sites - the same exp result
+// and the same choice about contracting its multiply-adds, which a shader compiler may make
+// differently per inlined site. Where it does not, the cached and uncached paths agree at Tier C.
 
 // Samples per window axis and in the whole (strided) window (PatchMatchPhotoConsistency.WindowCount).
 const PM_WINDOW_PER_AXIS: i32 = (2i * PM_WINDOW_RADIUS) / PM_WINDOW_STEP + 1i;
@@ -91,8 +93,11 @@ fn pm_prepare_window(rotation: i32, row: i32, col: i32) -> PmWindow {
 
 // 1 - NCC from the weighted source sums and the reference window's statistics (FinishNcc).
 fn pm_finish_ncc(src_color_sum0: f32, src_color_squared_sum0: f32, src_ref_color_sum0: f32, bilateral_weight_sum: f32, ref_color_sum: f32, ref_color_squared_sum: f32) -> f32 {
-	// The centre weight is exp(0) = 1, so the sum is at least 1 and the divisor is not zero.
-	let inv_bilateral_weight_sum = 1.0f / bilateral_weight_sum;
+	// The sum can be zero: when PM_WINDOW_STEP does not divide PM_WINDOW_RADIUS the centre (weight
+	// exp(0) = 1) is never sampled, and every sampled weight can underflow to 0. pm_div keeps C#'s
+	// result for that case explicit: an infinite reciprocal. Every source sum is then 0 (each term
+	// has a zero weight factor), so the normalized sums are 0 * inf = NaN; see below for the cost.
+	let inv_bilateral_weight_sum = pm_div(1.0f, bilateral_weight_sum);
 	let src_color_sum = src_color_sum0 * inv_bilateral_weight_sum;
 	let src_color_squared_sum = src_color_squared_sum0 * inv_bilateral_weight_sum;
 	let src_ref_color_sum = src_ref_color_sum0 * inv_bilateral_weight_sum;
@@ -101,7 +106,10 @@ fn pm_finish_ncc(src_color_sum0: f32, src_color_squared_sum0: f32, src_ref_color
 	let src_color_var = src_color_squared_sum - src_color_sum * src_color_sum;
 
 	// Based on Jensen's Inequality for convex functions, the variance should always be larger
-	// than 0. Do not make this threshold smaller. (Every term is finite: samples are in [0, 1].)
+	// than 0. Do not make this threshold smaller. The terms are finite (samples are in [0, 1])
+	// unless the weight sum was zero, when src_color_var is NaN. C# then compares false and falls
+	// through to cuda_min(PM_MAX_COST, NaN) = PM_MAX_COST; a GPU whose NaN comparison answers true
+	// returns PM_MAX_COST here. Either way the cost is PM_MAX_COST, so this needs no NaN guard.
 	const MIN_VAR: f32 = 1e-5f;
 	if (ref_color_var < MIN_VAR || src_color_var < MIN_VAR) {
 		return PM_MAX_COST;

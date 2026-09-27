@@ -2,10 +2,11 @@
 //
 // patch_match_filter.wgsl: the filter_pixels kernel of GPU PatchMatch (not "filter", a reserved
 // word in WGSL) - after the last sweep's rows and before its rotation, marks the source images
-// each pixel's best depth and normal are consistent with, and clears the pixel when fewer than filter_min_num_consistent are. One invocation per
-// pixel of the current rotation's frame; element count P, element e is row e / width, column
-// e % width. It writes 0 or 1 to every (source, pixel) entry of the mask, because the mask reuses
-// the cost buffer (still holding cost bits), where the CPU writes only the 1s of a zeroed mask.
+// each pixel's best depth and normal are consistent with, and clears the pixel when fewer than
+// filter_min_num_consistent are. One invocation per pixel of the current rotation's frame;
+// element count P, element e is row e / width, column e % width. It writes 0 or 1 to every
+// (source, pixel) entry of the mask, because the mask reuses the cost buffer (still holding cost
+// bits), where the CPU writes only the 1s of a zeroed mask.
 // Mirrors: PatchMatchCpu.FilterPixels / FilterPixel in ColmapSharp/Mvs/PatchMatchCpu.Sweep.cs
 //   (PatchMatchCpu.Sweep.cs explains why filtering after the sweep equals filtering per row).
 // Ports: the filtering step of patch_match_cuda.cu's SweepFromTopToBottom, as the CPU port models
