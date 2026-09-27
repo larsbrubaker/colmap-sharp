@@ -31,7 +31,12 @@ namespace ColmapSharp.Controllers;
 /// <param name="ModelIdx">The index of the sparse model (dense/&lt;ModelIdx&gt;).</param>
 /// <param name="Mesh">The mesh that was textured (the Poisson or Delaunay output).</param>
 /// <param name="Texture">The atlas, UVs (6 floats per face) and per-face view ids.</param>
-/// <param name="MeshPath">The textured mesh.ply; the atlas belongs next to it as texture.png.</param>
+/// <param name="MeshPath">
+/// The textured mesh.ply. Its header names texture.png next to it, which the library does not
+/// encode: the host writes <c>Texture.TextureAtlas</c> there (or supplies
+/// <see cref="AutomaticReconstructionOptions.TextureSink"/>, which receives it under that path).
+/// An empty atlas (no face seen by any view) has no texture.png.
+/// </param>
 public sealed record TexturedModelMesh(int ModelIdx, PlyMesh Mesh, MeshTextureMappingResult Texture, string MeshPath);
 
 public sealed partial class AutomaticReconstructionController
@@ -97,5 +102,8 @@ public sealed partial class AutomaticReconstructionController
 		Ply.WriteBinaryPlyMesh(meshPath, texturedMesh);
 
 		texturedMeshes.Add(new TexturedModelMesh(modelIdx, mesh, result, meshPath));
+
+		// MeshTextureMapping returns early without reaching 1 for an empty mesh or no views.
+		progress?.Report(1.0);
 	}
 }

@@ -169,7 +169,10 @@ public sealed class AutomaticReconstructionOptions
 	/// <summary>
 	/// Receives each texture atlas as dense/&lt;i&gt;/&lt;mesh name&gt;-textured/texture.png
 	/// for the host to encode (COLMAP's texturer writes that PNG itself), or null to keep the
-	/// atlases in memory only (AutomaticReconstructionController.TexturedMeshes).
+	/// atlases in memory only (AutomaticReconstructionController.TexturedMeshes). The mesh.ply
+	/// written beside that path names texture.png either way, so with no sink the host must
+	/// encode each TexturedModelMesh's atlas next to its MeshPath for the file to be usable on
+	/// its own. An empty atlas (no face seen by any view) is not passed to the sink.
 	/// </summary>
 	public IBitmapSink? TextureSink { get; set; }
 

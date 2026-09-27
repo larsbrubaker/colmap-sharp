@@ -8,8 +8,11 @@
 // fused.ply.vis, and meshes them (Mvs/PoissonMeshing.cs or Mvs/DelaunayMeshing.cs). With
 // Options.Texture on it then textures the mesh (AutomaticReconstruction.Texture.cs, C#-only,
 // docs/CPP_DIVERGENCES.md entry 135); a model whose fused.ply and mesh already exist is then
-// still undistorted and textured once per controller, since the texture lives in memory. The
-// rest of the controller is in AutomaticReconstruction.cs.
+// still undistorted and textured once per controller, since the texture lives in memory. Also
+// under entry 135, a mesher that fails or is cancelled leaves no mesh file behind, and a mesh
+// file without a PLY mesh header counts as missing, so a resume re-meshes the model rather
+// than trusting (or failing on) a partial file. The rest of the controller is in
+// AutomaticReconstruction.cs.
 //
 // Translation notes (docs/CPP_DIVERGENCES.md entry 134):
 // - COLMAP skips PatchMatch (and so everything after undistortion) without CUDA; the
@@ -70,6 +73,16 @@ public sealed partial class AutomaticReconstructionController
 				_ => Path.Combine(densePath, "meshed-advancing-front.ply"),
 			};
 
+			// A mesh file without a PLY mesh header is what an interrupted Poisson run leaves
+			// (PoissonMeshing.Run creates its output before reconstructing). COLMAP would skip
+			// such a model for good; here it counts as missing, so the model is re-meshed from
+			// its fused.ply (divergence 135).
+			if (File.Exists(meshingPath) && !HasPlyMeshHeader(meshingPath))
+			{
+				Log.Warning($"Re-meshing model {i}: {meshingPath} is not a PLY mesh");
+				File.Delete(meshingPath);
+			}
+
 			// Texturing needs the undistorted images even when the mesh exists, and its result
 			// lives in memory, so a model whose mesh exists is still textured once per controller.
 			bool haveDense = File.Exists(fusedPath) && File.Exists(meshingPath);
@@ -122,7 +135,9 @@ public sealed partial class AutomaticReconstructionController
 				return;
 			}
 
-			if (needTexture)
+			// No mesh here means Poisson reconstruction failed (it logged why); COLMAP goes on
+			// to the next model, and so does texturing.
+			if (needTexture && File.Exists(meshingPath))
 			{
 				RunTexturing(i, densePath, meshingPath, undistortedImages);
 			}
@@ -170,20 +185,32 @@ public sealed partial class AutomaticReconstructionController
 
 		if (!File.Exists(meshingPath))
 		{
-			IProgress<double>? meshingProgress = Forward<double>(
-				v => new ControllerProgress(MeshingStage, (int)(v * 1000), 1000, ""));
-			if (options.Mesher == AutomaticReconstructionOptions.MesherType.Poisson)
-			{
-				PoissonMeshing.Run(optionManager.PoissonMeshing, fusedPath, meshingPath, CancellationToken, meshingProgress);
-			}
-			else if (options.Mesher == AutomaticReconstructionOptions.MesherType.Delaunay)
-			{
-				RunDenseDelaunayMeshing(densePath, fusedPath, meshingPath, meshingProgress);
-			}
-			else
+			if (options.Mesher == AutomaticReconstructionOptions.MesherType.AdvancingFront)
 			{
 				Log.Warning("Skipping advancing front meshing because CGAL is not available");
 				return false;
+			}
+
+			IProgress<double>? meshingProgress = Forward<double>(
+				v => new ControllerProgress(MeshingStage, (int)(v * 1000), 1000, ""));
+
+			// A mesher that fails or is cancelled must not leave a partial mesh behind, or the
+			// next run would take it for a finished one (divergence 135). COLMAP ignores
+			// PoissonMeshing's result and keeps the file it created.
+			try
+			{
+				bool meshed = options.Mesher == AutomaticReconstructionOptions.MesherType.Poisson
+					? PoissonMeshing.Run(optionManager.PoissonMeshing, fusedPath, meshingPath, CancellationToken, meshingProgress)
+					: RunDenseDelaunayMeshing(densePath, fusedPath, meshingPath, meshingProgress);
+				if (!meshed)
+				{
+					File.Delete(meshingPath);
+				}
+			}
+			catch
+			{
+				File.Delete(meshingPath);
+				throw;
 			}
 		}
 
@@ -192,7 +219,8 @@ public sealed partial class AutomaticReconstructionController
 
 	// Port of mvs::DenseDelaunayMeshing(options, dense_path, output_path): reads the
 	// undistorted sparse model, fused.ply and fused.ply.vis of the dense workspace.
-	private void RunDenseDelaunayMeshing(string densePath, string fusedPath, string meshingPath, IProgress<double>? progress)
+	// Returns true (it throws on failure), to match PoissonMeshing.Run's result.
+	private bool RunDenseDelaunayMeshing(string densePath, string fusedPath, string meshingPath, IProgress<double>? progress)
 	{
 		var reconstruction = new Reconstruction();
 		reconstruction.Read(Path.Combine(densePath, "sparse"));
@@ -201,6 +229,52 @@ public sealed partial class AutomaticReconstructionController
 		PlyMesh mesh = DelaunayMeshing.DenseDelaunayMeshing(
 			optionManager.DelaunayMeshing, reconstruction, plyPoints, visibility, progress, CancellationToken);
 		Ply.WriteBinaryPlyMesh(meshingPath, new PlyTexturedMesh(mesh));
+		return true;
+	}
+
+	// Whether path starts with a complete PLY header ("ply" through "end_header") that has an
+	// element vertex with x, y and z properties and an element face: the cheap check that a
+	// mesh file was written, without reading its body. Bounded, since a damaged file may
+	// hold anything.
+	private static bool HasPlyMeshHeader(string path)
+	{
+		const int MaxHeaderLines = 1000;
+		using FileStream stream = FileOpen.OpenRead(path);
+		var reader = new PlyByteReader(stream);
+		if (reader.ReadLine()?.Trim() != "ply")
+		{
+			return false;
+		}
+
+		bool inVertex = false;
+		bool haveFace = false;
+		var coordinates = new HashSet<string>(StringComparer.Ordinal);
+		for (int lineIdx = 0; lineIdx < MaxHeaderLines; ++lineIdx)
+		{
+			string? line = reader.ReadLine();
+			if (line is null)
+			{
+				return false;
+			}
+
+			string[] elems = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+			if (elems.Length == 1 && elems[0] == "end_header")
+			{
+				return haveFace && coordinates.Count == 3;
+			}
+
+			if (elems.Length >= 2 && elems[0] == "element")
+			{
+				inVertex = elems[1] == "vertex";
+				haveFace |= elems[1] == "face";
+			}
+			else if (inVertex && elems.Length == 3 && elems[0] == "property" && elems[2] is "x" or "y" or "z")
+			{
+				coordinates.Add(elems[2]);
+			}
+		}
+
+		return false;
 	}
 
 	// The undistorted images, plus the host's masks under MaskRoot/<name> for the fusion.

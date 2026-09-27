@@ -2777,6 +2777,18 @@ writes it. Every result is also kept in memory in
 already exist is still undistorted again and textured once per controller (PatchMatch, fusion
 and meshing stay skipped); with `Texture` off, the skip is COLMAP's.
 
+Resuming after an interrupted mesher also differs, deliberately. `PoissonMeshing` creates its
+output file before reconstructing (COLMAP's `THROW_CHECK_PATH_OPEN`, kept as is in
+`Mvs/PoissonMeshing.cs`), and COLMAP ignores its `false` result, so a failed or cancelled run
+leaves an empty `meshed-poisson.ply` beside a complete `fused.ply`. COLMAP's next run skips that
+model for good on `ExistsFile`; here texturing would fail to read it and abort every resume.
+So the controller deletes the mesh file when a mesher throws, is cancelled or returns `false`
+(and then skips texturing that model, going on to the next as COLMAP does), and on a resume a
+mesh file without a complete PLY header naming vertex `x`, `y`, `z` and a face element counts
+as missing: it is deleted and the model is re-meshed from its kept `fused.ply`. Texturing
+progress always ends at 100%, also when `MeshTextureMapping` returns early (empty mesh, no
+views).
+
 **Why.** MatterCAD's photo-to-mesh result carries the photos' colors as a texture, so the
 automatic pipeline has to end in a textured mesh; running COLMAP's own texturer step with its
 own defaults keeps the result what `colmap automatic_reconstructor` followed by
@@ -2788,3 +2800,10 @@ runs photos in to a textured Delaunay mesh: one textured model whose UVs number 
 face and lie in [0, 1], more than half the faces assigned a view, a non-empty atlas that is the
 same bitmap the sink received, a `mesh.ply` whose header names `texture.png` and whose UVs match,
 and the `"Texturing"` stage last in the progress stages.
+`AutomaticReconstructionTests.CSharpOnly_ResumeReusesDenseResultsAndRecoversPartialMesh` pins
+the resume rules on one finished workspace: with `Texture` on, a new controller leaves
+`fused.ply` and the mesh untouched (same length and write time), reports no fusion or meshing
+stage and textures the model; with `Texture` off it reports nothing past the dense heading and
+textures nothing; over a zero-byte mesh it re-meshes from the untouched `fused.ply` and
+textures; cancelling during Poisson meshing leaves no `meshed-poisson.ply`; and a Poisson run
+whose trim empties the mesh still ends texturing progress at 1000 of 1000.
