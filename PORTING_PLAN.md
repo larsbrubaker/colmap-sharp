@@ -128,13 +128,14 @@ Done: the seam (`ColmapSharp/Compute/`), WGSL kernels (`Mvs/Shaders/`), planner,
 `PatchMatchCpu`), public API (`PatchMatch.RunAsync(device)`, `PatchMatchController.ComputeDevice`,
 `AutomaticReconstructionOptions.ComputeDevice`; divergence 136). On an Apple M5 (MatterCAD
 `Tests/ColmapGpuTests`, branch `gpu-compute-adapter`, not merged) the GPU run passes every Tier C
-check. The cooperative `sweep_band` (workgroup per column) makes it 1.7–2.8× faster than the
-10-core CPU (1000×750: 6.1 s vs 10.5 s); on Metal only photometric sums are bit-identical to the
+check. The cooperative `sweep_band` (workgroup per column) and its workgroup-shared reference
+window make it 2.3–3.8× faster than the 10-core CPU (1000×750: 4.5 s vs 10.5 s); on Metal only photometric sums are bit-identical to the
 serial kernel (wgpu compiles with fast math). `AutomaticReconstructionController.RunAsync` lets a
 non-blocking (browser) device run PatchMatch, and `Mvs/Testing/PatchMatchGpuConformance` checks
 any device (RNG/conversion probes, kernel probes, four Tier C runs incl. a banded one). Remaining:
-- D1b speed: workgroup-shared reference window, band re-sizing for the cooperative kernel,
-  32-lane workgroups, splitting the final per-source NCC.
+- More speed: 32-lane workgroups; reusing the sampled NCC in the final per-source loop (~10%
+  faster but failed the real-GPU test when run after the serial kernel — being root-caused).
+  Bigger bands measured no gain.
 - Merge MatterCAD's `gpu-compute-adapter` (needs agg-sharp `cb97c4cc` pushed first — Lars).
 - C3 app wiring / C4 browser smoke check wait for Phase 14.
 - `sweep_band`/`filter_pixels` per-kernel GPU probes (full-run agreement covers them today).
