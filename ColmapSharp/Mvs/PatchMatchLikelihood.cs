@@ -40,6 +40,16 @@ public readonly struct PatchMatchLikelihood
 		nccNormFactor = ComputeNCCCostNormFactor(nccSigma);
 	}
 
+	// The four constants, which the GPU path (PatchMatchGpu.cs) packs into its PmLikelihood
+	// uniform so the shaders use exactly these floats.
+	internal float CosMinTriangulationAngle => cosMinTriangulationAngle;
+
+	internal float InvIncidentAngleSigmaSquare => invIncidentAngleSigmaSquare;
+
+	internal float InvNccSigmaSquare => invNccSigmaSquare;
+
+	internal float NccNormFactor => nccNormFactor;
+
 	/// <summary>
 	/// Compute forward message from current cost and forward message of previous /
 	/// neighboring pixel.

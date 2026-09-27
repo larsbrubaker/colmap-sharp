@@ -237,7 +237,7 @@ public class PatchMatchGpuPlanTests
 			("initial_cost", 3_000_000),
 			("backward_messages", 4_000),
 			("sweep_band", 1_000),
-			("filter", 750_000),
+			("filter_pixels", 750_000),
 			("rotate_planes", 3_000_000),
 			("rotate_normals", 750_000),
 		];

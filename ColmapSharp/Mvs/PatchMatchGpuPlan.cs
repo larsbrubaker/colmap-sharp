@@ -344,7 +344,7 @@ internal sealed class PatchMatchGpuPlan
 		dispatches.Add(Dispatch("sweep_band", columns, maxGroups));
 		if (filter)
 		{
-			dispatches.Add(Dispatch("filter", p, maxGroups));
+			dispatches.Add(Dispatch("filter_pixels", p, maxGroups));
 		}
 
 		// The widest copy is a whole source map (or mask); the reference planes are 3 planes.

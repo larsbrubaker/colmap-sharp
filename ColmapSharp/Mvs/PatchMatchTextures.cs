@@ -85,6 +85,15 @@ public sealed class PatchMatchSourceImages
 	public int NumLayers { get; }
 
 	/// <summary>
+	/// The layers' bytes, layer l row r column c at (l MaxHeight + r) MaxWidth + c: what the GPU
+	/// path (PatchMatchGpu.cs) uploads as the source image buffer.
+	/// </summary>
+	internal ReadOnlySpan<byte> RawData => data;
+
+	/// <summary>byte / 255.0f for every byte (256 floats), the GPU path's byte table uniform.</summary>
+	internal static ReadOnlySpan<float> ByteToUnitTable => ByteToUnit;
+
+	/// <summary>
 	/// The bilinearly interpolated value in [0, 1] at unnormalized texture coordinates
 	/// (<paramref name="x"/>, <paramref name="y"/>) of <paramref name="layer"/>, as
 	/// tex2DLayered with linear filtering, border addressing and normalized-float reads.
@@ -269,6 +278,12 @@ public sealed class PatchMatchSourceDepthMaps
 
 	/// <summary>Number of layers (source depth maps).</summary>
 	public int NumLayers { get; }
+
+	/// <summary>
+	/// The layers' depths in the same layout as <see cref="PatchMatchSourceImages.RawData"/>: what
+	/// the GPU path (PatchMatchGpu.cs) uploads as the source depth buffer.
+	/// </summary>
+	internal ReadOnlySpan<float> RawData => data;
 
 	/// <summary>
 	/// The depth of the texel containing unnormalized coordinates (<paramref name="x"/>,

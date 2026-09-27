@@ -37,6 +37,12 @@ public readonly struct BilateralWeightComputer
 		colorNormalization = 1.0f / (2.0f * sigmaColor * sigmaColor);
 	}
 
+	// 1 / (2 sigma_spatial²) and 1 / (2 sigma_color²), which the GPU path (PatchMatchGpu.cs)
+	// packs into its problem uniform.
+	internal float SpatialNormalization => spatialNormalization;
+
+	internal float ColorNormalization => colorNormalization;
+
 	/// <summary>The weight of a pixel (rowDiff, colDiff) away with color2, relative to color1.</summary>
 	public float Compute(float rowDiff, float colDiff, float color1, float color2)
 	{

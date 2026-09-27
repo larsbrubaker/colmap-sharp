@@ -208,7 +208,14 @@ internal sealed partial class PatchMatchCpu
 	/// For every pixel with consistent source images: col, row, count, then the image
 	/// indices (of the problem's images). Port of PatchMatchCuda::GetConsistentImageIdxs.
 	/// </summary>
-	public List<int> GetConsistentImageIdxs()
+	public List<int> GetConsistentImageIdxs() => ConsistentImageIdxs(consistencyMask, problem.SrcImageIdxs);
+
+	/// <summary>
+	/// The consistent image list of <paramref name="consistencyMask"/> (one slice per source,
+	/// nonzero where consistent), with slice d reported as <paramref name="srcImageIdxs"/>[d].
+	/// Shared with the GPU path (PatchMatchGpu.cs), which decodes its mask into the same form.
+	/// </summary>
+	internal static List<int> ConsistentImageIdxs(Mat<byte> consistencyMask, IReadOnlyList<int> srcImageIdxs)
 	{
 		var consistentImageIdxs = new List<int>();
 		var pixelConsistentImageIdxs = new List<int>(consistencyMask.GetDepth());
@@ -221,7 +228,7 @@ internal sealed partial class PatchMatchCpu
 				{
 					if (consistencyMask.Get(r, c, d) != 0)
 					{
-						pixelConsistentImageIdxs.Add(problem.SrcImageIdxs[d]);
+						pixelConsistentImageIdxs.Add(srcImageIdxs[d]);
 					}
 				}
 
