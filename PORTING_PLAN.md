@@ -133,9 +133,8 @@ window make it 2.3–3.8× faster than the 10-core CPU (1000×750: 4.5 s vs 10.5
 serial kernel (wgpu compiles with fast math). `AutomaticReconstructionController.RunAsync` lets a
 non-blocking (browser) device run PatchMatch, and `Mvs/Testing/PatchMatchGpuConformance` checks
 any device (RNG/conversion probes, kernel probes, four Tier C runs incl. a banded one). Remaining:
-- More speed: 32-lane workgroups; reusing the sampled NCC in the final per-source loop (~10%
-  faster but failed the real-GPU test when run after the serial kernel — being root-caused).
-  Bigger bands measured no gain.
+- More speed: 32-lane workgroups (not tried). The final per-source loop reuses the sampled NCC
+  (~10%); bigger bands measured no gain.
 - Merge MatterCAD's `gpu-compute-adapter` (needs agg-sharp `cb97c4cc` pushed first — Lars).
 - C3 app wiring / C4 browser smoke check wait for Phase 14.
 - `sweep_band`/`filter_pixels` per-kernel GPU probes (full-run agreement covers them today).
