@@ -20,9 +20,10 @@
 //   across the face is finer, whose faces come from its own leaves), and pushes them up, keyed
 //   by face, to the coarser slices or slabs whose face contains this one, stopping at the first
 //   ancestor whose neighbor across the face is finer.
-// The polygon step that reads them (SetLevelSet, IsoSurface) is not ported yet. Tier A against
-// oracle/poisson_levelset5_harness.cc; none of its runs reaches a vertex pair (both halves of a
-// coarse edge crossed), so the pair branches are pinned only by reading.
+// The polygon step that reads them (SetLevelSet, IsoSurface) is
+// PoissonLevelSetExtractor.Polygons.cs. Tier A against oracle/poisson_levelset5_harness.cc;
+// none of its runs reaches a vertex pair (both halves of a coarse edge crossed), so the pair
+// branches are pinned only by reading.
 //
 // Translation notes:
 // - Upstream runs each step in a ThreadPool::ParallelFor over the leaves, with per-thread key

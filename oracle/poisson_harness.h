@@ -87,13 +87,15 @@ bool quiet = false;
 // double's bit pattern). The C# test hashes its own values the same way and, on a mismatch,
 // reports the first differing chunk and its values. Inputs, the libm tables and the level-set
 // vertex colors (so a color mismatch can be located) and the smallest run of the iso-edges
-// (poisson_levelset5_harness.cc, so a case can be read in full) stay in full.
+// and polygons (poisson_levelset5_harness.cc and poisson_levelset6_harness.cc, so a case can be
+// read in full) stay in full.
 const size_t kChunk = 256;
 const size_t kFullLimit = 1024;
 
 bool KeepFull(const std::string& name) {
   return name.find("/input") != std::string::npos || name.find("/vertexcolors") != std::string::npos || name.rfind("powonethird/", 0) == 0 || name.rfind("logf/", 0) == 0 ||
-         name.rfind("levelset3/isoedges/", 0) == 0;
+         name.rfind("levelset3/isoedges/", 0) == 0 ||
+         name.rfind("levelset3/polygon", 0) == 0;
 }
 
 void PrintChunks(const std::string& name, const std::vector<unsigned long long>& bits, bool isFloat) {

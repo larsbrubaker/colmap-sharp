@@ -26,6 +26,9 @@
 #                       slice and slab (PoissonLevelSetExtractor.IsoEdges)
 #   poisson_isoroot.json oracle/poisson_isoroot_harness.cc: getSolutions and GetIsoVertex's
 #                       root on crafted edges (PoissonPolynomial, AverageRoot)
+#   poisson_levelset6.json oracle/poisson_levelset6_harness.cc: the polygons (triangles and
+#                       barycenter vertices) in write order (PoissonLevelSetExtractor.Polygons,
+#                       MinimalAreaTriangulation)
 #   poisson_libm.json   oracle/poisson_libm_harness.cc: libm's pow( x , 1./3 ) and logf
 # Tier A, bit-exact. Read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests*.cs.
 #
@@ -74,6 +77,7 @@ HARNESSES = [
     ("poisson_levelset4_harness.cc", "poisson_levelset4.json", None),
     ("poisson_levelset5_harness.cc", "poisson_levelset5.json", None),
     ("poisson_isoroot_harness.cc", "poisson_isoroot.json", None),
+    ("poisson_levelset6_harness.cc", "poisson_levelset6.json", None),
 ]
 
 if __name__ == "__main__":

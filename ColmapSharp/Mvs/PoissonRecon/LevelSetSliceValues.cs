@@ -16,7 +16,7 @@
 // .XSliceIsoVertices.cs, the iso-edges and vertex pairs in .IsoEdges.cs). Like upstream, the
 // value arrays grow but never shrink or clear on reuse: a corner, edge or face entry is read
 // only once its flag is set. The lookups the polygon step makes (addIsoEdges, setVertexPair,
-// setEdgeVertex) are not ported yet.
+// setEdgeVertex) are in PoissonLevelSetExtractor.Polygons.cs.
 //
 // Translation notes: the key/vertex lists hold the vertex's index in the output stream rather
 // than a copy of the vertex (upstream pairs both); the vertex is the sink's entry at that

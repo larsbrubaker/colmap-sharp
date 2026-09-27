@@ -2568,7 +2568,10 @@ so the vertex order varies with threads; the port visits the leaves in sorted or
 list, as a single-threaded run does. The iso-edges (`PoissonLevelSetExtractor.IsoEdges.cs`) keep
 per-thread lists too (the vertex pairs and the face iso-edges pushed to coarser slices and
 slabs), merged in thread order at finalize, so the order of the iso-edges inside one face-edge
-map entry varies with threads; the port records them in leaf order with one list.
+map entry varies with threads; the port records them in leaf order with one list. The polygons
+(`PoissonLevelSetExtractor.Polygons.cs`) are the same: upstream's `SetLevelSet` triangulates a
+slab's leaves in a `ParallelFor`, so the order of the triangles and the numbering of the
+barycenter vertices it writes vary with threads; the port writes them in sorted leaf order.
 
 **Why.** CLAUDE.md requires deterministic results, and there is no fixed multi-threaded order
 to match. The single-threaded order is the one reproducible reference (the same choice as
@@ -2581,7 +2584,8 @@ solutions and the base-depth multigrid solve; `PoissonTreeOracleTests.PostSolveS
 (levelset3, levelset5, levelset6, levelset8) does the same for the iso-value sums, and
 `PoissonTreeOracleTests.LevelSetSliceIsoVertices_MatchHarness` and
 `PoissonTreeOracleTests.LevelSetIsoVertices_MatchHarness` for the vertex order, and
-`PoissonTreeOracleTests.LevelSetIsoEdges_MatchHarness` for the iso-edge lists.
+`PoissonTreeOracleTests.LevelSetIsoEdges_MatchHarness` for the iso-edge lists, and
+`PoissonTreeOracleTests.LevelSetPolygons_MatchHarness` for the triangles and barycenters.
 ## 124. LO-RANSAC can start its local optimization from a different five-point solution
 
 **What differs.** The five-point solver returns up to ten essential matrices per minimal

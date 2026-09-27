@@ -5,8 +5,8 @@
 // nonLinearFit on, gradientNormals off, with the density estimator and the color field, as
 // --density and --colors ask): Extract's slab loop with InitSlice, InitSlab, SetSliceValues,
 // SetSlabIsoVertices, the vertex loop of SetSliceIso, and the edge parts of FinalizeSlice and
-// FinalizeSlab, in Extract's order, leaving out the iso-edges and the polygons (which write no
-// vertices without --barycenter, which COLMAP never passes). Extract's lambdas are copied here,
+// FinalizeSlab, in Extract's order, leaving out the iso-edges and the polygons (whose barycenter
+// vertices oracle/poisson_levelset6_harness.cc pins). Extract's lambdas are copied here,
 // since they are local to it. The level is Solve's iso-value, and the color field is scaled per
 // level as Solve does. Output: every vertex in write order (position, gradient, depth, color),
 // the colors alone in full for the smaller runs (so a mismatch can be located without the
