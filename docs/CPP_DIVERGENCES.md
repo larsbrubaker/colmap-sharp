@@ -2617,3 +2617,34 @@ pose to 2.6e-14 deg. pycolmap's own result is stable: `estimate_essential_matrix
 1000, and with every keypoint perturbed by up to 1e-4 px, so the difference is not rounding
 noise. Downstream, the global pipeline on the two calibrations agrees to 4.0e-4 deg and 2.5e-5
 of the scene radius.
+
+## 125. A polygon's barycenter vertex gets the mean of its loop's depths
+
+**What differs.** When `AddIsoPolygons` (`FEMTree.LevelSet.3D.inl`) splits a coplanar loop
+around a new barycenter vertex, upstream builds that vertex as `Vertex c; c *= 0;`, adds the
+loop's vertices and divides by their count. The position, gradient and color members are
+zero-initialized `Point`s, but the depth is a plain `float` that the default constructor
+leaves uninitialized, and an uninitialized (possibly NaN) value times zero is not reliably
+zero. `PoissonLevelSetExtractor.Barycenter` starts the depth at zero, so the barycenter's depth
+(the density COLMAP's `--density` writes) is the mean of the loop's depths. Upstream's value
+is undefined: an optimized build gives every barycenter a NaN depth.
+
+**Why.** Reading the uninitialized float is undefined behavior, so there is no upstream value
+to match. Averaging the depth like every other member is what `c *= 0` evidently intends, and
+it keeps the density finite. That matters: `PoissonMeshing` passes `--density` whenever
+`trim > 0` (the default is 10) and the surface trimmer then cuts by that density, so a NaN
+density on a barycenter vertex would make trimming depend on how NaN compares, rather than on
+the surface.
+
+**Evidence.** `oracle/poisson_levelset6_harness.cc` built with the fixture script's flags
+(`-std=c++17 -O1 -ffp-contract=off`, Apple clang 21, Darwin arm64) reproduces the checked-in
+`poisson_levelset6.json` bit for bit, with finite barycenter depths (levelset6's first is
+`0x1.2ab9fp+2`); `PoissonTreeOracleTests.LevelSetPolygons_MatchHarness` pins the port to it.
+The same harness at `-O2` prints NaN for every barycenter depth (all 40 in levelset6, all 92
+in levelset8) and is otherwise unchanged. At `-O0` the depths are finite again, but a few
+upstream bits move with the optimization level alone: 7 barycenter values in levelset6 (e.g.
+a position `0x1.26efdap-1` becomes `0x1.26efd8p-1`) and 3 in levelset8 differ from the `-O1`
+fixture, and so do a few triangle-index checksum chunks in levelset5, 6 and 8 (not traced;
+the minimal-area triangulation's float comparisons are the likely path). The oracle therefore stays at the harness's
+standard `-O1`, and a Tier C end-to-end mesh fixture from optimized pycolmap must not expect
+bit-exact barycenter vertices or their densities.

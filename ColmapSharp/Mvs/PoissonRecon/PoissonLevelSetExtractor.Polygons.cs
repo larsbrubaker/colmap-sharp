@@ -27,8 +27,10 @@
 //   order reaches the output.
 // - The barycenter starts from upstream's default-constructed vertex times zero; its
 //   positions, gradient and colors are zero-initialized Points, but the depth is an
-//   uninitialized float, taken here as zero (anything finite times zero, which upstream relies
-//   on).
+//   uninitialized float, and garbage (or NaN) times zero is not reliably zero. That is undefined
+//   behavior upstream (an optimized build gives every barycenter a NaN depth); the port starts
+//   the depth at zero, so the barycenter's depth is the mean of the loop's depths
+//   (docs/CPP_DIVERGENCES.md, entry 125).
 // - A face whose iso-edges are neither set nor in the face-edge map is only warned about
 //   upstream ("Invalid face"); here it is counted in InvalidFaceCount. The other failures
 //   (MK_THROW) throw InvalidOperationException.
@@ -329,6 +331,8 @@ public sealed partial class PoissonLevelSetExtractor
 	// component (position, gradient, depth, data), in float.
 	private LevelSetVertex Barycenter(int[] polygon)
 	{
+		// depth = 0f where upstream's is uninitialized (undefined behavior; see the header and
+		// docs/CPP_DIVERGENCES.md, entry 125).
 		float x = 0f, y = 0f, z = 0f, gx = 0f, gy = 0f, gz = 0f, depth = 0f;
 		float[] data = new float[zeroData.Length];
 		foreach (int index in polygon)
