@@ -62,9 +62,12 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
   (SparseSchurComplementSolver.InitStorage's SortedSet, GetCellLayout's lists) costs about as
   much as ten eliminations at 200 cams/20k pts. Still open: parallel implicit products for
   ITERATIVE_SCHUR, blocked LLT for DENSE_SCHUR.
-- Fusion is single-threaded (divergence 87): per-image parallel precompute of per-pixel
-  world points/normals first, then a speculative band-parallel traversal with in-order commit,
-  which reproduces the one-thread result.
+- Fusion is single-threaded (divergence 87). `FusionOracleTests`'
+  `CSharpOnly_FusedOutputIsBitIdenticalForAnyThreadCount` pins the output hash. A per-image
+  precompute of world points/normals was measured and gives nothing (the per-pixel math is
+  <100 ms of a ~3.3 s traversal at 10×1600×1200) for 24 B/pixel, so don't retry it. Profile
+  the traversal's bookkeeping (queue, medians, visibility lists, bitmap lookups, GC) first;
+  the structural fix is a speculative band-parallel traversal with in-order commit.
 - Optional: Vector128 lanes in `Jet` (allowed under CLAUDE.md's lane rule).
 - Evaluate a faithful port of libc++ `std::sort` (sort3/4/5, insertion sort below 24, pdqsort
   above) so tie-sensitive sorts match COLMAP instead of carrying divergence entries.
