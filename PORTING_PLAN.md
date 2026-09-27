@@ -40,14 +40,20 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
   2. Harness hardening: pin `MakeInput`'s sin/cos in `oracle/poisson_harness.h` to
      `__sincosf_stret` so fixtures don't depend on `-O` level (verified byte-identical at
      `-O1`; see divergence 125's evidence).
-  3. SurfaceTrimmer (SurfaceTrimmer.cpp, bit-exact via a harness on `PoissonMeshOutput`).
+  3. Trimmer coverage: `SurfaceTrimmer_Crafted_MatchesHarness` pins libc++ order only for
+     `componentEdges`; walking `componentHalfEdges` (`PoissonSurfaceTrimmer.Islands.cs:83`) or
+     `componentBoundaryHalfEdges` (:97) in insertion order still passes. Needs a crafted mesh
+     with more neighbor-rich merges.
   4. The public in-memory `PoissonMeshing` API plus the file wrapper, and
      `poisson_meshing_test.cc` 1:1, with a Tier C pycolmap fixture. Colors follow the input's
      extra PLY properties, not `options.color` (PoissonRecon ignores `--colors` for .ply).
      Review items: `PoissonMeshOutput.FromLevelSet` must throw unless `Extract` completed
      (cancelled or never-run extractors now give a partial/empty mesh), and the extractor's
      step methods (`InitSlice`, `IsoSurface`, ...) should become internal so `Extract`'s
-     run-once guard can't be bypassed.
+     run-once guard can't be bypassed. Chain `PoissonMeshOutput.FromLevelSet` →
+     `PoissonSurfaceTrimmer.Trim` when `trim != 0`, converting the trim as COLMAP does
+     (`std::to_string` then `atof` then float: `(float)double.Parse(trim.ToString("F6",
+     InvariantCulture))`).
 
 ### Verification
 - End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us (also the
