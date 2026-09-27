@@ -7,7 +7,8 @@
 // counterpart (its PatchMatch is CUDA). These pin the recorded schedule against
 // PatchMatchCpu.Run's (kernel order, bands, the last sweep's filter, the rotations and the
 // buffer roles that rotate with them), one flush per sweep, cancellation between sweeps, the
-// progress fractions, the uniform bytes, and the decoding of the read-back buffers. Whether the
+// progress fractions, the uniform bytes, that every created buffer is one the plan counts at
+// the planned size, and the decoding of the read-back buffers. Whether the
 // kernels compute the CPU's numbers is the reference twin's job (ReferenceComputeDevice).
 
 using System.Buffers.Binary;
@@ -31,7 +32,7 @@ public class PatchMatchGpuTests
 	private const int Height = 19;
 
 	private static (PatchMatchGpu Gpu, PatchMatchOptions Options, PatchMatch.Problem Problem) Setup(
-		string config, int width = Width, int height = Height, int numIterations = 2, int numSamples = 15)
+		string config, int width = Width, int height = Height, int numIterations = 2, int numSamples = 15, ulong seed = PatchMatchRandom.DefaultSeed)
 	{
 		(List<Image> images, List<DepthMap> truth, List<NormalMap> normals) = PatchMatchRunTests.Scene(width, height);
 		bool geometric = config == "geometric";
@@ -40,7 +41,7 @@ public class PatchMatchGpuTests
 		PatchMatch.Problem problem = geometric
 			? PatchMatchRunTests.Problem(images, truth, normals)
 			: PatchMatchRunTests.Problem(images);
-		return (new PatchMatchGpu(options, problem), options, problem);
+		return (new PatchMatchGpu(options, problem, seed), options, problem);
 	}
 
 	private static PatchMatchGpuPlan PlanOf(PatchMatchGpu gpu, PatchMatchOptions options)
@@ -256,6 +257,88 @@ public class PatchMatchGpuTests
 	}
 
 	[Test]
+	[MethodDataSource(nameof(Configs))]
+	public async Task Schedule_InitAndSweepUniformBindings(string config)
+	{
+		var (gpu, options, _) = Setup(config);
+		var device = new RecordingComputeDevice();
+		await gpu.RunAsync(device);
+		var dispatches = device.CommandsOf<DispatchCommand>().ToList();
+		List<DispatchCommand> Of(string entryPoint) => dispatches.Where(d => d.Kernel.Descriptor.EntryPoint == entryPoint).ToList();
+
+		// Before the first sweep the maps are in rotation 0: init_random fills state 0, and
+		// initial_cost reads state and reference 0 and writes the first sweep's cost map, A.
+		var initRandom = Of("init_random");
+		await Assert.That(initRandom.Count).IsEqualTo(config == "geometric" ? 0 : 1);
+		if (initRandom.Count == 1)
+		{
+			await Assert.That(Bound(initRandom[0], 0, PatchMatchGpuKernels.StateBinding)).IsEqualTo("pm_state_0");
+		}
+
+		DispatchCommand initialCost = Of("initial_cost").Single();
+		await Assert.That(Bound(initialCost, 0, PatchMatchGpuKernels.CostsBinding)).IsEqualTo("pm_source_maps_a");
+		await Assert.That(Bound(initialCost, 0, PatchMatchGpuKernels.StateBinding)).IsEqualTo("pm_state_0");
+		await Assert.That(Bound(initialCost, 0, PatchMatchGpuKernels.ReferenceBinding)).IsEqualTo("pm_reference_0");
+
+		// Sweep k's backward_messages binds sweep k's uniform; the filter binds the last sweep's,
+		// the only one with the filter flags set.
+		var backward = Of("backward_messages");
+		await Assert.That(backward.Count).IsEqualTo(4 * options.NumIterations);
+		for (int k = 0; k < backward.Count; ++k)
+		{
+			await Assert.That(Bound(backward[k], PatchMatchGpuKernels.SweepGroup, 0)).IsEqualTo($"pm_sweep_{k}");
+		}
+
+		var filters = Of("filter_pixels");
+		await Assert.That(filters.Count).IsEqualTo(config == "photometric" ? 0 : 1);
+		if (filters.Count == 1)
+		{
+			await Assert.That(Bound(filters[0], PatchMatchGpuKernels.SweepGroup, 0)).IsEqualTo($"pm_sweep_{backward.Count - 1}");
+		}
+	}
+
+	[Test]
+	[MethodDataSource(nameof(Configs))]
+	public async Task Buffers_MatchThePlanExactly(string config)
+	{
+		// Every buffer the run creates is one the plan accounts for, at the planned size and
+		// kind, and the plan counts nothing the run does not create; so TotalBytes (the memory
+		// budget check) is exactly what the run takes.
+		var (gpu, options, _) = Setup(config);
+		PatchMatchGpuPlan plan = PlanOf(gpu, options);
+		var device = new RecordingComputeDevice();
+		await gpu.RunAsync(device);
+
+		var created = device.CommandsOf<CreateBufferCommand>().Select(c => c.Buffer).ToList();
+		foreach (PatchMatchGpuBuffer planned in plan.Buffers)
+		{
+			var ofRole = created.Where(b => RoleOf(b.Label) == planned.Role).ToList();
+			await Assert.That(ofRole.Count).IsEqualTo(planned.Count).Because(planned.Role.ToString());
+			await Assert.That(ofRole.All(b => b.Size == planned.Size && b.Kind == planned.Kind)).IsTrue().Because(planned.Role.ToString());
+		}
+
+		await Assert.That(plan.Buffers.Sum(b => b.Count)).IsEqualTo(created.Count);
+		await Assert.That(created.Sum(b => b.Size)).IsEqualTo(plan.TotalBytes);
+	}
+
+	// The plan role of an orchestrator buffer, by its label.
+	private static PatchMatchGpuBufferRole RoleOf(string? label) => label switch
+	{
+		"pm_byte_to_unit" => PatchMatchGpuBufferRole.ByteTable,
+		"pm_poses" => PatchMatchGpuBufferRole.PoseTable,
+		"pm_problem" => PatchMatchGpuBufferRole.Problem,
+		"pm_source_images" => PatchMatchGpuBufferRole.SourceImages,
+		"pm_source_depths" => PatchMatchGpuBufferRole.SourceDepths,
+		_ when label!.StartsWith("pm_reference_", StringComparison.Ordinal) => PatchMatchGpuBufferRole.ReferencePlanes,
+		_ when label.StartsWith("pm_state_", StringComparison.Ordinal) => PatchMatchGpuBufferRole.State,
+		_ when label.StartsWith("pm_source_maps_", StringComparison.Ordinal) => PatchMatchGpuBufferRole.SourceMaps,
+		_ when label.StartsWith("pm_sweep_", StringComparison.Ordinal) => PatchMatchGpuBufferRole.SweepUniforms,
+		_ when label.StartsWith("pm_band_", StringComparison.Ordinal) => PatchMatchGpuBufferRole.BandUniforms,
+		_ when label.StartsWith("pm_rotate_", StringComparison.Ordinal) => PatchMatchGpuBufferRole.RotateUniforms,
+		_ => throw new InvalidOperationException($"No plan role for buffer {label}."),
+	};
+
+	[Test]
 	public async Task Dispatch_ShapesFollowElementCounts()
 	{
 		var (gpu, _, _) = Setup("filter");
@@ -341,14 +424,18 @@ public class PatchMatchGpuTests
 	{
 		var (gpu, _, _) = Setup("photometric");
 		var device = new RecordingComputeDevice { Limits = ComputeDeviceLimits.Defaults with { MaxStorageBuffersPerShaderStage = 4 } };
-		await Assert.That(async () => await gpu.RunAsync(device)).Throws<InvalidOperationException>().WithMessageContaining("Using the CPU.");
+		// RunAsync does not fall back, so its message must not say it does.
+		await Assert.That(async () => await gpu.RunAsync(device)).Throws<InvalidOperationException>().WithMessage(
+			"The GPU cannot run this problem: The GPU allows 4 storage buffers per shader; PatchMatch needs 7.");
 		await Assert.That(device.Commands.Count).IsEqualTo(0);
 	}
 
 	[Test]
 	public async Task Uniforms_ProblemAndSweepFields()
 	{
-		var (gpu, options, _) = Setup("geometric");
+		// Distinct high and low halves, so swapped or truncated seed words show.
+		const ulong Seed = 0x0123_4567_89AB_CDEFUL;
+		var (gpu, options, _) = Setup("geometric", seed: Seed);
 		var device = new RecordingComputeDevice();
 		await gpu.RunAsync(device);
 
@@ -360,7 +447,7 @@ public class PatchMatchGpuTests
 		await Assert.That(problem[1]).IsEqualTo(-0.5f / ((float)options.IncidentAngleSigma * (float)options.IncidentAngleSigma));
 		await Assert.That(problem[2]).IsEqualTo(-0.5f / ((float)options.NccSigma * (float)options.NccSigma));
 		await Assert.That(problem[3]).IsEqualTo(PatchMatchLikelihood.ComputeNCCCostNormFactor((float)options.NccSigma));
-		await Assert.That((problemWords[4], problemWords[5])).IsEqualTo((0u, 0u));
+		await Assert.That((problemWords[4], problemWords[5])).IsEqualTo((0x89AB_CDEFu, 0x0123_4567u));
 		await Assert.That((problem[6], problem[7])).IsEqualTo(((float)options.DepthMin, (float)options.DepthMax));
 		await Assert.That(problem[8]).IsEqualTo((float)options.GeomConsistencyRegularizer);
 		await Assert.That(problem[9]).IsEqualTo((float)options.GeomConsistencyMaxCost);
@@ -422,10 +509,27 @@ public class PatchMatchGpuTests
 		}
 
 		// Rotation copies of an even sweep read the Width x Height frame; odd ones Height x Width.
-		uint[] normals0 = Words(Created(device, "pm_rotate_normals_0").GetContents());
-		await Assert.That(normals0[..5]).IsEquivalentTo(new uint[] { Width, Height, 3, Width * Height, Width * Height }, TUnit.Assertions.Enums.CollectionOrdering.Matching);
-		uint[] maps1 = Words(Created(device, "pm_rotate_sel_1").GetContents());
-		await Assert.That(maps1[..5]).IsEquivalentTo(new uint[] { Height, Width, (uint)s, 0, 0 }, TUnit.Assertions.Enums.CollectionOrdering.Matching);
+		// PmRotate: source width, source height, planes, source offset, destination offset
+		// (floats), then padding. Normals are the three planes after depth in the state buffer.
+		const uint P = Width * Height;
+		foreach (int p in new[] { 0, 1 })
+		{
+			uint w = p == 0 ? (uint)Width : Height;
+			uint h = p == 0 ? (uint)Height : Width;
+			(string Name, uint[] Fields)[] expected =
+			[
+				("depth", [w, h, 1, 0, 0]),
+				("normals", [w, h, 3, P, P]),
+				("reference", [w, h, 3, 0, 0]),
+				("sel", [w, h, (uint)s, 0, 0]),
+				("cost", [w, h, (uint)s, 0, 0]),
+			];
+			foreach ((string name, uint[] fields) in expected)
+			{
+				uint[] words = Words(Created(device, $"pm_rotate_{name}_{p}").GetContents());
+				await Assert.That(words).IsEquivalentTo(fields.Concat(new uint[3]).ToArray(), TUnit.Assertions.Enums.CollectionOrdering.Matching).Because($"{name}_{p}");
+			}
+		}
 	}
 
 	[Test]

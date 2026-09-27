@@ -33,8 +33,10 @@ namespace ColmapSharp.Mvs;
 internal sealed partial class PatchMatchGpu
 {
 	/// <summary>
-	/// Runs the problem on <paramref name="device"/>: plans it (throws if the device cannot run
-	/// it; callers wanting a CPU fallback check <see cref="PatchMatchGpuPlan.TryCreate"/> first),
+	/// Runs the problem on <paramref name="device"/>: plans it (throws
+	/// <see cref="InvalidOperationException"/> with the planner's reason if the device cannot run
+	/// it; this method never falls back, so callers wanting a CPU fallback check
+	/// <see cref="PatchMatchGpuPlan.TryCreate"/> first),
 	/// records the schedule, flushes once per sweep, and reads back the results the getters
 	/// return. Cancellation is checked before each sweep is recorded, so a canceled run leaves
 	/// nothing pending on the device; progress is the fraction of sweeps done, as PatchMatchCpu
@@ -45,11 +47,14 @@ internal sealed partial class PatchMatchGpu
 		ArgumentNullException.ThrowIfNull(device);
 		if (!PatchMatchGpuPlan.TryCreate(ProblemShape, options, device.Limits, null, out PatchMatchGpuPlan? plan, out string? reason, SweepBandRows))
 		{
-			throw new InvalidOperationException(reason);
+			// The planner's reason ends "Using the CPU.", which is the caller's decision, not ours.
+			throw new InvalidOperationException("The GPU cannot run this problem: " + PatchMatchGpuPlan.ReasonWithoutFallback(reason!));
 		}
 
 		cancellationToken.ThrowIfCancellationRequested();
 		using var run = new GpuRun(this, device, plan!);
+		// ConfigureAwait(false): the run may continue on another thread between device calls,
+		// which IComputeDevice's threading contract allows (calls are never concurrent).
 		await run.ExecuteAsync(cancellationToken, progress).ConfigureAwait(false);
 	}
 
@@ -292,6 +297,7 @@ internal sealed partial class PatchMatchGpu
 
 		// The rotation after a sweep of parity p, in PatchMatchCpu.Rotate's order: depth, normals,
 		// reference planes, selection into the previous map, cost into the old selection buffer.
+		// PatchMatchGpuPlan.RotateCopiesPerParity counts these for the plan's memory total.
 		private RotateCopy[] CreateRotateCopies(int p)
 		{
 			int srcWidth = p == 0 ? pm.refWidth : pm.refHeight;
@@ -311,7 +317,7 @@ internal sealed partial class PatchMatchGpu
 
 		private RotateCopy Copy(PatchMatchGpuKernel kernel, IComputeBindGroup buffers, byte[] data, long elements, string name, bool isCostCopy)
 		{
-			IComputeBuffer uniform = Own(device.CreateBuffer(ComputeBufferKind.Uniform, PatchMatchGpuKernels.RotateUniformSize, data, "pm_rotate_" + name));
+			IComputeBuffer uniform = Own(device.CreateBuffer(ComputeBufferKind.Uniform, Size(PatchMatchGpuBufferRole.RotateUniforms), data, "pm_rotate_" + name));
 			return new RotateCopy(kernel, buffers, UniformGroup(kernel, PatchMatchGpuKernels.SweepGroup, uniform), elements, isCostCopy);
 		}
 

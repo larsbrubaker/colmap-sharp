@@ -13,6 +13,7 @@
 // iterations), run with the planned bands and with a forced 4-row band so every sweep of both
 // orientations runs several sweep_band dispatches.
 
+using ColmapSharp.Compute.Testing;
 using ColmapSharp.Mvs;
 using ColmapSharp.Mvs.Testing;
 
@@ -57,6 +58,11 @@ public class PatchMatchGpuTwinTests
 		await Assert.That(plan!.BandCount(0)).IsEqualTo(expectedBands[0]);
 		await Assert.That(plan.BandCount(1)).IsEqualTo(expectedBands[1]);
 		await gpu.RunAsync(device);
+
+		// The run itself must have used those bands, not just a plan built here: sweep k runs
+		// orientation k % 2's bands, and an iteration is four sweeps.
+		int sweepBands = device.Commands.OfType<DispatchCommand>().Count(d => d.Kernel.Descriptor.EntryPoint == "sweep_band");
+		await Assert.That(sweepBands).IsEqualTo(options.NumIterations * 2 * (expectedBands[0] + expectedBands[1]));
 
 		await AssertBits("depth", gpu.GetDepthMap().Data, cpu.GetDepthMap().Data);
 		await AssertBits("normals", gpu.GetNormalMap().Data, cpu.GetNormalMap().Data);

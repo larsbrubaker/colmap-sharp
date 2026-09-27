@@ -64,6 +64,10 @@
     <!-- COLMAP's tests are in-tree and see its internals; ported helpers that are not
          public API here are internal, and the 1:1 test port needs to reach them. -->
     <InternalsVisibleTo Include="ColmapSharp.Tests" />
+    <!-- MatterCAD's real-GPU test project (ColmapGpuTests) runs the internal PatchMatchGpu
+         orchestrator on a real device adapter before PatchMatch exposes a public GPU entry
+         point; remove once that public API exists. -->
+    <InternalsVisibleTo Include="ColmapGpuTests" />
   </ItemGroup>
 
 </Project>

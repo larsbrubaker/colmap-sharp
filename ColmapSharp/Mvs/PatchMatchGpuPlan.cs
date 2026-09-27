@@ -37,8 +37,11 @@
 //   as patch_match_geometry.wgsl reads it (floats [8r, 8r + 4) RefK(r), [8r + 4, 8r + 8)
 //   RefInvK(r) for rotations r = 0..3, then source s of rotation r at float
 //   32 + 43 (r S + s), unpadded; 4 x 43 S floats is always whole vec4s); one problem
-//   uniform, one uniform per sweep and one per band per orientation, all created with their
-//   data up front so nothing is written while dispatches are being recorded.
+//   uniform, one uniform per sweep, one per band per orientation and one per rotation copy
+//   per sweep parity (five copies, two parities), all created with their data up front so
+//   nothing is written while dispatches are being recorded. Each uniform is exactly its WGSL
+//   struct's size (PatchMatchGpuKernels' *UniformSize), so TotalBytes is what the
+//   orchestrator creates; PatchMatchGpuTests pins the two against each other.
 // Every storage buffer is bound whole, so a buffer's size is also its binding size.
 //
 // Dispatches are 1D workgroups of 64, folded into two dimensions when the workgroup count
@@ -84,6 +87,9 @@ internal enum PatchMatchGpuBufferRole
 
 	/// <summary>One uniform per row band of each orientation.</summary>
 	BandUniforms,
+
+	/// <summary>One uniform per rotation copy (depth, normals, reference, selection, cost) per sweep parity.</summary>
+	RotateUniforms,
 }
 
 /// <summary>
@@ -150,20 +156,11 @@ internal sealed class PatchMatchGpuPlan
 	public const int ByteTableBytes = 256 * 4;
 
 	/// <summary>
-	/// Bytes reserved for the problem uniform (options and constants derived in C#: depth
-	/// range, NCC normalization, likelihood constants, filter thresholds). The kernels' WGSL
-	/// struct must fit; 256 bytes is 64 scalars.
+	/// Rotation copies after each sweep, each with its own uniform: depth, normals, reference
+	/// planes, selection map, cost map (PatchMatchGpu.Run.cs's CreateRotateCopies). The
+	/// orchestrator creates them once per sweep parity.
 	/// </summary>
-	public const int ProblemUniformBytes = 256;
-
-	/// <summary>
-	/// Bytes reserved for a sweep uniform: rotation index, perturbation, previous-selection
-	/// weight and sweep flags (the rotation's reference frame is in the pose table).
-	/// </summary>
-	public const int SweepUniformBytes = 64;
-
-	/// <summary>Bytes of a band uniform: first row and end row, padded to 16.</summary>
-	public const int BandUniformBytes = 16;
+	public const int RotateCopiesPerParity = 5;
 
 	/// <summary>
 	/// Storage bindings of sweep_band, the kernel with the most: reference planes, source
@@ -242,7 +239,7 @@ internal sealed class PatchMatchGpuPlan
 	/// </summary>
 	public long WindowSamplesPerPixel { get; }
 
-	/// <summary>Every buffer the run creates, in creation order.</summary>
+	/// <summary>Every buffer the run creates, one entry per role (the orchestrator interleaves some roles' creation).</summary>
 	public IReadOnlyList<PatchMatchGpuBuffer> Buffers { get; }
 
 	/// <summary>The largest dispatch of each kernel the run uses.</summary>
@@ -269,7 +266,7 @@ internal sealed class PatchMatchGpuPlan
 	/// <summary>
 	/// Plans a run of <paramref name="options"/> on <paramref name="shape"/> for a device with
 	/// <paramref name="limits"/>. Returns false with a user-readable
-	/// <paramref name="fallbackReason"/> (ending in "Using the CPU.") when the device cannot
+	/// <paramref name="fallbackReason"/> (ending in <see cref="FallbackSentence"/>) when the device cannot
 	/// run it: the first failing check, in a fixed order, so the reason is deterministic.
 	/// <paramref name="memoryBudget"/>, when given, caps the bytes all buffers may take.
 	/// <paramref name="bandRows"/>, when positive, replaces the planned rows per sweep_band
@@ -303,6 +300,19 @@ internal sealed class PatchMatchGpuPlan
 		return true;
 	}
 
+	/// <summary>The sentence every fallback reason ends with, after a space.</summary>
+	public const string FallbackSentence = "Using the CPU.";
+
+	/// <summary>
+	/// <paramref name="fallbackReason"/> without its trailing <see cref="FallbackSentence"/>: the
+	/// reason alone, for a caller that is not falling back (PatchMatchGpu.RunAsync).
+	/// </summary>
+	public static string ReasonWithoutFallback(string fallbackReason)
+	{
+		Util.Check.That(fallbackReason.EndsWith(" " + FallbackSentence, StringComparison.Ordinal));
+		return fallbackReason[..^(FallbackSentence.Length + 1)];
+	}
+
 	private static PatchMatchGpuPlan Build(PatchMatchGpuProblemShape shape, PatchMatchOptions options, uint maxWorkgroupsPerDimension, int bandRowsOverride)
 	{
 		long w = shape.RefWidth;
@@ -333,9 +343,10 @@ internal sealed class PatchMatchGpuPlan
 			new(PatchMatchGpuBufferRole.SourceDepths, ComputeBufferKind.Storage, geometric ? s * layer * 4 : 4, 1, "source depth maps"),
 			new(PatchMatchGpuBufferRole.ByteTable, ComputeBufferKind.Uniform, ByteTableBytes, 1, "color lookup table"),
 			new(PatchMatchGpuBufferRole.PoseTable, ComputeBufferKind.Uniform, 16 * (PoseTableHeaderVec4 + PoseFloatsPerSource * s), 1, "camera poses of the source images"),
-			new(PatchMatchGpuBufferRole.Problem, ComputeBufferKind.Uniform, ProblemUniformBytes, 1, "PatchMatch settings"),
-			new(PatchMatchGpuBufferRole.SweepUniforms, ComputeBufferKind.Uniform, SweepUniformBytes, sweeps, "sweep settings"),
-			new(PatchMatchGpuBufferRole.BandUniforms, ComputeBufferKind.Uniform, BandUniformBytes, bandCounts[0] + bandCounts[1], "row band settings"),
+			new(PatchMatchGpuBufferRole.Problem, ComputeBufferKind.Uniform, PatchMatchGpuKernels.ProblemUniformSize, 1, "PatchMatch settings"),
+			new(PatchMatchGpuBufferRole.SweepUniforms, ComputeBufferKind.Uniform, PatchMatchGpuKernels.SweepUniformSize, sweeps, "sweep settings"),
+			new(PatchMatchGpuBufferRole.BandUniforms, ComputeBufferKind.Uniform, PatchMatchGpuKernels.BandUniformSize, bandCounts[0] + bandCounts[1], "row band settings"),
+			new(PatchMatchGpuBufferRole.RotateUniforms, ComputeBufferKind.Uniform, PatchMatchGpuKernels.RotateUniformSize, 2 * RotateCopiesPerParity, "rotation settings"),
 		];
 
 		uint maxGroups = maxWorkgroupsPerDimension;

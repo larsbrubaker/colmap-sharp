@@ -72,8 +72,12 @@ namespace ColmapSharp.Compute;
 /// caller at a time, and the host must not interleave its own rendering or other work on the
 /// same device while compute work is being recorded (between the first <see cref="Dispatch"/>
 /// and the flush or read that submits it). A host should give compute its own device.
-/// Continuing on another thread after an <c>await</c> is fine only if the host's device allows
-/// calls from that thread.
+/// Calls are never concurrent, but they may arrive from different threads one after another:
+/// callers await <see cref="FlushAsync"/> and <see cref="ReadBufferAsync"/> with
+/// <c>ConfigureAwait(false)</c>, so the calls after an <c>await</c> can come from whichever
+/// thread-pool thread completed it. So an implementation must not assume thread affinity: a
+/// host whose GPU API only accepts calls from one thread marshals each call to that thread
+/// itself.
 /// </para>
 /// <para>
 /// <b>Ownership.</b> The host owns the device and disposes it; callers dispose only the handles
