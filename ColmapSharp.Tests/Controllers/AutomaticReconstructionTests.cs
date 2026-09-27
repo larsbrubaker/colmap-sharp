@@ -23,7 +23,7 @@ using TUnit.Core;
 
 namespace ColmapSharp.Tests.Controllers;
 
-public class AutomaticReconstructionTests
+public partial class AutomaticReconstructionTests
 {
 	private static string CreateTestDir()
 	{
