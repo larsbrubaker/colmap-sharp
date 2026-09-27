@@ -11,9 +11,13 @@
 // addIsoEdges, setVertexPair and setEdgeVertex. Loops of more than three vertices are split by
 // MinimalAreaTriangulation (MAT.h), unless two non-adjacent vertices share a coordinate, in
 // which case they are fanned around their barycenter, a new vertex written to Vertices. Tier A
-// against oracle/poisson_levelset6_harness.cc; the walk across a vertex pair (through the back
-// slice's, the front slice's and the slab's pair maps) and the face-edge map fallbacks with
-// pushed-up iso-edges are reached by oracle/poisson_extract_harness.cc's "vertexpairs*" runs.
+// against oracle/poisson_levelset6_harness.cc. The walk across a vertex pair (through the back
+// slice's, the front slice's and the slab's pair maps) is reached by
+// oracle/poisson_extract_harness.cc's crafted "vertexpairs*" runs, and pinned there (dropping
+// the pair a slice or a slab makes fails a run); it has never been seen to walk through a
+// pair pushed from a finer depth (see PoissonLevelSetExtractor.IsoEdges.cs). The face-edge map
+// fallbacks with non-empty pushed-up iso-edges, on slices and cross faces, are already reached
+// by that harness's levelset6 and levelset8 runs (and by vertexpairs2 and vertexpairs3).
 //
 // COLMAP's settings, the only branch ported: PoissonRecon.cpp's Execute passes
 // forceManifold = !--nonManifold (true, COLMAP never passes it) to Extract's addBarycenter

@@ -17,8 +17,13 @@
 // vertexpairs1 (the shell at depth 6) walks loops across the back and front slices' pair maps;
 // vertexpairs2 (the shell plus three small spheres, depth 7) makes pairs on slices and slabs
 // and pushes both to coarser slices; vertexpairs3 (a thin slab of two sheets, depth 7) walks
-// across the slab's pair map. All three reach the pushed-up face-edge map fallbacks, on
-// slices and on cross faces, with non-empty iso-edges.
+// across the slab's pair map. Checked by deleting each line and running every case, the pair
+// made on a slice is pinned (dropping it fails vertexpairs1) and so is the pair made on a slab
+// (fails vertexpairs3). The pushes to coarser slices are reached but not pinned: no loop in
+// any run walks through a pushed pair, so dropping either push leaves all seven runs passing
+// (see PoissonLevelSetExtractor.IsoEdges.cs). vertexpairs2 and vertexpairs3 also reach the
+// pushed-up face-edge map fallbacks with non-empty iso-edges, as levelset6 and levelset8
+// already did; vertexpairs1 does not.
 
 using System.Text.Json;
 

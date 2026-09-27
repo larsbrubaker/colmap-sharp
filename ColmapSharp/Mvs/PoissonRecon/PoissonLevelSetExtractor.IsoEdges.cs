@@ -22,10 +22,16 @@
 //   ancestor whose neighbor across the face is finer.
 // The polygon step that reads them (SetLevelSet, IsoSurface) is
 // PoissonLevelSetExtractor.Polygons.cs. Tier A against oracle/poisson_levelset5_harness.cc
-// per slice and slab. The vertex pairs (both halves of a coarse edge crossed) on slices and
-// slabs, their push to the coarser slices, and the finalize that maps them are pinned end to
-// end by oracle/poisson_extract_harness.cc's crafted "vertexpairs*" runs
-// (PoissonTreeOracleTests.Extract.cs), which reach each of those branches.
+// per slice and slab. The vertex pairs (both halves of a coarse edge crossed) are pinned end
+// to end by oracle/poisson_extract_harness.cc's crafted "vertexpairs*" runs
+// (PoissonTreeOracleTests.Extract.cs): dropping the pair made on a slice fails vertexpairs1,
+// and the one made on a slab fails vertexpairs3. The pushes of a pair to the coarser slices
+// (in both CopyFiner methods) are only reached, not pinned: vertexpairs2 pushes on slices and
+// slabs, but no loop in any run walks through a pushed pair, so dropping either push leaves
+// every run's mesh unchanged. A search over 320 more crafted inputs (shells, spheres and
+// sheets at depths 7 and 8, 89 of them pushing) found none that does: a pushed pair's
+// vertices lie on edges at least two levels finer than the slice it is pushed to, so only a
+// leaf that much coarser than its neighbors across the edge could walk to it.
 //
 // Translation notes:
 // - Upstream runs each step in a ThreadPool::ParallelFor over the leaves, with per-thread key
