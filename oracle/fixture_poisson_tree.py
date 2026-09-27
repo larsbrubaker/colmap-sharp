@@ -9,10 +9,12 @@
 #   poisson_fem.json    oracle/poisson_fem_harness.cc: the FEM integrators and their stencils
 #   poisson_system.json oracle/poisson_system_harness.cc: the system assembly after finalizing
 #                       (PoissonFemConstraints)
+#   poisson_levelset.json oracle/poisson_levelset_harness.cc: what follows the linear solve
+#                       (PoissonImplicitEvaluator, the iso-value; PoissonCornerEvaluator)
 #   poisson_libm.json   oracle/poisson_libm_harness.cc: libm's pow( x , 1./3 ) and logf
 # Tier A, bit-exact. Read by ColmapSharp.Tests/Mvs/PoissonRecon/PoissonTreeOracleTests*.cs.
 #
-# It compiles each harness (they share oracle/poisson_harness.h) against COLMAP's vendored
+# It compiles each harness (they share oracle/poisson_harness.h, and the solve harnesses oracle/poisson_solve.h) against COLMAP's vendored
 # PoissonRecon with -ffp-contract=off exactly as oracle/fixture_poisson_bspline.py does (that
 # script's header explains why this, and not the -ffast-math pycolmap build, is the oracle),
 # runs it and records what it prints.
@@ -50,6 +52,7 @@ HARNESSES = [
     ("poisson_fem_harness.cc", "poisson_fem.json", None),
     ("poisson_libm_harness.cc", "poisson_libm.json", add_correct_pow),
     ("poisson_system_harness.cc", "poisson_system.json", None),
+    ("poisson_levelset_harness.cc", "poisson_levelset.json", None),
 ]
 
 if __name__ == "__main__":

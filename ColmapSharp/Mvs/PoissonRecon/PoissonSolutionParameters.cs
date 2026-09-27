@@ -31,6 +31,9 @@ public enum PoissonStage
 	/// <summary>Solving the screened Poisson system, depth by depth.</summary>
 	Solve,
 
+	/// <summary>Averaging the solved function at the samples for the surface's iso-value.</summary>
+	IsoValue,
+
 	/// <summary>Extracting the iso-surface.</summary>
 	LevelSet,
 

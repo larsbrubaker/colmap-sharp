@@ -17,7 +17,8 @@
 // chunks (the harness's PrintChunks); a mismatch there reports the first differing chunk.
 // This file holds the tree-stage tests and the shared helpers; the density, splat,
 // interpolation and finalize stages are in PoissonTreeOracleTests.Stages.cs, and the system
-// assembly after finalizing (poisson_system.json) in PoissonTreeOracleTests.System.cs.
+// assembly after finalizing (poisson_system.json) in PoissonTreeOracleTests.System.cs, and what
+// follows the solve (poisson_levelset.json) in PoissonTreeOracleTests.LevelSet.cs.
 //
 // The harness generates its input points (a noisy ellipsoid shell with some zero, non-finite
 // and coincident samples) and prints them as each run's "input" case, so this test replays

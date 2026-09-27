@@ -31,7 +31,8 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
   splatting, finalize, interpolation info, FEM constraint/system integrators and
   restriction/prolongation, FEM and interpolation constraints, system matrix rows, point-constraint transfers and the
   sliced Gauss-Seidel, and the whole linear solve (`_solveRegularMG`, SolveCG, cascadic
-  solveSystem). Remaining: iso-value evaluation, level-set extraction, the trimmer, the
+  solveSystem). iso-value, level-set corner evaluation. Remaining: level-set extraction (HyperCube tables and
+  MC indices, iso-vertices, iso-edges/polygons, driver and output), the trimmer, the
   public API and `poisson_meshing_test.cc`.
 
 ### Verification

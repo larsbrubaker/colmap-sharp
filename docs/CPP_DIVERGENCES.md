@@ -2542,11 +2542,14 @@ atomic float adds into shared entries in several places: `_addFEMConstraints` (e
 scattering into the constraints around its parent), `_addInterpolationConstraints` and
 `_updateRestrictedInterpolationConstraints` (each interpolation point adding into the
 constraints of the functions supported on it), and the conjugate-gradient solve at the base
-of `_solveRegularMG` (`SolveCG` sums its dot products in per-thread partial sums). With
+of `_solveRegularMG` (`SolveCG` sums its dot products in per-thread partial sums), as does
+Solve's iso-value (per-thread double sums of the weighted sample values, added in thread
+order). With
 COLMAP's default of every hardware thread,
 the order of those float additions, and with it the last bits of the right-hand side and so of
 the solution, varies from run to run. The port (`Mvs/PoissonRecon/PoissonFemConstraints.cs`,
-`PoissonMultigrid.cs`, `PoissonSystem.cs`, `PoissonSparseMatrix.cs`) makes those adds in
+`PoissonMultigrid.cs`, `PoissonSystem.cs`, `PoissonSparseMatrix.cs`,
+`PoissonImplicitEvaluator.cs`) makes those adds in
 sorted node (or row) order, which is what
 PoissonRecon does with one thread (`ThreadPool::NONE`). The multi-colored Gauss-Seidel
 relaxation (`PoissonSystem.GaussSeidel.cs`) is not affected: two rows of one color never share
@@ -2559,10 +2562,8 @@ entry 106 for splatting).
 **Evidence.** `PoissonTreeOracleTests.SystemConstraints_MatchHarness` (system3, system5,
 system6, system8) matches a single-threaded run of the vendored C++ bit for bit: the FEM and
 interpolation constraints, the restricted interpolation constraints, the Gauss-Seidel
-solutions and the base-depth multigrid solve.
-interpolation constraints, the restricted interpolation constraints, and the Gauss-Seidel
-solutions.
-
+solutions and the base-depth multigrid solve; `PoissonTreeOracleTests.PostSolveStages_MatchHarness`
+(levelset3, levelset5, levelset6, levelset8) does the same for the iso-value sums.
 ## 124. LO-RANSAC can start its local optimization from a different five-point solution
 
 **What differs.** The five-point solver returns up to ten essential matrices per minimal
