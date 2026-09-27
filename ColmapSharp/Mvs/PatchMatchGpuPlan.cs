@@ -196,8 +196,10 @@ internal sealed class PatchMatchGpuPlan
 		int[] bandRows,
 		int[] bandCounts,
 		PatchMatchGpuBuffer[] buffers,
-		PatchMatchGpuDispatch[] dispatches)
+		PatchMatchGpuDispatch[] dispatches,
+		long sweepWorkgroupBytes)
 	{
+		SweepWorkgroupBytes = sweepWorkgroupBytes;
 		Shape = shape;
 		Geometric = geometric;
 		Filter = filter;
@@ -219,6 +221,12 @@ internal sealed class PatchMatchGpuPlan
 
 	private readonly int[] bandRows;
 	private readonly int[] bandCounts;
+
+	/// <summary>
+	/// Workgroup memory the cooperative sweep_band needs
+	/// (<see cref="PatchMatchGpuKernels.SweepWorkgroupBytes"/>); 0 for the serial scheme.
+	/// </summary>
+	public long SweepWorkgroupBytes { get; }
 
 	/// <summary>The problem sizes planned for.</summary>
 	public PatchMatchGpuProblemShape Shape { get; }
@@ -371,7 +379,8 @@ internal sealed class PatchMatchGpuPlan
 		dispatches.Add(Dispatch("rotate_planes", Math.Max(3, s) * p, maxGroups));
 		dispatches.Add(Dispatch("rotate_normals", p, maxGroups));
 
-		return new PatchMatchGpuPlan(shape, geometric, filter, windowCount, samplesPerPixel, bandRows, bandCounts, buffers, [.. dispatches]);
+		long sweepWorkgroupBytes = cooperativeSweep ? PatchMatchGpuKernels.SweepWorkgroupBytes(shape.NumSources, options.NumSamples) : 0;
+		return new PatchMatchGpuPlan(shape, geometric, filter, windowCount, samplesPerPixel, bandRows, bandCounts, buffers, [.. dispatches], sweepWorkgroupBytes);
 	}
 
 	// The most rows whose window samples stay within TargetWindowSamplesPerDispatch, at least
@@ -398,6 +407,11 @@ internal sealed class PatchMatchGpuPlan
 		if (limits.MaxComputeInvocationsPerWorkgroup < WorkgroupSize)
 		{
 			return $"The GPU runs at most {limits.MaxComputeInvocationsPerWorkgroup} threads per workgroup; PatchMatch needs {WorkgroupSize}. Using the CPU.";
+		}
+
+		if (plan.SweepWorkgroupBytes > limits.MaxComputeWorkgroupStorageSize)
+		{
+			return $"The GPU gives a group of threads at most {Limit(limits.MaxComputeWorkgroupStorageSize)} of shared memory; PatchMatch with {plan.Shape.NumSources.ToString("N0", CultureInfo.InvariantCulture)} source images needs {Need(plan.SweepWorkgroupBytes)}. {TryFewerSources} Using the CPU.";
 		}
 
 		if (limits.MaxBindGroups < BindGroups)

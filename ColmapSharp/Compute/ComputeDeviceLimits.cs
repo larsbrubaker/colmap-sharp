@@ -44,7 +44,7 @@ public readonly record struct ComputeDeviceLimits(
 	int MaxComputeInvocationsPerWorkgroup,
 	int MinStorageBufferOffsetAlignment)
 {
-	// The three limits below were added after the positional ones; they are init properties
+	// The limits below were added after the positional ones; they are init properties
 	// with their WebGPU defaults so the seven-argument constructor keeps its meaning.
 
 	/// <summary>
@@ -66,10 +66,16 @@ public readonly record struct ComputeDeviceLimits(
 	public int MaxBindingsPerBindGroup { get; init; } = 1000;
 
 	/// <summary>
+	/// The most bytes of <c>var&lt;workgroup&gt;</c> memory one kernel may declare
+	/// (<c>maxComputeWorkgroupStorageSize</c>).
+	/// </summary>
+	public int MaxComputeWorkgroupStorageSize { get; init; } = 16384;
+
+	/// <summary>
 	/// The WebGPU default limits: 256 MiB buffers, 128 MiB storage bindings, 8 storage buffers
 	/// per stage, 64 KiB uniform bindings, 65535 workgroups per dimension, 256 invocations per
 	/// workgroup, 256-byte binding offsets, 4 bind groups, 12 uniform buffers per stage, binding
-	/// indices below 1000. Every WebGPU device supports at least these.
+	/// indices below 1000, 16 KiB of workgroup memory. Every WebGPU device supports at least these.
 	/// </summary>
 	public static ComputeDeviceLimits Defaults { get; } = new(
 		MaxBufferSize: 268435456,

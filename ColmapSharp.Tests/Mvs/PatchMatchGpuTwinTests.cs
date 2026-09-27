@@ -36,7 +36,10 @@ public class PatchMatchGpuTwinTests
 		{
 			// 0: the plan's bands (one per sweep at this size); 4: five bands across the
 			// 19 rows, seven across the 26. Both sweep_band schemes (a workgroup or an
-			// invocation per column) dispatch differently and must reach every column.
+			// invocation per column) dispatch differently and must reach every column. The twin
+			// runs PatchMatchCpu.SweepRows for both, so this pins each scheme's plan, dispatch
+			// shape and band coverage, not the cooperative WGSL; MatterCAD's ColmapGpuTests pin
+			// that kernel against the serial one on a real GPU.
 			foreach (bool cooperative in new[] { true, false })
 			{
 				yield return (config, 0, cooperative);

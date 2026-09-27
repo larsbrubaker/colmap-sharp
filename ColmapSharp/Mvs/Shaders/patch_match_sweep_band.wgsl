@@ -7,8 +7,9 @@
 // updates costs, forward messages and selection probabilities. Two schemes, chosen by the
 // PM_SWEEP_COOPERATIVE constant: cooperative (the default) runs one workgroup per column of the
 // current rotation's frame, its lanes splitting each row's work (see "Cooperative sweep" below);
-// serial runs one invocation per column, as COLMAP does. Both walk the band's rows in order and
-// give the same floats. Element count width (cooperative: width workgroups) with width =
+// serial runs one invocation per column, as COLMAP does. Both walk the band's rows in order and,
+// in WGSL semantics, give the same floats; on Metal only the photometric sums come out
+// bit-identical, because wgpu compiles with fast math (see "Cooperative sweep"). Element count width (cooperative: width workgroups) with width =
 // pm_frame_width(rotation); the host composes for C = max(width, height) columns. A column
 // resumes from, and leaves for the next band, its column state (patch_match_layout.wgsl), so the
 // bands of a sweep give the same result as one pass; backward_messages must have run first.
@@ -64,7 +65,9 @@ fn pm_geom_term(rotation: i32, frame: PmFrame, row: i32, col: i32, depth: f32, i
 @compute @workgroup_size(64)
 fn sweep_band(@builtin(workgroup_id) workgroup_id: vec3<u32>, @builtin(local_invocation_index) local_index: u32) {
 	// A const condition, so both branches are in uniform control flow (the cooperative one has
-	// barriers).
+	// barriers). Checked by hand, not by a validator: the cooperative path's only early return
+	// depends on workgroup_id and the uniform pm_sweep; its row loop's bounds come from the
+	// uniform pm_band; and no barrier sits inside a per-lane loop or a lane-dependent branch.
 	if (PM_SWEEP_COOPERATIVE) {
 		pm_sweep_band_cooperative(workgroup_id, local_index);
 	} else {
@@ -244,8 +247,14 @@ fn pm_sweep_band_serial(workgroup_id: vec3<u32>, local_index: u32) {
 // image_idx mod lanes, and the (sample, hypothesis) cost evaluations to lane item mod lanes. Each
 // value is computed by the same function, from the same inputs, as the serial path computes it;
 // every order-dependent step - the PDF-to-CDF sums, the random draws, and each hypothesis's sum
-// over samples - runs in one lane in the serial order. So the cooperative and serial paths give
-// the same floats (ColmapGpuTests pins it on a real GPU). Every lane redundantly carries the row's
+// over samples - runs in one lane in the serial order. So in WGSL semantics the cooperative and
+// serial paths give the same floats. On Metal only the photometric sums are bit-identical:
+// wgpu-hal compiles with the default MTLCompileOptions, i.e. fastMathEnabled, so the compiler may
+// reassociate `cost += ncc; cost += geom` differently in each kernel, while a photometric
+// hypothesis gets one addition per sample. ColmapGpuTests pins photometric runs bit for bit and
+// geometric runs within tight bounds on a real GPU. The CPU twin (ReferenceComputeDevice) checks
+// this scheme's plan, dispatch shape and band coverage, but runs PatchMatchCpu.SweepRows, not this
+// WGSL; the real-GPU test is what pins the kernel. Every lane redundantly carries the row's
 // scalars (propagated depth, current and random hypotheses, the prepared window): they are
 // deterministic, so all lanes hold the same values, and recomputing is cheaper than sharing.
 
@@ -358,6 +367,9 @@ fn pm_sweep_band_cooperative(workgroup_id: vec3<u32>, local_index: u32) {
 		// The reference half of the NCC, the same in every lane.
 		let window = pm_prepare_window(rotation, row, col);
 
+		// storageBarrier orders lane 0's pm_costs reads above before the other lanes' pm_costs
+		// writes below (a cross-lane write-after-read on the same pixel).
+		storageBarrier();
 		workgroupBarrier();
 
 		// The (sample, hypothesis) evaluations, one per lane: hypotheses 1-4 get the NCC cost,
@@ -406,6 +418,9 @@ fn pm_sweep_band_cooperative(workgroup_id: vec3<u32>, local_index: u32) {
 			pm_wg_hypothesis_costs[lane] = cost;
 		}
 
+		// storageBarrier orders every lane's pm_state[pixel] reads at the top of the row before
+		// lane 0 writes the best parameters there below.
+		storageBarrier();
 		workgroupBarrier();
 
 		var hypothesis_costs: array<f32, PM_NUM_COSTS>;
@@ -445,8 +460,8 @@ fn pm_sweep_band_cooperative(workgroup_id: vec3<u32>, local_index: u32) {
 		prev_depth = best_depth;
 		prev_normal = best_normal;
 
-		// The next row overwrites the shared arrays (lane 0's cost reads above precede the other
-		// lanes' cost writes through the earlier barriers).
+		// The next row overwrites the shared arrays. (The storage write-after-read hazards within
+		// the row are ordered by the storage barriers above; across rows the pixels differ.)
 		workgroupBarrier();
 	}
 

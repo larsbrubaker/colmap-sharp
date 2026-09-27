@@ -2860,7 +2860,12 @@ the outside:
   multiply-add, and a GPU may flush subnormals; the kernels guard the NaN, infinity and
   subnormal cases whose outcome would otherwise change control flow (`patch_match_common.wgsl`),
   but depth and normal values can differ from the CPU's in the last bits and, through the
-  sweeps, beyond.
+  sweeps, beyond. On Metal, wgpu compiles shaders with the default `MTLCompileOptions`
+  (wgpu-hal's `metal/device.rs`), so fast math is on and the compiler may also reassociate
+  float sums, differently in each kernel. That is why `sweep_band`'s two schemes (cooperative,
+  a workgroup per column, the default; serial, an invocation per column) agree bit for bit on
+  photometric runs, where each hypothesis's cost gains one term per sample, but only within
+  tight bounds on geometric runs, where it gains two (`c += ncc; c += geom`).
 
 **Why.** CUDA is native code and not available in the browser; WebGPU is what MatterCAD can
 reach on every platform, including browser-wasm, and keeping the device behind a host-provided

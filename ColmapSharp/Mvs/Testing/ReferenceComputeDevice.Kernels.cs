@@ -195,8 +195,10 @@ public sealed partial class ReferenceComputeDevice
 			Span<float> state = this.StateWithColumns(width);
 			float[] rowScratch = new float[PatchMatchCpu.RowScratchSize(this.NumSrc, pcc.WindowCount)];
 
-			// A column is one invocation (serial) or one workgroup (cooperative); either way the
-			// column's rows run as SweepRows runs them, and element col * perColumn is its first.
+			// A column is one invocation (serial) or one workgroup (cooperative), and element
+			// col * perColumn is its first. Either way the twin runs the column's rows with the
+			// CPU's SweepRows, not the cooperative WGSL: it checks that scheme's dispatch shape and
+			// coverage, while a real-GPU test pins the kernel itself.
 			int perColumn = PatchMatchGpuKernels.SweepInvocationsPerColumn(this.twin.Int("PM_SWEEP_COOPERATIVE") != 0);
 			for (int col = 0; col < width; ++col)
 			{

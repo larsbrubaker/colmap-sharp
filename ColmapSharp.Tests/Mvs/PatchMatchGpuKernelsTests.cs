@@ -33,6 +33,38 @@ public class PatchMatchGpuKernelsTests
 	private static readonly PatchMatchGpuShaderShape Geometric = new(33, 71, 20, 80, 80, 20, 2, 7, true);
 
 	[Test]
+	public async Task SweepWorkgroupBytes_MatchesTheWgslDeclarations()
+	{
+		// The planner checks SweepWorkgroupBytes against the device; it must be what the WGSL
+		// declares. Every var<workgroup> array's length, with the header's constants put in.
+		foreach (PatchMatchGpuShaderShape shape in new[] { Photometric, Geometric })
+		{
+			string source = PatchMatchGpuKernels.Descriptor(PatchMatchGpuKernel.SweepBand, shape, 1).Source;
+			long bytes = 0;
+			var declaration = new Regex(@"var<workgroup> \w+: array<(f32|i32|u32), (?<length>[^>]+)>;");
+			foreach (Match match in declaration.Matches(source))
+			{
+				long length = 1;
+				foreach (string factor in match.Groups["length"].Value.Split('*'))
+				{
+					length *= factor.Trim() switch
+					{
+						"PM_NUM_SRC_IMAGES" => shape.NumSrcImages,
+						"PM_NUM_SAMPLES" => shape.NumSamples,
+						"PM_NUM_COSTS" => PatchMatchGpuKernels.NumCosts,
+						string other => throw new InvalidOperationException($"Unknown workgroup array length term {other}."),
+					};
+				}
+
+				bytes += 4 * length;
+			}
+
+			await Assert.That(bytes).IsEqualTo(PatchMatchGpuKernels.SweepWorkgroupBytes(shape.NumSrcImages, shape.NumSamples));
+			await Assert.That(source).Contains($"const PM_NUM_COSTS: i32 = {PatchMatchGpuKernels.NumCosts}i;");
+		}
+	}
+
+	[Test]
 	public async Task EveryKernel_ComposesDeterministicallyAndMatchesItsDescriptor()
 	{
 		var problems = new List<string>();

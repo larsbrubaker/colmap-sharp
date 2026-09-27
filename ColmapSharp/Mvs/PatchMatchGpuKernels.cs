@@ -121,6 +121,20 @@ internal static class PatchMatchGpuKernels
 	/// </summary>
 	public static int SweepInvocationsPerColumn(bool cooperative) => cooperative ? WorkgroupSize : 1;
 
+	/// <summary>Hypotheses scored per pixel (PM_NUM_COSTS in patch_match_likelihood.wgsl).</summary>
+	public const int NumCosts = 5;
+
+	/// <summary>
+	/// Bytes of <c>var&lt;workgroup&gt;</c> memory the cooperative sweep_band declares
+	/// (patch_match_sweep_band.wgsl), every element 4 bytes: forward messages and sampling
+	/// priors (S each), per sample the drawn source and hypothesis 0's cost (N each), per
+	/// (sample, hypothesis) the NCC and geometric terms (N x NumCosts each), and the hypothesis
+	/// sums (NumCosts). The serial scheme's module declares the same arrays, but a backend only
+	/// allocates what the entry point reaches.
+	/// </summary>
+	public static long SweepWorkgroupBytes(int numSrc, int numSamples) =>
+		4L * ((2L * numSrc) + (2L * numSamples) + (2L * numSamples * NumCosts) + NumCosts);
+
 	/// <summary>Every kernel.</summary>
 	public static IReadOnlyList<PatchMatchGpuKernel> All { get; } = Enum.GetValues<PatchMatchGpuKernel>();
 
