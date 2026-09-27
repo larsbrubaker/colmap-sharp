@@ -24,13 +24,14 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
 
 ### Phase 11 — Pipeline controllers
 `automatic_reconstruction` (minus CGAL/GPU branches), including the step that turns
-`MeshTextureMapping`'s result into a textured mesh. Starts once `poisson_meshing` is done.
+`MeshTextureMapping`'s result into a textured mesh. Unblocked: `PoissonMeshing.Run` exists.
 
 ### Phase 12 — Dense reconstruction (MVS)
 - `poisson_meshing` (PoissonRecon port, `Mvs/PoissonRecon/`). Everything through the linear
   solve, the iso-value, the level set's iso-vertices, iso-edges and polygons, the Extract
-  driver, model-space output (`PoissonMeshOutput`) and `PoissonSurfaceTrimmer` is done and bit-exact against the
-  vendored C++ (harnesses `oracle/poisson_levelset{,2,3,4,5,6}_harness.cc` and
+  driver, model-space output (`PoissonMeshOutput`), `PoissonSurfaceTrimmer` and the public
+  `PoissonMeshing` API (`Mvs/PoissonMeshing.cs`, `poisson_meshing_test.cc` ported) are done
+  and bit-exact against the vendored C++ (harnesses `oracle/poisson_levelset{,2,3,4,5,6}_harness.cc` and
   `poisson_{extract,trim}_harness.cc`, built at `-O1`). Remaining (harness fixtures ≤ ~1 MB):
   1. Coverage: the vertex-pair push loops (`PoissonLevelSetExtractor.IsoEdges.cs` slice and
      slab pushes) are reached (vertexpairs2) but not pinned — deleting either still passes, and
@@ -41,16 +42,15 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
      `componentEdges`; walking `componentHalfEdges` (`PoissonSurfaceTrimmer.Islands.cs:83`) or
      `componentBoundaryHalfEdges` (:97) in insertion order still passes. Needs a crafted mesh
      with more neighbor-rich merges.
-  3. The public in-memory `PoissonMeshing` API plus the file wrapper, and
-     `poisson_meshing_test.cc` 1:1, with a Tier C pycolmap fixture. Colors follow the input's
-     extra PLY properties, not `options.color` (PoissonRecon ignores `--colors` for .ply).
-     Review items: `PoissonMeshOutput.FromLevelSet` must throw unless `Extract` completed
-     (cancelled or never-run extractors now give a partial/empty mesh), and the extractor's
-     step methods (`InitSlice`, `IsoSurface`, ...) should become internal so `Extract`'s
-     run-once guard can't be bypassed. Chain `PoissonMeshOutput.FromLevelSet` →
-     `PoissonSurfaceTrimmer.Trim` when `trim != 0`, converting the trim as COLMAP does
-     (`std::to_string` then `atof` then float: `(float)double.Parse(trim.ToString("F6",
-     InvariantCulture))`).
+  3. `PoissonMeshing` follow-ups (API, tests and Tier C fixture are in): add a Tier A
+     end-to-end fixture from upstream `RunPoissonRecon`/`RunSurfaceTrimmer` built at `-O1`
+     with COLMAP's argv (review found it byte-identical except one density ulp from `LogF`,
+     divergence 116); throw on an unwritable output path before the try, like
+     `THROW_CHECK_PATH_OPEN`; carry a has-colors flag so an empty colored PLY keeps its
+     red/green/blue header; reword the header's thread-independence claim (upstream is
+     thread-dependent, divergences 106/123); assert progress is monotonic; make
+     `CppToStringAsFloat` internal; shrink `poisson_meshing.json` (1.37 MB) with `%.9g`
+     floats and summary-only trimmed cases.
 
 ### Verification
 - End-to-end Tier C fixtures: small real photo sets reconstructed by pycolmap vs. us (also the
