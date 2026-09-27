@@ -28,18 +28,18 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
 
 ### Phase 12 — Dense reconstruction (MVS)
 - `poisson_meshing` (PoissonRecon port, `Mvs/PoissonRecon/`). Everything through the linear
-  solve, the iso-value and the level set's corner values/MC indices is done and bit-exact
-  against the vendored C++. Remaining, in order (each bit-exact through a new
-  `oracle/poisson_levelset3_harness.cc` fixture, each fixture file ≤ ~1 MB):
-  1. Iso-vertex coverage (all iso-vertices are ported, levelset3/4 fixtures): no fixture
-     reaches the linear fallback, the bad-root clamp, multi-root averaging, the zero-weight
-     `zeroData` fallback, pushes below `FullDepth`, or `GetSolutions`' complex/linear
-     branches (25 random `MakeInput` runs never hit the clamp; needs a crafted input or a
-     harness-backed unit test). Also tidy the per-edge closure and per-vertex
-     `PoissonPolynomial` allocations and the uncopied `zeroData` argument.
-  2. Iso-edges and polygons: `CopyFiner(X)SliceIsoEdgeKeys`, `Set(X)SliceIsoEdges`,
-     `SetLevelSet`, `AddIsoPolygons` with addBarycenter (and `MinimalAreaTriangulation`,
-     MAT.h), winding reversed (`2-j`).
+  solve, the iso-value and the level set's iso-vertices and iso-edges is done and bit-exact
+  against the vendored C++ (harnesses `oracle/poisson_levelset{,2,3,4,5}_harness.cc`).
+  Remaining, in order (each bit-exact through a new harness fixture, each file ≤ ~1 MB):
+  1. Coverage: no fixture reaches the iso-vertex linear fallback, the bad-root clamp,
+     multi-root averaging, the zero-weight `zeroData` fallback, pushes below `FullDepth`,
+     `GetSolutions`' complex/linear branches, or any iso-edge vertex pair (pair branches are
+     pinned by reading only). Needs crafted inputs or harness-backed unit tests. Also tidy the
+     per-edge closure, per-vertex `PoissonPolynomial` and zero-count per-face edge-array
+     allocations and the uncopied `zeroData` argument.
+  2. Polygons: `SetLevelSet`, `AddIsoPolygons` with addBarycenter (and
+     `MinimalAreaTriangulation`, MAT.h), winding reversed (`2-j`), plus the polygon-side
+     lookups (`addIsoEdges`, `setVertexPair`, `setEdgeVertex`).
   3. Extract's slab driver (no boundaries; CancellationToken and IProgress per slab),
      `unitCubeToModel`, output vertices (position, RGB, density value when trimming).
   4. SurfaceTrimmer, the public in-memory `PoissonMeshing` API plus the file wrapper, and
