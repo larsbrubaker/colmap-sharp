@@ -28,7 +28,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// of each coarser slab that it ends, finest depth first. Port of Extract's
 	/// <c>SetSlabIsoVertices</c> (without a boundary).
 	/// </summary>
-	public void SetSlabIsoVertices(int slabAtMaxDepth)
+	internal void SetSlabIsoVertices(int slabAtMaxDepth)
 	{
 		for (int d = MaxDepth, o = slabAtMaxDepth; d >= FullDepth; d--, o >>= 1)
 		{
@@ -48,7 +48,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// each coarser slab that it ends, into its edge-vertex map. Port of the edge part of
 	/// Extract's <c>FinalizeSlab</c>.
 	/// </summary>
-	public void FinalizeSlabEdges(int slabAtMaxDepth)
+	internal void FinalizeSlabEdges(int slabAtMaxDepth)
 	{
 		for (int d = MaxDepth, o = slabAtMaxDepth; d >= FullDepth; d--, o >>= 1)
 		{
@@ -66,7 +66,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// and <paramref name="fCoordinate"/>. The slices on either side must have their corner
 	/// values and marching-squares indices. Port of <c>SetXSliceIsoVertices</c>.
 	/// </summary>
-	public void SetXSliceIsoVertices(int depth, int slab, float bCoordinate, float fCoordinate)
+	internal void SetXSliceIsoVertices(int depth, int slab, float bCoordinate, float fCoordinate)
 	{
 		LevelSetSliceValues bValues = SlabValues[depth].SliceValues(slab);
 		LevelSetSliceValues fValues = SlabValues[depth].SliceValues(slab + 1);

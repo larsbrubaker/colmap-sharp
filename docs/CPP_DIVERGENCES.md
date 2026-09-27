@@ -2647,3 +2647,40 @@ optimization level), so PoissonRecon itself does not depend on it apart from thi
 oracle stays at the harness's
 standard `-O1`, and a Tier C end-to-end mesh fixture from optimized pycolmap must not expect
 bit-exact barycenter vertices or their densities.
+
+## 130. PoissonMeshing carries only red, green and blue from the input PLY
+
+**What differs.** `RunPoissonRecon` reads a PLY input's vertex header and turns every property
+other than x, y, z and nx, ny, nz into auxiliary data (`VertexFactory::DynamicFactory`), which
+it splats, extracts and writes back under the same names and on-disk types. The file wrapper
+`PoissonMeshing.Run(options, inputPath, outputPath)` carries exactly `uchar red`, `uchar green`
+and `uchar blue` (the mesh colors) and drops any other extra vertex property; values are read
+with COLMAP's own `Ply.ReadPly`.
+
+**Why.** COLMAP's `poisson_mesher` input is the `fused.ply` that stereo fusion writes, whose
+extra properties are exactly those three uchar colors, so for COLMAP's own pipeline the output
+is the same. Carrying arbitrary properties would need a per-channel type through the extractor,
+the trimmer and the writer that no COLMAP input exercises.
+
+**Evidence.** `PoissonMeshingOracleTests` feeds pycolmap and the port a fused.ply-layout input
+and requires the identical output PLY property layout (x, y, z, [value,] red, green, blue).
+
+## 131. PoissonRecon's command-line flags do not leak between PoissonMeshing calls
+
+**What differs.** PoissonRecon.cpp and SurfaceTrimmer.cpp keep their command-line parameters in
+namespace-scope globals, and `CmdLineParse` only ever sets a flag's `set` state, never clears
+it. So within one process a `--density` (trim > 0) or `--fullDepth` (depth < 5) from an earlier
+`PoissonMeshing` call stays in force for every later call: a later untrimmed run still writes
+the density `value` property, and a later depth >= 5 run keeps the earlier, smaller full depth.
+The port derives every setting from the call's own options.
+
+**Why.** The leak is an accident of the command-line wrapper, not a documented behavior; one
+call's result should not depend on earlier calls. A single `colmap poisson_mesher` process
+makes one call, which the port matches.
+
+**Evidence.** Running pycolmap 4.2.0's `poisson_meshing` in one Python process for depth 5 with
+trim 3.6, then depth 4 with point weight 0 and trim 0, wrote a `property float value` in the
+second output; the same second call in a fresh process did not. Likewise depth 6 with trim 3.5
+after the depth 4 call gave 2736 vertices, and 4062 in a fresh process (the port gives 4065;
+the difference is the trim-boundary noise PoissonMeshingOracleTests allows).
+`oracle/fixture_poisson_meshing.py` therefore runs each case in its own process.

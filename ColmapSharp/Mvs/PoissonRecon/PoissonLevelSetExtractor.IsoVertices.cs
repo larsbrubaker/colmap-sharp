@@ -65,7 +65,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// <paramref name="sliceAtMaxDepth"/>, finest depth first. Port of the vertex loop of
 	/// Extract's <c>SetSliceIso</c> (without a boundary).
 	/// </summary>
-	public void SetSliceIsoVertices(int sliceAtMaxDepth)
+	internal void SetSliceIsoVertices(int sliceAtMaxDepth)
 	{
 		for (int d = MaxDepth, o = sliceAtMaxDepth; d >= FullDepth; d--, o >>= 1)
 		{
@@ -81,7 +81,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// Moves each slice's recorded edge keys on the plane <paramref name="sliceAtMaxDepth"/> into
 	/// its edge-vertex map. Port of the edge part of Extract's <c>FinalizeSlice</c>.
 	/// </summary>
-	public void FinalizeSliceEdges(int sliceAtMaxDepth)
+	internal void FinalizeSliceEdges(int sliceAtMaxDepth)
 	{
 		for (int d = MaxDepth, o = sliceAtMaxDepth; d >= FullDepth; d--, o >>= 1)
 		{
@@ -98,7 +98,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// from the leaves behind it and then those in front. Port of
 	/// <c>SetSliceIsoVertices( ... , depth , fullDepth , slice , ... )</c>.
 	/// </summary>
-	public void SetSliceIsoVertices(int depth, int slice)
+	internal void SetSliceIsoVertices(int depth, int slice)
 	{
 		if (slice > 0)
 		{

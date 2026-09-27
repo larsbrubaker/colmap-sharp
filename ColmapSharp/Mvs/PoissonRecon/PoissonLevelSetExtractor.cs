@@ -173,7 +173,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// Indexes and resets every slice on the plane <paramref name="sliceAtMaxDepth"/>, finest
 	/// depth first, down to the full depth. Port of Extract's <c>InitSlice</c>.
 	/// </summary>
-	public void InitSlice(int sliceAtMaxDepth)
+	internal void InitSlice(int sliceAtMaxDepth)
 	{
 		for (int d = MaxDepth; d >= FullDepth; d--)
 		{
@@ -195,7 +195,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// (all of them on the first call, otherwise up to the first that it does not start).
 	/// Port of Extract's <c>InitSlab</c>.
 	/// </summary>
-	public void InitSlab(int slabAtMaxDepth, bool first)
+	internal void InitSlab(int slabAtMaxDepth, bool first)
 	{
 		int slab = slabAtMaxDepth;
 		for (int d = MaxDepth; d >= FullDepth; d--, slab >>= 1)
@@ -214,7 +214,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// <paramref name="sliceAtMaxDepth"/>, finest depth first. Port of Extract's
 	/// <c>SetSliceValues</c> (without a boundary).
 	/// </summary>
-	public void SetSliceValues(int sliceAtMaxDepth)
+	internal void SetSliceValues(int sliceAtMaxDepth)
 	{
 		for (int d = MaxDepth, o = sliceAtMaxDepth; d >= FullDepth; d--, o >>= 1)
 		{
@@ -232,7 +232,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// slices that share it, and each leaf's marching-squares index. Port of
 	/// <c>SetSliceCornerValuesAndMCIndices</c>.
 	/// </summary>
-	public void SetSliceCornerValuesAndMcIndices(int depth, int slice)
+	internal void SetSliceCornerValuesAndMcIndices(int depth, int slice)
 	{
 		if (slice > 0)
 		{

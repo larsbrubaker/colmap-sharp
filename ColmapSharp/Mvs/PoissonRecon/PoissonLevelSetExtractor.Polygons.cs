@@ -73,7 +73,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// Extract's <c>IsoSurface</c> (without a boundary; InteriorSlab holds for every slab of the
 	/// whole tree).
 	/// </summary>
-	public void IsoSurface(int slabAtMaxDepth)
+	internal void IsoSurface(int slabAtMaxDepth)
 	{
 		for (int d = MaxDepth, o = slabAtMaxDepth; d >= FullDepth; d--, o >>= 1)
 		{
@@ -89,7 +89,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// The polygons of the leaves in slab <paramref name="offset"/> at <paramref name="depth"/>.
 	/// Port of <c>SetLevelSet</c> with COLMAP's settings (see the file header).
 	/// </summary>
-	public void SetLevelSet(int depth, int offset)
+	internal void SetLevelSet(int depth, int offset)
 	{
 		LevelSetSliceValues bValues = SlabValues[depth].SliceValues(offset);
 		LevelSetSliceValues fValues = SlabValues[depth].SliceValues(offset + 1);

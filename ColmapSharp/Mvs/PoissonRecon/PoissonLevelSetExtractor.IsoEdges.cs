@@ -52,7 +52,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// depth first, first copying each coarser slice's edge keys from the finer one. Port of the
 	/// iso-edge loop of Extract's <c>SetSliceIso</c> (without a boundary).
 	/// </summary>
-	public void SetSliceIsoEdges(int sliceAtMaxDepth)
+	internal void SetSliceIsoEdges(int sliceAtMaxDepth)
 	{
 		for (int d = MaxDepth, o = sliceAtMaxDepth; d >= FullDepth; d--, o >>= 1)
 		{
@@ -75,7 +75,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// cross-edge keys from the finer ones. Port of Extract's <c>SetSlabIsoEdges</c> (without a
 	/// boundary; InteriorSlab holds for every slab of the whole tree).
 	/// </summary>
-	public void SetSlabIsoEdges(int slabAtMaxDepth)
+	internal void SetSlabIsoEdges(int slabAtMaxDepth)
 	{
 		for (int d = MaxDepth, o = slabAtMaxDepth; d >= FullDepth; d--, o >>= 1)
 		{
@@ -97,7 +97,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// <paramref name="sliceAtMaxDepth"/> into its maps. Port of Extract's <c>FinalizeSlice</c>
 	/// (without a boundary).
 	/// </summary>
-	public void FinalizeSlice(int sliceAtMaxDepth)
+	internal void FinalizeSlice(int sliceAtMaxDepth)
 	{
 		FinalizeSliceEdges(sliceAtMaxDepth);
 		for (int d = MaxDepth, o = sliceAtMaxDepth; d >= FullDepth; d--, o >>= 1)
@@ -117,7 +117,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// <paramref name="slabAtMaxDepth"/> and each coarser slab that it ends into their maps.
 	/// Port of Extract's <c>FinalizeSlab</c> (without a boundary).
 	/// </summary>
-	public void FinalizeSlab(int slabAtMaxDepth)
+	internal void FinalizeSlab(int slabAtMaxDepth)
 	{
 		FinalizeSlabEdges(slabAtMaxDepth);
 		for (int d = MaxDepth, o = slabAtMaxDepth; d >= FullDepth; d--, o >>= 1)
@@ -137,7 +137,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// split in the finer slice the key of their one finer iso-vertex, or pairs their two.
 	/// Port of <c>CopyFinerSliceIsoEdgeKeys( ... , depth , fullDepth , slice , ... )</c>.
 	/// </summary>
-	public void CopyFinerSliceIsoEdgeKeys(int depth, int slice)
+	internal void CopyFinerSliceIsoEdgeKeys(int depth, int slice)
 	{
 		if (slice > 0)
 		{
@@ -211,7 +211,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// are split in the two finer slabs the key of their one finer iso-vertex, or pairs their
 	/// two. Port of <c>CopyFinerXSliceIsoEdgeKeys</c>.
 	/// </summary>
-	public void CopyFinerXSliceIsoEdgeKeys(int depth, int slab)
+	internal void CopyFinerXSliceIsoEdgeKeys(int depth, int slab)
 	{
 		LevelSetXSliceValues pValues = SlabValues[depth].XSliceValues(slab);
 		LevelSetXSliceValues cValues0 = SlabValues[depth + 1].XSliceValues((slab << 1) | 0);
@@ -282,7 +282,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// from the leaves behind it and then those in front. Port of
 	/// <c>SetSliceIsoEdges( keyGenerator , tree , depth , slice , slabValues )</c>.
 	/// </summary>
-	public void SetSliceIsoEdges(int depth, int slice)
+	internal void SetSliceIsoEdges(int depth, int slice)
 	{
 		if (slice > 0)
 		{
@@ -367,7 +367,7 @@ public sealed partial class PoissonLevelSetExtractor
 	/// <paramref name="depth"/>. The slices on either side and the slab must have their edge
 	/// keys. Port of <c>SetXSliceIsoEdges</c>.
 	/// </summary>
-	public void SetXSliceIsoEdges(int depth, int slab)
+	internal void SetXSliceIsoEdges(int depth, int slab)
 	{
 		LevelSetSliceValues bValues = SlabValues[depth].SliceValues(slab);
 		LevelSetSliceValues fValues = SlabValues[depth].SliceValues(slab + 1);

@@ -16,7 +16,9 @@
 //
 // Translation notes: upstream's timing statistics (Stats) and its "bad average roots" warning
 // are not ported; BadRootCount holds the count. Cancellation is checked and progress reported
-// once per slab at the finest depth, where upstream has neither.
+// once per slab at the finest depth, where upstream has neither. The step methods are internal
+// so the run-once guard cannot be bypassed, and IsComplete (set only when every stage ran over
+// every slab) is what PoissonMeshOutput.FromLevelSet requires.
 
 namespace ColmapSharp.Mvs.PoissonRecon;
 
@@ -52,6 +54,13 @@ internal sealed class LevelSetExtractHooks
 public sealed partial class PoissonLevelSetExtractor
 {
 	private bool extracted;
+
+	/// <summary>
+	/// Whether <see cref="Extract(CancellationToken, IProgress{double}?)"/> ran every stage over
+	/// every slab, so Vertices and Polygons hold the whole surface. False before Extract, after a
+	/// cancelled one, and after a stage test's early stop.
+	/// </summary>
+	public bool IsComplete { get; private set; }
 
 	/// <summary>
 	/// Whether each vertex's Depth is a density weight (the extractor was given Extract's
@@ -160,5 +169,7 @@ public sealed partial class PoissonLevelSetExtractor
 			hooks?.SlabExtracted?.Invoke(slab);
 			progress?.Report((double)(slab + 1) / slabs);
 		}
+
+		IsComplete = stages == LevelSetExtractStages.Polygons;
 	}
 }

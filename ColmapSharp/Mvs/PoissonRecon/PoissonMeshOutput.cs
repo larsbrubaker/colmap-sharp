@@ -57,7 +57,8 @@ public sealed class PoissonMeshOutput
 	public int[] Triangles { get; }
 
 	/// <summary>
-	/// The output mesh of an extractor that has run Extract: each vertex moved to the model by
+	/// The output mesh of an extractor whose Extract ran to completion (else
+	/// InvalidOperationException): each vertex moved to the model by
 	/// <paramref name="unitCubeToModel"/> (Solve's unitCubeToModel, a 4x4 homogeneous transform)
 	/// with its density value and color bytes when present. Port of extractLevelSet's
 	/// TransformedOutputLevelSetVertexStream and WriteMesh's vertex conversion.
@@ -69,6 +70,12 @@ public sealed class PoissonMeshOutput
 		if (unitCubeToModel.Dim != 4)
 		{
 			throw new ArgumentException($"unitCubeToModel must be 4x4 (homogeneous 3D); it is {unitCubeToModel.Dim}x{unitCubeToModel.Dim}.", nameof(unitCubeToModel));
+		}
+
+		// A partial extraction (not run, cancelled, or stopped early) would read as a mesh with holes.
+		if (!extractor.IsComplete)
+		{
+			throw new InvalidOperationException("The level set has not been fully extracted; run Extract to completion first.");
 		}
 
 		List<LevelSetVertex> vertices = extractor.Vertices;
