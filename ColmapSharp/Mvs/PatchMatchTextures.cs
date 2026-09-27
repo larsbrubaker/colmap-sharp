@@ -187,14 +187,27 @@ public sealed class PatchMatchSourceImages
 	}
 
 	/// <summary>
-	/// Debug builds only: how many Sample4 calls took the all-lanes-interior vector blend,
-	/// so the bit-identity test can show it exercised that path. Not thread safe; only
-	/// read by single-threaded tests.
+	/// Debug builds only, and only while <see cref="TrackVectorBlends"/> is set: how many
+	/// Sample4 calls took the all-lanes-interior vector blend, so the bit-identity test can
+	/// show it exercised that path. Not thread safe; only read by single-threaded tests.
 	/// </summary>
 	internal long VectorBlendCount { get; private set; }
 
+	/// <summary>
+	/// Turns on <see cref="VectorBlendCount"/>. Off by default because every sweep thread
+	/// shares this instance: unconditional increments from all of them fight over one cache
+	/// line and made a multi-threaded Debug PatchMatch run 3-4x slower than Release.
+	/// </summary>
+	internal bool TrackVectorBlends { get; set; }
+
 	[System.Diagnostics.Conditional("DEBUG")]
-	private void CountVectorBlend() => VectorBlendCount++;
+	private void CountVectorBlend()
+	{
+		if (TrackVectorBlends)
+		{
+			VectorBlendCount++;
+		}
+	}
 
 	// The bilinear blend when some of the four texels are outside the layer (read as 0);
 	// kept out of line so the common path above stays small enough to inline.

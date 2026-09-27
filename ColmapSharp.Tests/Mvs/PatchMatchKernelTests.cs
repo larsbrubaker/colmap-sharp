@@ -323,6 +323,7 @@ public class PatchMatchKernelTests
 		List<Image> images = [NewImage(Identity, [0, 0, 0]), wide, tall];
 		var transforms = new PatchMatchTransforms(images, 0, [1, 2]);
 		var srcImages = new PatchMatchSourceImages([wide, tall]);
+		srcImages.TrackVectorBlends = true;
 		int mismatches = 0;
 		int compared = 0;
 		foreach ((int radius, int step) in new[] { (3, 1), (4, 2) })

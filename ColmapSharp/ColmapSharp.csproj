@@ -12,6 +12,13 @@
          P/Invoke, no native artifact, no reflection. That is what lets it run on
          browser-wasm with no emcc link step, so keep it trim- and AOT-clean. -->
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- Optimize in every configuration. The unoptimized Debug JIT runs the dense kernels
+         (PatchMatch above all) about 17x slower, which turns a Debug host (MatterCAD during
+         development, the test suite) into minutes per image. The JIT neither contracts
+         float operations into FMA nor reorders them, so optimized and unoptimized builds
+         give bit-identical results. DEBUG stays defined, so Debug-only checks still run;
+         only stepping through locals gets harder. -->
+    <Optimize>true</Optimize>
   </PropertyGroup>
 
   <!-- No package references. docs/LICENSE_AUDIT.md allows only the .NET base class
