@@ -89,11 +89,8 @@ public sealed class PatchMatchSourceImages
 		NumLayers = numLayers;
 	}
 
-	/// <summary>byte / 255.0f for every byte: the table the GPU reads as a uniform.</summary>
+	/// <summary>byte / 255.0f for every byte (256 floats): the GPU path's byte table uniform.</summary>
 	internal static ReadOnlySpan<float> ByteToUnitTable => ByteToUnit;
-
-	/// <summary>The packed layers (see the internal constructor); not a copy.</summary>
-	internal ReadOnlySpan<byte> Data => data;
 
 	/// <summary>Layer width (the largest source image width).</summary>
 	public int MaxWidth { get; }
@@ -109,9 +106,6 @@ public sealed class PatchMatchSourceImages
 	/// path (PatchMatchGpu.cs) uploads as the source image buffer.
 	/// </summary>
 	internal ReadOnlySpan<byte> RawData => data;
-
-	/// <summary>byte / 255.0f for every byte (256 floats), the GPU path's byte table uniform.</summary>
-	internal static ReadOnlySpan<float> ByteToUnitTable => ByteToUnit;
 
 	/// <summary>
 	/// The bilinearly interpolated value in [0, 1] at unnormalized texture coordinates
@@ -303,9 +297,6 @@ public sealed class PatchMatchSourceDepthMaps
 		MaxHeight = maxHeight;
 		NumLayers = numLayers;
 	}
-
-	/// <summary>The packed layers (see the internal constructor); not a copy.</summary>
-	internal ReadOnlySpan<float> Data => data;
 
 	/// <summary>Layer width.</summary>
 	public int MaxWidth { get; }

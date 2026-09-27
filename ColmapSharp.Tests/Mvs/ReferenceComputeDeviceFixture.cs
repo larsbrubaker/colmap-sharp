@@ -42,7 +42,7 @@ internal sealed class ReferenceComputeDeviceFixture
 		ProblemUniform = Device.CreateBuffer(ComputeBufferKind.Uniform, PatchMatchGpuKernels.ProblemUniformSize, ProblemBytes(), "problem");
 		float[] reference = [.. Units(RefImage.Image.Data), .. RefImage.SumImage.Data, .. RefImage.SquaredSumImage.Data];
 		Reference = Device.CreateBuffer(ComputeBufferKind.Storage, 4 * reference.Length, MemoryMarshal.AsBytes(reference.AsSpan()), "reference");
-		byte[] layers = PadTo4(SrcImages.Data.ToArray());
+		byte[] layers = PadTo4(SrcImages.RawData.ToArray());
 		SourceImages = Device.CreateBuffer(ComputeBufferKind.Storage, layers.Length, layers, "source_images");
 		SourceDepths = Device.CreateBuffer(ComputeBufferKind.Storage, 4, default, "source_depths_dummy");
 
