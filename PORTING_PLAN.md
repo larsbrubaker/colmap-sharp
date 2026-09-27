@@ -29,14 +29,14 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
 ### Phase 12 — Dense reconstruction (MVS)
 - `poisson_meshing` (PoissonRecon port, `Mvs/PoissonRecon/`). Everything through the linear
   solve, the iso-value, the level set's iso-vertices, iso-edges and polygons, the Extract
-  driver and model-space output (`PoissonMeshOutput`) is done and bit-exact against the
+  driver, model-space output (`PoissonMeshOutput`) and `PoissonSurfaceTrimmer` is done and bit-exact against the
   vendored C++ (harnesses `oracle/poisson_levelset{,2,3,4,5,6}_harness.cc` and
-  `poisson_extract_harness.cc`, built at `-O1`). Remaining, in order (each bit-exact through a harness fixture, ≤ ~1 MB):
-  1. Coverage: no fixture produces an iso-edge vertex pair, so the pair branches, the polygon
-     loop walk across a pair and the pushed-up `faceEdgeMap` fallbacks are pinned by reading
-     only (needs a crafted input with leaves coarser than `FullDepth` beside finer ones).
-     Tidy: zero-count faces still allocate a `LevelSetIsoEdge[0]`; `SetLevelSet` allocates
-     a list per loop and an array per polygon.
+  `poisson_{extract,trim}_harness.cc`, built at `-O1`). Remaining (harness fixtures ≤ ~1 MB):
+  1. Coverage: the vertex-pair push loops (`PoissonLevelSetExtractor.IsoEdges.cs` slice and
+     slab pushes) are reached (vertexpairs2) but not pinned — deleting either still passes, and
+     a 320-input C++ search found no input where a walk uses a pushed pair. Likely needs a leaf
+     two levels coarser than its neighbors across a doubly crossed edge, or a proof that grading
+     rules it out.
   2. Harness hardening: pin `MakeInput`'s sin/cos in `oracle/poisson_harness.h` to
      `__sincosf_stret` so fixtures don't depend on `-O` level (verified byte-identical at
      `-O1`; see divergence 125's evidence).
