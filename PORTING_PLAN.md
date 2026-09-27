@@ -31,16 +31,13 @@ Each step ends with its ported tests green. Test names follow COLMAP's.
   solve, the iso-value and the level set's corner values/MC indices is done and bit-exact
   against the vendored C++. Remaining, in order (each bit-exact through a new
   `oracle/poisson_levelset3_harness.cc` fixture, each fixture file ≤ ~1 MB):
-  1. Iso-vertices (FEMTree.LevelSet.3D.inl ~1007-1140, 1679-1800):
-     `Polynomial<2>::getSolutions` (Factor.h quadratic) in `PoissonPolynomial.cs`;
-     `GetIsoVertex` for slice and cross-slice edges with the exact float/double mix, roots
-     averaged in [0,1], the `_BadRootCount` clamp, the linear fallback, zero vertex gradient
-     (gradientNormals is off); density via a weight key and `PoissonSplat.GetSampleDepthAndWeight`;
-     color via `_addEvaluation` (FEMTree.Evaluation.inl 566-600) of the aux field with the
-     zeroData fallback; `SetSliceIsoVertices`/`SetXSliceIsoVertices` with eSet/fSet scratch,
-     edgeKeys, eKeyValues and the push-down to coarser/X slices; `setFromScratch`; a vertex
-     sink. Vertex numbering follows `vertexStream.write` order — confirm no hash-map order
-     reaches it; multi-thread order goes in divergence 123.
+  1. Iso-vertices: in-slice edges are done (`PoissonLevelSetExtractor.IsoVertices.cs`,
+     levelset3 fixture). Remaining: cross-slice edges (`SetXSliceIsoVertices`, the X-slice
+     part of `setFromScratch`) and the real Extract interleaving of vertex numbering. Then
+     close the coverage gaps review found — no fixture reaches the linear fallback, the
+     bad-root clamp, multi-root averaging, the zero-weight `zeroData` fallback, pushes below
+     `FullDepth`, or `GetSolutions`' complex/linear branches — and tidy the per-edge closure
+     and per-vertex `PoissonPolynomial` allocations and the uncopied `zeroData` argument.
   2. Iso-edges and polygons: `CopyFiner(X)SliceIsoEdgeKeys`, `Set(X)SliceIsoEdges`,
      `SetLevelSet`, `AddIsoPolygons` with addBarycenter (and `MinimalAreaTriangulation`,
      MAT.h), winding reversed (`2-j`).
