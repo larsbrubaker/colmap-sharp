@@ -43,6 +43,20 @@ public readonly struct BilateralWeightComputer
 
 	internal float ColorNormalization => colorNormalization;
 
+	// The weight from its two derived values (FromNormalizations).
+	private BilateralWeightComputer((float Spatial, float Color) normalizations)
+	{
+		spatialNormalization = normalizations.Spatial;
+		colorNormalization = normalizations.Color;
+	}
+
+	/// <summary>
+	/// The weight from the values the public constructor derives: 1 / (2 sigma_spatial²) and
+	/// 1 / (2 sigma_color²) (the GPU problem uniform carries these).
+	/// </summary>
+	internal static BilateralWeightComputer FromNormalizations(float spatialNormalization, float colorNormalization)
+		=> new((spatialNormalization, colorNormalization));
+
 	/// <summary>The weight of a pixel (rowDiff, colDiff) away with color2, relative to color1.</summary>
 	public float Compute(float rowDiff, float colDiff, float color1, float color2)
 	{

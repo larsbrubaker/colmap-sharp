@@ -127,6 +127,40 @@ public sealed class PatchMatchTransforms
 		}
 	}
 
+	// The transforms of a GPU pose table (FromPoseTable): every value already computed.
+	private PatchMatchTransforms(int refWidth, int refHeight, int numSrcImages)
+	{
+		RefWidth = refWidth;
+		RefHeight = refHeight;
+		NumSrcImages = numSrcImages;
+	}
+
+	/// <summary>
+	/// The transforms held by a GPU PatchMatch pose table (patch_match_geometry.wgsl's contract:
+	/// floats [8 r, 8 r + 4) are RefK(r), [8 r + 4, 8 r + 8) RefInvK(r), and Poses(r) starts at
+	/// float 32 + NumTformParams r S), for a <paramref name="refWidth"/> x
+	/// <paramref name="refHeight"/> reference image and <paramref name="numSrcImages"/> sources.
+	/// Lets Mvs/Testing/ReferenceComputeDevice run the CPU kernels on the table the GPU reads.
+	/// </summary>
+	internal static PatchMatchTransforms FromPoseTable(ReadOnlySpan<float> table, int refWidth, int refHeight, int numSrcImages)
+	{
+		int tableSize = 32 + 4 * NumTformParams * numSrcImages;
+		if (table.Length < tableSize)
+		{
+			throw new ArgumentException($"A pose table for {numSrcImages} source images needs {tableSize} floats, but has {table.Length}.", nameof(table));
+		}
+
+		var transforms = new PatchMatchTransforms(refWidth, refHeight, numSrcImages);
+		for (int r = 0; r < 4; ++r)
+		{
+			transforms.refK[r] = table.Slice(8 * r, 4).ToArray();
+			transforms.refInvK[r] = table.Slice(8 * r + 4, 4).ToArray();
+			transforms.poses[r] = table.Slice(32 + NumTformParams * r * numSrcImages, NumTformParams * numSrcImages).ToArray();
+		}
+
+		return transforms;
+	}
+
 	/// <summary>Width of the unrotated reference image.</summary>
 	public int RefWidth { get; }
 

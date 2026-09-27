@@ -466,7 +466,7 @@ public sealed class RecordingComputeDevice : IComputeDevice
 		}
 	}
 
-	private static void ValidateRange(RecordingComputeBuffer buffer, long offset, int length, string verb)
+	internal static void ValidateRange(RecordingComputeBuffer buffer, long offset, int length, string verb)
 	{
 		if (offset < 0 || offset % 4 != 0 || length % 4 != 0)
 		{

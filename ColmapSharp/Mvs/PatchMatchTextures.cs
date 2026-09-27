@@ -75,6 +75,26 @@ public sealed class PatchMatchSourceImages
 		}
 	}
 
+	/// <summary>
+	/// Layers already packed: <paramref name="numLayers"/> layers of
+	/// <paramref name="maxWidth"/> x <paramref name="maxHeight"/> bytes, laid out as the
+	/// public constructor lays them out (the GPU's source image buffer). Takes the array.
+	/// </summary>
+	internal PatchMatchSourceImages(byte[] data, int maxWidth, int maxHeight, int numLayers)
+	{
+		Util.Check.Eq(data.Length, checked(maxWidth * maxHeight * numLayers));
+		this.data = data;
+		MaxWidth = maxWidth;
+		MaxHeight = maxHeight;
+		NumLayers = numLayers;
+	}
+
+	/// <summary>byte / 255.0f for every byte: the table the GPU reads as a uniform.</summary>
+	internal static ReadOnlySpan<float> ByteToUnitTable => ByteToUnit;
+
+	/// <summary>The packed layers (see the internal constructor); not a copy.</summary>
+	internal ReadOnlySpan<byte> Data => data;
+
 	/// <summary>Layer width (the largest source image width).</summary>
 	public int MaxWidth { get; }
 
@@ -269,6 +289,23 @@ public sealed class PatchMatchSourceDepthMaps
 			}
 		}
 	}
+
+	/// <summary>
+	/// Layers already packed: <paramref name="numLayers"/> layers of
+	/// <paramref name="maxWidth"/> x <paramref name="maxHeight"/> floats (the GPU's source
+	/// depth buffer). Takes the array.
+	/// </summary>
+	internal PatchMatchSourceDepthMaps(float[] data, int maxWidth, int maxHeight, int numLayers)
+	{
+		Util.Check.Eq(data.Length, checked(maxWidth * maxHeight * numLayers));
+		this.data = data;
+		MaxWidth = maxWidth;
+		MaxHeight = maxHeight;
+		NumLayers = numLayers;
+	}
+
+	/// <summary>The packed layers (see the internal constructor); not a copy.</summary>
+	internal ReadOnlySpan<float> Data => data;
 
 	/// <summary>Layer width.</summary>
 	public int MaxWidth { get; }

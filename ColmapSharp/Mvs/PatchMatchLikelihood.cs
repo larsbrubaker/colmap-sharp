@@ -50,6 +50,23 @@ public readonly struct PatchMatchLikelihood
 
 	internal float NccNormFactor => nccNormFactor;
 
+	// The model from its four derived values (FromParameters).
+	private PatchMatchLikelihood(float cosMinTriangulationAngle, float invIncidentAngleSigmaSquare, float invNccSigmaSquare, float nccNormFactor)
+	{
+		this.cosMinTriangulationAngle = cosMinTriangulationAngle;
+		this.invIncidentAngleSigmaSquare = invIncidentAngleSigmaSquare;
+		this.invNccSigmaSquare = invNccSigmaSquare;
+		this.nccNormFactor = nccNormFactor;
+	}
+
+	/// <summary>
+	/// The model from the four values the public constructor derives, in its field order (the
+	/// GPU's PmLikelihood uniform): cos(min triangulation angle), -0.5 / incident sigma²,
+	/// -0.5 / NCC sigma², and the NCC normalization factor.
+	/// </summary>
+	internal static PatchMatchLikelihood FromParameters(float cosMinTriangulationAngle, float invIncidentAngleSigmaSquare, float invNccSigmaSquare, float nccNormFactor)
+		=> new(cosMinTriangulationAngle, invIncidentAngleSigmaSquare, invNccSigmaSquare, nccNormFactor);
+
 	/// <summary>
 	/// Compute forward message from current cost and forward message of previous /
 	/// neighboring pixel.

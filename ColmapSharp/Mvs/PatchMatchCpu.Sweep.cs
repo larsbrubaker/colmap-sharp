@@ -35,7 +35,7 @@ namespace ColmapSharp.Mvs;
 internal sealed partial class PatchMatchCpu
 {
 	/// <summary>Port of SweepOptions (patch_match_cuda.cu), the per-sweep kernel settings.</summary>
-	private struct SweepOptions
+	internal struct SweepOptions
 	{
 		public float Perturbation;
 		public float PrevSelProbWeight;
@@ -56,11 +56,11 @@ internal sealed partial class PatchMatchCpu
 
 	// Layout of a column's carried state: the forward message per source image, then the
 	// previous row's best depth and normal.
-	private static int ColumnStateSize(int numImages) => numImages + 4;
+	internal static int ColumnStateSize(int numImages) => numImages + 4;
 
 	// Per-row scratch: sampling probabilities per source image, then the reference window's
 	// colors and weights.
-	private static int RowScratchSize(int numImages, int windowCount) => numImages + 2 * windowCount;
+	internal static int RowScratchSize(int numImages, int windowCount) => numImages + 2 * windowCount;
 
 	/// <summary>
 	/// The backward message pass of SweepFromTopToBottom for column <paramref name="col"/>:
@@ -70,9 +70,22 @@ internal sealed partial class PatchMatchCpu
 	/// </summary>
 	private void BackwardMessages(int col, Span<float> columnState)
 	{
+		for (int imageIdx = 0; imageIdx < costMap.GetDepth(); ++imageIdx)
+		{
+			BackwardMessage(col, imageIdx, columnState);
+		}
+
+		InitColumnPrevious(col, columnState);
+	}
+
+	/// <summary>
+	/// BackwardMessages for one source image of the column: its messages and its forward
+	/// message's start. The GPU's backward_messages runs one per (source image, column).
+	/// </summary>
+	internal void BackwardMessage(int col, int imageIdx, Span<float> columnState)
+	{
 		int width = costMap.GetWidth();
 		int height = costMap.GetHeight();
-		int numImages = costMap.GetDepth();
 		int planeSize = width * height;
 		float[] costs = costMap.Data;
 		float[] selProbs = selProbMap.Data;
@@ -80,19 +93,25 @@ internal sealed partial class PatchMatchCpu
 		// Compute backward message for all rows. Note that the backward messages are
 		// temporarily stored in the sel_prob_map and replaced row by row as the updated
 		// forward messages are computed further below.
-		for (int imageIdx = 0; imageIdx < numImages; ++imageIdx)
+		float beta = UniformProb;
+		for (int row = height - 1; row >= 0; --row)
 		{
-			float beta = UniformProb;
-			for (int row = height - 1; row >= 0; --row)
-			{
-				int idx = imageIdx * planeSize + row * width + col;
-				beta = likelihood.ComputeBackwardMessage(costs[idx], beta);
-				selProbs[idx] = beta;
-			}
-
-			// Initialize forward message.
-			columnState[imageIdx] = UniformProb;
+			int idx = imageIdx * planeSize + row * width + col;
+			beta = likelihood.ComputeBackwardMessage(costs[idx], beta);
+			selProbs[idx] = beta;
 		}
+
+		// Initialize forward message.
+		columnState[imageIdx] = UniformProb;
+	}
+
+	/// <summary>
+	/// The previous depth and normal of the column state for the first row: the top pixel's.
+	/// </summary>
+	internal void InitColumnPrevious(int col, Span<float> columnState)
+	{
+		int numImages = costMap.GetDepth();
+		int planeSize = costMap.GetWidth() * costMap.GetHeight();
 
 		// Parameters for first row in column.
 		columnState[numImages] = depthMap.Data[col];
@@ -105,7 +124,7 @@ internal sealed partial class PatchMatchCpu
 	/// <paramref name="columnState"/> (see ColumnStateSize). BackwardMessages must have run for
 	/// the column in this sweep, and the column's bands must run in order.
 	/// </summary>
-	private void SweepRows(
+	internal void SweepRows(
 		int col, int rowStart, int rowEnd, in SweepOptions sweep, PatchMatchPhotoConsistency pcc,
 		Span<float> columnState, Span<float> rowScratch)
 	{
@@ -301,6 +320,10 @@ internal sealed partial class PatchMatchCpu
 		float[] normals = normalMap.Data;
 		float[] poses = transforms.Poses(rotation);
 		var frame = new PatchMatchFrame(transforms, rotation);
+
+		// The same for every pixel (the CUDA kernel computes them per pixel).
+		float minNccProb = likelihood.ComputeNCCProb(1.0f - filterMinNcc);
+		float cosMinTriangulationAngle = MathF.Cos(filterMinTriangulationAngle);
 		ParallelOptions parallelOptions = Mat<float>.ParallelOptionsFor(options.NumThreads);
 		parallelOptions.CancellationToken = cancellationToken;
 		Parallel.For(0, costMap.GetHeight(), parallelOptions, row =>
@@ -310,16 +333,21 @@ internal sealed partial class PatchMatchCpu
 			{
 				int pixel = row * width + col;
 				ReadNormal(normals, planeSize, pixel, bestNormal);
-				FilterPixel(sweep, poses, frame, row, col, depths[pixel], bestNormal);
+				FilterPixel(sweep, poses, frame, row, col, depths[pixel], bestNormal, minNccProb, cosMinTriangulationAngle);
 			}
 		});
 	}
 
 	/// <summary>
 	/// Marks the source images the pixel's best depth and normal are consistent with, and
-	/// clears the pixel when fewer than filter_min_num_consistent are.
+	/// clears the pixel when fewer than filter_min_num_consistent are. Writes only the 1s of
+	/// the pixel's mask entries (the mask starts zeroed), and 0s when it clears the pixel.
+	/// <paramref name="minNccProb"/> is ComputeNCCProb(1 - filter_min_ncc) and
+	/// <paramref name="cosMinTriangulationAngle"/> cos(filter_min_triangulation_angle).
 	/// </summary>
-	private void FilterPixel(in SweepOptions sweep, float[] poses, in PatchMatchFrame frame, int row, int col, float bestDepth, ReadOnlySpan<float> bestNormal)
+	internal void FilterPixel(
+		in SweepOptions sweep, float[] poses, in PatchMatchFrame frame, int row, int col, float bestDepth, ReadOnlySpan<float> bestNormal,
+		float minNccProb, float cosMinTriangulationAngle)
 	{
 		int width = costMap.GetWidth();
 		int planeSize = width * costMap.GetHeight();
@@ -332,9 +360,6 @@ internal sealed partial class PatchMatchCpu
 
 		Span<float> bestPoint = stackalloc float[3];
 		PatchMatchKernel.ComputePointAtDepth(frame, row, col, bestDepth, bestPoint);
-
-		float minNccProb = likelihood.ComputeNCCProb(1.0f - filterMinNcc);
-		float cosMinTriangulationAngle = MathF.Cos(filterMinTriangulationAngle);
 
 		for (int imageIdx = 0; imageIdx < numImages; ++imageIdx)
 		{

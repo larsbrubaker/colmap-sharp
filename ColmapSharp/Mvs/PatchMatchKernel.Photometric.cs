@@ -70,6 +70,28 @@ public sealed partial class PatchMatchPhotoConsistency
 		bilateralWeightComputer = new BilateralWeightComputer(sigmaSpatial, sigmaColor);
 	}
 
+	/// <summary>
+	/// As the public constructor, with the bilateral weight given directly (built from the GPU
+	/// problem uniform's normalizations by Mvs/Testing/ReferenceComputeDevice).
+	/// </summary>
+	internal PatchMatchPhotoConsistency(
+		PatchMatchRefImage refImage,
+		PatchMatchSourceImages srcImages,
+		float[] poses,
+		in PatchMatchFrame frame,
+		int windowRadius,
+		int windowStep,
+		in BilateralWeightComputer bilateralWeightComputer)
+	{
+		this.refImage = Util.Check.NotNull(refImage);
+		this.srcImages = Util.Check.NotNull(srcImages);
+		this.poses = Util.Check.NotNull(poses);
+		this.frame = frame;
+		this.windowRadius = windowRadius;
+		this.windowStep = windowStep;
+		this.bilateralWeightComputer = bilateralWeightComputer;
+	}
+
 	/// <summary>Width of the (rotated) reference image.</summary>
 	public int RefWidth => refImage.Image.GetWidth();
 

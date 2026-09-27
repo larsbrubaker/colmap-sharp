@@ -317,23 +317,30 @@ internal sealed partial class PatchMatchCpu
 	private void InitRandomDepthAndNormalMaps(float depthMin, float depthMax)
 	{
 		var frame = new PatchMatchFrame(transforms, 0);
-		float[] depths = depthMap.Data;
-		float[] normals = normalMap.Data;
-		int planeSize = refWidth * refHeight;
 		Parallel.For(0, refHeight, Mat<float>.ParallelOptionsFor(options.NumThreads), row =>
 		{
-			Span<float> normal = stackalloc float[3];
 			for (int col = 0; col < refWidth; ++col)
 			{
-				int pixel = row * refWidth + col;
-				var depthRandom = new PatchMatchRandom(seed, row, col, PatchMatchRandom.InitDepthPhase);
-				depths[pixel] = depthRandom.NextUniform() * (depthMax - depthMin) + depthMin;
-
-				var normalRandom = new PatchMatchRandom(seed, row, col, PatchMatchRandom.InitNormalPhase);
-				PatchMatchKernel.GenerateRandomNormal(frame, row, col, ref normalRandom, normal);
-				WriteNormal(normals, planeSize, pixel, normal);
+				InitRandomPixel(frame, row, col, depthMin, depthMax);
 			}
 		});
+	}
+
+	/// <summary>
+	/// The random depth and normal of pixel (<paramref name="row"/>, <paramref name="col"/>) of
+	/// the unrotated maps, from the pixel's own streams (the GPU's init_random runs this per
+	/// pixel).
+	/// </summary>
+	internal void InitRandomPixel(in PatchMatchFrame frame, int row, int col, float depthMin, float depthMax)
+	{
+		Span<float> normal = stackalloc float[3];
+		int pixel = row * refWidth + col;
+		var depthRandom = new PatchMatchRandom(seed, row, col, PatchMatchRandom.InitDepthPhase);
+		depthMap.Data[pixel] = PatchMatchKernel.GenerateRandomDepth(depthMin, depthMax, ref depthRandom);
+
+		var normalRandom = new PatchMatchRandom(seed, row, col, PatchMatchRandom.InitNormalPhase);
+		PatchMatchKernel.GenerateRandomNormal(frame, row, col, ref normalRandom, normal);
+		WriteNormal(normalMap.Data, refWidth * refHeight, pixel, normal);
 	}
 
 	/// <summary>

@@ -61,6 +61,12 @@ public sealed class RecordingComputeBuffer : IComputeBuffer
 	public override string ToString() => $"buffer#{this.Id.ToString(CultureInfo.InvariantCulture)}"
 		+ (this.Label == null ? string.Empty : $" '{this.Label}'");
 
+	/// <summary>
+	/// The live bytes (allocated on first use), for a device that executes kernels over this
+	/// double's buffers (Mvs/Testing/ReferenceComputeDevice.cs).
+	/// </summary>
+	internal Span<byte> Memory => this.contents ??= new byte[this.Size];
+
 	internal void Write(long offset, ReadOnlySpan<byte> data)
 	{
 		if (data.IsEmpty)
