@@ -162,9 +162,14 @@ std::vector<Sample> MakeInput(int count) {
     Sample s;
     // A noisy ellipsoid shell in an off-center, anisotropic box.
     float u = NextUnit() * 6.2831853f, v = NextUnit() * 3.1415927f, r = 1.0f + 0.05f * NextUnit();
-    s.p = Point<Real, Dim>(3.0f + 2.0f * r * std::cos(u) * std::sin(v), -1.0f + r * std::sin(u) * std::sin(v),
-                           0.5f + 0.7f * r * std::cos(v));
-    s.n = Point<Real, Dim>(std::cos(u) * std::sin(v), 2.0f * std::sin(u) * std::sin(v), std::cos(v) / 0.7f);
+    // Explicit __sincosf_stret rather than std::sin/std::cos: at -O1 and up clang merges each
+    // float sin/cos pair into Apple libm's __sincosf_stret, while at -O0 it calls sinf and cosf,
+    // and the two round some values differently. Calling it directly keeps the fixtures
+    // independent of the optimization level (macOS-only, as every harness already is).
+    __float2 su = __sincosf_stret(u), sv = __sincosf_stret(v);
+    s.p = Point<Real, Dim>(3.0f + 2.0f * r * su.__cosval * sv.__sinval, -1.0f + r * su.__sinval * sv.__sinval,
+                           0.5f + 0.7f * r * sv.__cosval);
+    s.n = Point<Real, Dim>(su.__cosval * sv.__sinval, 2.0f * su.__sinval * sv.__sinval, sv.__cosval / 0.7f);
     s.c = Color((float)(int)(NextUnit() * 256), (float)(int)(NextUnit() * 256), (float)(int)(NextUnit() * 256));
     if (i % 37 == 5) s.n = Point<Real, Dim>();                          // zero normal: invalid
     if (i % 53 == 7) s.n = Point<Real, Dim>(NAN, 0.f, 1.f);            // non-finite: invalid

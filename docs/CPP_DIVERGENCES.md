@@ -2641,12 +2641,9 @@ the surface.
 `poisson_levelset6.json` bit for bit, with finite barycenter depths (levelset6's first is
 `0x1.2ab9fp+2`); `PoissonTreeOracleTests.LevelSetPolygons_MatchHarness` pins the port to it.
 The same harness at `-O2` prints NaN for every barycenter depth (all 40 in levelset6, all 92
-in levelset8) and is otherwise unchanged. At `-O0` the depths are finite again, and the
-output differs from the fixture only because the harness's own `MakeInput`
-(`oracle/poisson_harness.h`) rounds differently: at `-O0` clang calls `sinf`/`cosf`
-separately, at `-O1` it merges each pair into Apple libm's `__sincosf_stret`, which rounds 34
-of the 2400 generated u/v values differently. With `MakeInput` pinned to `__sincosf_stret`,
-every harness is bit-identical at `-O0` and `-O1`, so PoissonRecon itself does not depend on
-the optimization level apart from this depth. The oracle stays at the harness's
+in levelset8) and is otherwise unchanged. At `-O0` every harness is bit-identical to `-O1`
+(the harnesses call `__sincosf_stret` explicitly so their inputs don't depend on the
+optimization level), so PoissonRecon itself does not depend on it apart from this depth. The
+oracle stays at the harness's
 standard `-O1`, and a Tier C end-to-end mesh fixture from optimized pycolmap must not expect
 bit-exact barycenter vertices or their densities.

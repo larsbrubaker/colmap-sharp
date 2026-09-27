@@ -148,7 +148,9 @@ void AddSphere(std::vector<Sample>& samples, float cx, float cy, float cz, float
   for (int i = 0; i < count; i++) {
     Sample s;
     float u = NextUnit() * 6.2831853f, v = NextUnit() * 3.1415927f;
-    s.n = Point<Real, Dim>(std::cos(u) * std::sin(v), std::sin(u) * std::sin(v), std::cos(v));
+    // __sincosf_stret for the same reason as MakeInput (poisson_harness.h).
+    __float2 su = __sincosf_stret(u), sv = __sincosf_stret(v);
+    s.n = Point<Real, Dim>(su.__cosval * sv.__sinval, su.__sinval * sv.__sinval, sv.__cosval);
     s.p = Point<Real, Dim>(cx, cy, cz) + s.n * r;
     s.c = IndexColor(samples.size());
     samples.push_back(s);
