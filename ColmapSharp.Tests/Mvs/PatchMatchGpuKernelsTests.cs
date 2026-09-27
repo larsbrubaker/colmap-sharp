@@ -66,6 +66,28 @@ public class PatchMatchGpuKernelsTests
 		}
 	}
 
+	[Test]
+	public async Task SerialSweep_ReadsNoWorkgroupMemory()
+	{
+		// The serial scheme runs one invocation per column and never writes the cooperative
+		// scheme's var<workgroup> arrays, so any read of them sees WGSL's zero initialization, not
+		// data (the planner also gives it no workgroup memory). A lever that reused the cooperative
+		// scheme's pm_wg_first_sample / pm_wg_ncc in the serial body read first sample 0 and NCC 0
+		// there: on M5 Metal the serial depth then differed from the cooperative one in 39,414 of
+		// 76,800 pixels.
+		string source = PatchMatchGpuKernels.Descriptor(PatchMatchGpuKernel.SweepBand, Photometric, 1).Source;
+		const string Start = "\nfn pm_sweep_band_serial(";
+		int start = source.IndexOf(Start, StringComparison.Ordinal);
+		await Assert.That(start).IsGreaterThanOrEqualTo(0);
+		int end = source.IndexOf("\n}", start, StringComparison.Ordinal);
+		string serialBody = source[start..end];
+
+		string[] workgroupVariables = new Regex(@"var<workgroup> (?<name>\w+):").Matches(source).Select(m => m.Groups["name"].Value).ToArray();
+		await Assert.That(workgroupVariables.Length).IsGreaterThan(0);
+		string[] read = workgroupVariables.Where(name => Regex.IsMatch(serialBody, $@"\b{name}\b")).ToArray();
+		await Assert.That(string.Join(", ", read)).IsEqualTo("");
+	}
+
 	// The shared window's slots, counted independently of SweepWorkgroupBytes: the whole window
 	// while it fits the cache (Photometric's 11 x 11), one when it does not (Geometric's 21 x 21).
 	private static int SharedWindowSlots(PatchMatchGpuShaderShape shape)

@@ -213,13 +213,7 @@ fn pm_sweep_band_serial(workgroup_id: vec3<u32>, local_index: u32) {
 			if (min_cost_idx == 0i) {
 				cost = pm_costs[idx];
 			} else {
-				let first = pm_wg_first_sample[image_idx];
-				if (first != -1i) {
-					cost = pm_wg_ncc[first * PM_NUM_COSTS + min_cost_idx];
-				} else {
-					cost = pm_compute_ncc_cost(rotation, frame, row, col, best_depth, best_normal, image_idx, window);
-				}
-
+				cost = pm_compute_ncc_cost(rotation, frame, row, col, best_depth, best_normal, image_idx, window);
 				pm_costs[idx] = cost;
 			}
 
