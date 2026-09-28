@@ -2943,7 +2943,8 @@ port's controller runs on the caller's thread, often a reused pool thread after 
 the mapper continued whatever that thread drew before. `RunSparseMapper`
 (`Controllers/AutomaticReconstruction.cs`) now clears the thread's PRNG before building and
 running the mapper, and restores the caller's PRNG afterwards, the same choice as entries 71
-and 121.
+and 121. The global mapper's relative pose re-estimation runs on worker threads in COLMAP too;
+entry 139 covers it.
 
 **Why.** The same photos must give the same model whatever ran before in the process;
 CLAUDE.md requires sequential and parallel runs to agree. The mapper now sees the stream a
@@ -2955,3 +2956,31 @@ suite run in four the second session's sparse points differed
 (sum of x 191.4505 vs 191.6660, same 197 points), so the mesh had 30624 faces instead of 31843. `AutomaticReconstructionTests.CSharpOnly_UnseededSparseModelIgnoresTheCallersPrng`
 (C#-only) runs the sparse stages twice on one thread after seeding it differently; `cameras.bin`
 differed without the fresh PRNG, and all sparse files are byte-identical with it.
+
+## 139. ViewGraphCalibration re-estimates each relative pose from a fresh PRNG
+
+**What differs.** `ReestimateRelativePoses` (colmap/estimators/view_graph_calibration.cc), which
+the global mapper runs before `GlobalPipeline`, estimates every pair's calibrated two-view
+geometry on a new `ThreadPool`. With `random_seed` -1, RANSAC does not seed, so each worker
+draws from its `thread_local` PRNG: a fresh worker starts from the default seed on its first
+draw, and a worker that takes several pairs carries its stream from one pair to the next. Which
+pair gets which draws therefore depends on the thread count and on scheduling; with one thread
+the pairs share one stream in pair order. The port's `Parallel.For` also runs iterations on the
+calling thread (the controller's thread, whose PRNG the global mapper then uses), so without
+isolation those pairs both inherited and consumed the mapper's stream. The port now runs each
+pair on a PRNG freshly seeded with `kDefaultPRNGSeed` and restores the thread's own PRNG
+afterwards (`Estimators/ViewGraphCalibration.cs`), as entry 71 does for matching. COLMAP's first
+pair on each worker matches exactly; later pairs on a worker draw different samples, a Tier C
+difference.
+
+**Why.** CLAUDE.md requires sequential and parallel runs to give the same result, and the same
+photos must give the same model whatever ran before in the process. COLMAP's own result here is
+timing dependent, so there is no fixed stream to reproduce.
+
+**Evidence.**
+`AutomaticReconstructionTests.CSharpOnly_UnseededGlobalModelIgnoresTheCallersPrngAndThreadCount`
+(C#-only) runs extraction, matching and the global mapper unseeded twice, once with 1 thread
+after seeding the caller's PRNG with 1234 and once with 4 threads after seeding it with 98765
+and drawing 1000 values; without the per-pair PRNG `0/cameras.bin` differed, and with it all
+sparse files are byte-identical and the caller's PRNG is kept. `ViewGraphCalibrationTests` and
+`GlobalPipelineTests` pass.

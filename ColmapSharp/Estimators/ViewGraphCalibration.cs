@@ -20,13 +20,15 @@
 // - The focal of a camera is a double[1] (COLMAP points Ceres at a NodeHashMap value).
 // - ReestimateRelativePoses' ThreadPool becomes Parallel.For; each task writes its own
 //   pair. The matches are read up front instead of under a mutex inside the task, which
-//   only changes when they are read.
+//   only changes when they are read. With random_seed -1 each pair runs on a fresh
+//   default-seeded PRNG and the thread's own is restored afterwards (entry 139).
 // - LOG(WARNING)/LOG(ERROR) go to Util/Log.cs; LOG(INFO)/VLOG output is dropped.
 
 using ColmapSharp.Estimators.CostFunctions;
 using ColmapSharp.Feature;
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
+using ColmapSharp.Mathematics;
 using ColmapSharp.Scene;
 using ColmapSharp.Solver;
 using ColmapSharp.Util;
@@ -401,14 +403,33 @@ public static class ViewGraphCalibration
 		{
 			(ulong pairId, _) = pairs[i];
 			(uint imageId1, uint imageId2) = Types.PairIdToImagePair(pairId);
-			TwoViewGeometry tvg = TwoViewGeometryEstimation.EstimateCalibratedTwoViewGeometry(
-				imageIdToCamera[imageId1],
-				imagePoints[imageId1],
-				imageIdToCamera[imageId2],
-				imagePoints[imageId2],
-				matches[i],
-				twoViewOptions);
-			pairs[i] = (pairId, tvg);
+
+			// COLMAP's new ThreadPool workers start from the default seed and carry their
+			// stream from pair to pair, so which pair sees which draws depends on scheduling.
+			// Here every pair starts from a fresh default-seeded PRNG, and the thread's own
+			// PRNG is restored, so Parallel.For's inline iterations on the calling thread
+			// don't consume the caller's stream (docs/CPP_DIVERGENCES.md entry 139).
+			Mt19937? threadPrng = RandomUtils.Prng;
+			try
+			{
+				if (twoViewOptions.RansacOptions.RandomSeed == -1)
+				{
+					RandomUtils.SetPRNGSeed();
+				}
+
+				TwoViewGeometry tvg = TwoViewGeometryEstimation.EstimateCalibratedTwoViewGeometry(
+					imageIdToCamera[imageId1],
+					imagePoints[imageId1],
+					imageIdToCamera[imageId2],
+					imagePoints[imageId2],
+					matches[i],
+					twoViewOptions);
+				pairs[i] = (pairId, tvg);
+			}
+			finally
+			{
+				RandomUtils.Prng = threadPrng;
+			}
 		});
 	}
 

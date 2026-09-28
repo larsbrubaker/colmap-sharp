@@ -10,8 +10,10 @@
 // mixes GPU and CPU depth maps. It wraps ReferenceComputeDevice, the bit-identical CPU twin of the
 // WGSL kernels (see the library's AutomaticReconstructionTests.ComputeDevice.cs), so that mix still
 // gives exactly the plain CPU run's mesh; on a real GPU it would only come close. The two sessions
-// run on whatever pool threads the awaits land on, so this also pins that an unseeded run does not
-// depend on what those threads drew before (docs/CPP_DIVERGENCES.md entry 138).
+// run on whatever pool threads the awaits land on, so this test catches an unseeded run that
+// depends on what those threads drew before only when the scheduling happens to expose it. The
+// library test AutomaticReconstructionTests.CSharpOnly_UnseededSparseModelIgnoresTheCallersPrng
+// pins that property (docs/CPP_DIVERGENCES.md entry 138).
 
 using ColmapSharp.Compute;
 using ColmapSharp.Mvs.Testing;
