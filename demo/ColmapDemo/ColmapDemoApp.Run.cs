@@ -230,6 +230,8 @@ namespace ColmapDemo
 
 		private void AddRunControls(FlowLayoutWidget panel, ThemeConfig theme, string computeNote)
 		{
+			this.stageTimer.StageFinished += (stage, seconds) => Console.WriteLine($"COLMAP_DEMO stage {stage}: {seconds:F1} s");
+
 			var runButtons = new FlowLayoutWidget(FlowDirection.LeftToRight)
 			{
 				HAnchor = HAnchor.Stretch,
