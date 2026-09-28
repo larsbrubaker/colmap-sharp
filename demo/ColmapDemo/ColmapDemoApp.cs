@@ -3,9 +3,8 @@
 // ColmapDemoApp: the whole demo as one widget, which each head (ColmapDemo.Mac,
 // ColmapDemo.Browser) only has to put in a window - the shape of agg-sharp's
 // examples/AggSharpDemo/AggSharpDemo/AggSharpDemoApp.cs. The left panel collects the photos
-// and lists the pipeline's stages; the right is the 3D viewport. This first step only
-// collects photos: Run stays disabled and the viewport stays empty until the pipeline and the
-// preview are wired in (docs/DEMO_PLAN.md phase 1).
+// and lists the pipeline's stages; the right is the 3D viewport (ModelViewport.cs). Running,
+// progress, cancel and saving are in ColmapDemoApp.Run.cs.
 
 using System;
 using System.Collections.Generic;
@@ -22,7 +21,7 @@ namespace ColmapDemo
 	/// The demo's window content: a left panel (add photos, the photo list, Run, the stage list)
 	/// and a 3D viewport on the right.
 	/// </summary>
-	public class ColmapDemoApp : FlowLayoutWidget
+	public partial class ColmapDemoApp : FlowLayoutWidget
 	{
 		/// <summary>
 		/// The photo extensions the demo takes. The mac open panel ignores agg's filter string, and
@@ -34,8 +33,6 @@ namespace ColmapDemo
 		private static readonly string PhotoFilter = "Photos|" + string.Join(";", PhotoExtensions.Select(e => "*" + e));
 
 		private static readonly Color PanelColor = new Color("#f2f2f2");
-
-		private static readonly Color ViewportColor = new Color("#3a3d42");
 
 		private static readonly Color HintColor = new Color("#707070");
 
@@ -49,12 +46,17 @@ namespace ColmapDemo
 
 		private readonly ThemedTextButton clearButton;
 
+		private readonly ThemedTextButton addButton;
+
 		/// <param name="fileDropSupported">Whether the head delivers dropped files to the window. The
 		/// mac host does; the browser host does not yet (docs/DEMO_PLAN.md phase 3), and the drop hint
 		/// is only shown where a drop works.</param>
-		public ColmapDemoApp(bool fileDropSupported)
+		/// <param name="computeDevice">The GPU PatchMatch runs on, or null for the CPU.</param>
+		/// <param name="computeNote">One line on where PatchMatch runs and, on the CPU, why.</param>
+		public ColmapDemoApp(bool fileDropSupported, ColmapSharp.Compute.IComputeDevice computeDevice = null, string computeNote = "")
 			: base(FlowDirection.LeftToRight)
 		{
+			this.computeDevice = computeDevice;
 			this.AnchorAll();
 			ThemeConfig theme = ThemeConfig.Current;
 
@@ -76,9 +78,9 @@ namespace ColmapDemo
 			});
 
 			var photoButtons = new FlowLayoutWidget(FlowDirection.LeftToRight) { HAnchor = HAnchor.Stretch };
-			var addButton = new ThemedTextButton("Add photos…", theme) { Name = "Add Photos Button" };
-			addButton.Click += (sender, e) => this.ShowAddPhotosDialog();
-			photoButtons.AddChild(addButton);
+			this.addButton = new ThemedTextButton("Add photos…", theme) { Name = "Add Photos Button" };
+			this.addButton.Click += (sender, e) => this.ShowAddPhotosDialog();
+			photoButtons.AddChild(this.addButton);
 			photoButtons.AddChild(new HorizontalSpacer());
 			this.clearButton = new ThemedTextButton("Clear", theme)
 			{
@@ -132,50 +134,17 @@ namespace ColmapDemo
 			};
 			panel.AddChild(this.skippedNote);
 
-			// Disabled until the pipeline is wired in; a button that did nothing would lie.
-			var runButton = new ThemedTextButton("Run", theme)
-			{
-				Name = "Run Button",
-				HAnchor = HAnchor.Stretch,
-				Margin = new BorderDouble(0, 0, 0, 12),
-				Enabled = false,
-			};
-			panel.AddChild(runButton);
+			this.AddRunControls(panel, theme, computeNote);
 
-			panel.AddChild(new TextWidget("Stages", pointSize: 11, bold: true)
-			{
-				HAnchor = HAnchor.Left,
-				Margin = new BorderDouble(0, 4, 0, 12),
-			});
-			foreach (string stage in Stages)
-			{
-				panel.AddChild(new TextWidget(stage, pointSize: 10, textColor: HintColor)
-				{
-					HAnchor = HAnchor.Left,
-					Margin = new BorderDouble(8, 2, 0, 2),
-				});
-			}
-
-			var viewport = new GuiWidget()
-			{
-				Name = "Model Viewport",
-				HAnchor = HAnchor.Stretch,
-				VAnchor = VAnchor.Stretch,
-				BackgroundColor = ViewportColor,
-			};
-			viewport.AddChild(new TextWidget("No model yet", pointSize: 14, textColor: new Color("#b0b0b0"))
-			{
-				HAnchor = HAnchor.Center,
-				VAnchor = VAnchor.Center,
-			});
-			this.AddChild(viewport);
+			this.viewport = new ModelViewport();
+			this.AddChild(this.viewport);
 
 			this.UpdatePhotoCount();
 		}
 
 		/// <summary>
 		/// The pipeline's steps in the order a run goes through them, named by the library's own
-		/// progress stages so the list will match the progress reports once Run is wired in.
+		/// progress stages, so each report finds its row.
 		/// </summary>
 		public static IReadOnlyList<string> Stages { get; } = new[]
 		{
@@ -206,6 +175,12 @@ namespace ColmapDemo
 		/// </summary>
 		public void AddPhotos(IEnumerable<string> paths)
 		{
+			if (this.IsRunning)
+			{
+				// The run already took its photo list; changing it mid-run would only mislead.
+				return;
+			}
+
 			int skipped = 0;
 			foreach (string path in paths)
 			{
@@ -272,6 +247,11 @@ namespace ColmapDemo
 
 		private void ClearPhotos()
 		{
+			if (this.IsRunning)
+			{
+				return;
+			}
+
 			this.photoPaths.Clear();
 			this.photoList.CloseChildren();
 			this.skippedNote.Visible = false;
@@ -282,7 +262,8 @@ namespace ColmapDemo
 		{
 			int count = this.photoPaths.Count;
 			this.photoCount.Text = count == 0 ? "No photos yet" : count == 1 ? "1 photo" : $"{count} photos";
-			this.clearButton.Enabled = count > 0;
+			this.clearButton.Enabled = count > 0 && !this.IsRunning;
+			this.UpdateRunButtons();
 		}
 	}
 }

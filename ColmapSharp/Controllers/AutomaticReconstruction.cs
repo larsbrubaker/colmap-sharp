@@ -145,6 +145,9 @@ public sealed partial class AutomaticReconstructionController : BaseController
 			optionManager.FeatureMatching.GuidedMatching = false;
 		}
 
+		// C#-only (see AutomaticReconstructionOptions.PoissonTrim); no preset touches trim.
+		optionManager.PoissonMeshing.Trim = options.PoissonTrim;
+
 		optionManager.FeatureExtraction.NumThreads = options.NumThreads;
 		optionManager.FeatureMatching.NumThreads = options.NumThreads;
 		// sequential_pairing / vocab_tree_pairing num_threads only feed the vocabulary tree,

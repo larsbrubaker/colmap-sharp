@@ -10,6 +10,7 @@
 		<Nullable>disable</Nullable>
 		<ImplicitUsings>disable</ImplicitUsings>
 		<RootNamespace>ColmapDemo</RootNamespace>
+		<!-- The pure parts (decode, mesh bridge, session) are tested in ColmapDemo.Tests. -->
 		<Company>Lars Brubaker</Company>
 	</PropertyGroup>
 
@@ -18,6 +19,12 @@
 		<ProjectReference Include="..\agg-sharp\agg\Agg.csproj" />
 		<ProjectReference Include="..\agg-sharp\Gui\Gui.csproj" />
 		<ProjectReference Include="..\agg-sharp\VectorMath\VectorMath.csproj" />
+		<ProjectReference Include="..\agg-sharp\DataConverters2D\DataConverters2D.csproj" />
+		<ProjectReference Include="..\agg-sharp\PolygonMesh\PolygonMesh.csproj" />
+		<ProjectReference Include="..\agg-sharp\RenderCore\RenderCore.csproj" />
+		<ProjectReference Include="..\agg-sharp\RenderGl\RenderGl.csproj" />
+		<ProjectReference Include="..\agg-sharp\WebGpuRender\WebGpuRender.csproj" />
+		<ProjectReference Include="..\agg-sharp\WebGpu\MatterHackers.WebGpu.csproj" />
 	</ItemGroup>
 
 </Project>

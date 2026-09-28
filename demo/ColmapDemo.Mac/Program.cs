@@ -5,6 +5,8 @@
 // agg's AGG_SMOKE_FRAMES / AGG_SMOKE_SCREENSHOT environment variables work here unchanged
 // (the AppKit host reads them), so a smoke run can render a few frames, save a PNG and exit.
 
+using System;
+using ColmapDemo.Compute;
 using MatterHackers.Agg.UI;
 
 namespace ColmapDemo
@@ -19,8 +21,22 @@ namespace ColmapDemo
 			{
 				Title = "ColmapSharp — photos to mesh",
 			};
+			// PatchMatch runs on the GPU when wgpu gives us a device; otherwise on the CPU, and the
+			// panel says why so a slow run is not a mystery.
+			WebGpuComputeDevice gpu = null;
+			string computeNote;
+			try
+			{
+				gpu = WebGpuComputeDevice.Create(raiseComputeLimits: true);
+				computeNote = "Depth maps run on the GPU.";
+			}
+			catch (Exception e)
+			{
+				computeNote = "No GPU (" + e.Message + "); depth maps run on the CPU.";
+			}
+
 			// The AppKit host delivers dropped files (agg's FileDropDispatcher).
-			systemWindow.AddChild(new ColmapDemoApp(fileDropSupported: true));
+			systemWindow.AddChild(new ColmapDemoApp(fileDropSupported: true, gpu, computeNote));
 			systemWindow.ShowAsSystemWindow();
 		}
 	}

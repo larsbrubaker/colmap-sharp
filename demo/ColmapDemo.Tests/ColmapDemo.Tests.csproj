@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- Tests of the demo's pure parts: photo decoding, the mesh bridge, photo filtering and mesh
+	     saving. No window is opened, so the generated test entry point is used (like the library's
+	     ColmapSharp.Tests, whose TUnit version this matches). -->
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<OutputType>Exe</OutputType>
+		<IsPackable>false</IsPackable>
+		<IsTestProject>true</IsTestProject>
+		<Nullable>disable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<RootNamespace>ColmapDemo.Tests</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="TUnit" Version="1.63.0" />
+		<PackageReference Include="TUnit.Engine" Version="1.63.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\ColmapDemo\ColmapDemo.csproj" />
+	</ItemGroup>
+
+</Project>

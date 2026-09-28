@@ -1,0 +1,246 @@
+// Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
+//
+// ReconstructionSession: one photos-to-mesh run, without any UI - decode the photos
+// (PhotoDecoder.cs), run the library's AutomaticReconstructionController in a fresh temp
+// workspace, and hand back the sparse points and the (textured) mesh, converted for the
+// viewport by MeshBridge.cs. ColmapDemoApp drives it from a background task on the Mac and
+// marshals its events to the UI thread; tests and a headless try-out drive it directly.
+// SaveMesh writes the result as OBJ (+ MTL + texture.png) or PLY.
+//
+// Its events fire on whatever thread the run is on (the worker, on the Mac); listeners marshal.
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using ColmapSharp.Compute;
+using ColmapSharp.Controllers;
+using ColmapSharp.Scene;
+using ColmapSharp.Sensor;
+using ColmapSharp.Util;
+using MatterHackers.Agg.Image;
+using MatterHackers.PolygonMesh;
+
+namespace ColmapDemo
+{
+	/// <summary>The demo's run settings. Defaults are chosen for a quick run on a small photo set.</summary>
+	public sealed class SessionSettings
+	{
+		/// <summary>
+		/// Photos are shrunk so their longer side is at most this many pixels before anything
+		/// else sees them. The Low preset already caps SIFT (3200 * 0.3125 = 1000) and PatchMatch
+		/// and fusion (1000), so shrinking up front mostly saves decode memory and upload time.
+		/// </summary>
+		public int MaxImageSize { get; set; } = 1000;
+
+		/// <summary>The library's quality preset; Low keeps a demo run in the tens of seconds.</summary>
+		public AutomaticReconstructionOptions.QualityLevel Quality { get; set; } = AutomaticReconstructionOptions.QualityLevel.Low;
+
+		/// <summary>
+		/// Poisson trim. COLMAP's 10 cuts the sparse fused cloud of a handful of photos down to
+		/// nothing (PORTING_PLAN.md Phase 11); 5 keeps the surface near the samples while still
+		/// dropping most of the far-flung "balloon" Poisson closes the surface with.
+		/// </summary>
+		public double PoissonTrim { get; set; } = 5;
+
+		/// <summary>The GPU for PatchMatch, or null to run it on the CPU.</summary>
+		public IComputeDevice ComputeDevice { get; set; }
+	}
+
+	/// <summary>What a finished run produced.</summary>
+	public sealed class SessionResult
+	{
+		/// <summary>The sparse points of every model.</summary>
+		public IReadOnlyList<ColoredPoint> SparsePoints { get; init; } = Array.Empty<ColoredPoint>();
+
+		/// <summary>The first model's mesh as the library wrote it, or null when meshing gave none.</summary>
+		public PlyMesh Mesh { get; init; }
+
+		/// <summary>The mesh's per-corner UVs (6 per face) when textured, else null.</summary>
+		public float[] FaceUvs { get; init; }
+
+		/// <summary>The texture atlas, or null when no face was seen by any photo.</summary>
+		public ImageBuffer Atlas { get; init; }
+
+		/// <summary>The mesh converted for the viewport, or null.</summary>
+		public Mesh PreviewMesh { get; init; }
+
+		/// <summary>The workspace the run wrote into.</summary>
+		public string WorkspacePath { get; init; }
+
+		/// <summary>Whether a textured mesh came out.</summary>
+		public bool IsTextured => this.Atlas != null;
+	}
+
+	/// <summary>One photos-to-mesh run.</summary>
+	public sealed class ReconstructionSession
+	{
+		private readonly SessionSettings settings;
+
+		public ReconstructionSession(SessionSettings settings)
+		{
+			this.settings = settings ?? new SessionSettings();
+		}
+
+		/// <summary>Every progress report of the library (Stage is one of ColmapDemoApp.Stages).</summary>
+		public event Action<ControllerProgress> ProgressChanged;
+
+		/// <summary>The sparse model's points, as soon as the sparse stage has finished.</summary>
+		public event Action<IReadOnlyList<ColoredPoint>> SparseReady;
+
+		/// <summary>
+		/// Decodes <paramref name="photoPaths"/> and runs the whole pipeline, synchronously on the
+		/// calling thread between awaits (call it from a background task in a desktop UI).
+		/// Throws <see cref="OperationCanceledException"/> when <paramref name="cancel"/> fires.
+		/// </summary>
+		public async Task<SessionResult> RunAsync(IReadOnlyList<string> photoPaths, CancellationToken cancel)
+		{
+			var images = new InMemoryImageSource();
+			var names = new HashSet<string>(StringComparer.Ordinal);
+			for (int i = 0; i < photoPaths.Count; i++)
+			{
+				cancel.ThrowIfCancellationRequested();
+				this.ProgressChanged?.Invoke(new ControllerProgress("Loading photos", i, photoPaths.Count, Path.GetFileName(photoPaths[i])));
+				Bitmap bitmap = PhotoDecoder.Decode(photoPaths[i], this.settings.MaxImageSize);
+
+				// The library keys images by name; two folders can both hold "IMG_0001.JPG".
+				string name = Path.GetFileName(photoPaths[i]);
+				for (int n = 2; !names.Add(name); n++)
+				{
+					name = Path.GetFileNameWithoutExtension(photoPaths[i]) + "-" + n + Path.GetExtension(photoPaths[i]);
+				}
+
+				images.Add(name, bitmap);
+			}
+
+			return await this.RunAsync(images, cancel).ConfigureAwait(false);
+		}
+
+		/// <summary>Runs the pipeline on already-decoded photos.</summary>
+		public async Task<SessionResult> RunAsync(InMemoryImageSource images, CancellationToken cancel)
+		{
+			string workspace = Path.Combine(Path.GetTempPath(), "ColmapDemo", DateTime.Now.ToString("yyyyMMdd-HHmmss-fff"));
+			Directory.CreateDirectory(workspace);
+
+			var options = new AutomaticReconstructionOptions
+			{
+				WorkspacePath = workspace,
+				Images = images,
+				Data = AutomaticReconstructionOptions.DataType.Individual,
+				Quality = this.settings.Quality,
+				Dense = true,
+				Mesher = AutomaticReconstructionOptions.MesherType.Poisson,
+				PoissonTrim = this.settings.PoissonTrim,
+				Texture = true,
+				ComputeDevice = this.settings.ComputeDevice,
+			};
+
+			var models = new ReconstructionManager();
+			var controller = new AutomaticReconstructionController(options, models)
+			{
+				CancellationToken = cancel,
+			};
+
+			IReadOnlyList<ColoredPoint> sparse = null;
+			controller.Progress = new SyncProgress(p =>
+			{
+				// The dense stage's heading is the first report after the sparse mapper finished and
+				// wrote the models, so the points are complete here (reported on the run's thread,
+				// which is the only one touching the models).
+				if (sparse == null && p.Stage == AutomaticReconstructionController.DenseStage)
+				{
+					sparse = MeshBridge.SparsePoints(models);
+					this.SparseReady?.Invoke(sparse);
+				}
+
+				this.ProgressChanged?.Invoke(p);
+			});
+
+			controller.Setup();
+			await controller.RunAsync().ConfigureAwait(false);
+			cancel.ThrowIfCancellationRequested();
+
+			if (sparse == null)
+			{
+				sparse = MeshBridge.SparsePoints(models);
+				this.SparseReady?.Invoke(sparse);
+			}
+
+			TexturedModelMesh textured = controller.TexturedMeshes.FirstOrDefault();
+			PlyMesh mesh = textured?.Mesh ?? ReadFirstMesh(workspace);
+			ImageBuffer atlas = null;
+			float[] uvs = null;
+			if (textured != null && !textured.Texture.TextureAtlas.IsEmpty)
+			{
+				atlas = PhotoDecoder.ToImageBuffer(textured.Texture.TextureAtlas);
+				uvs = textured.Texture.FaceUvs;
+			}
+
+			bool hasMesh = mesh != null && mesh.Faces.Count > 0;
+			return new SessionResult
+			{
+				SparsePoints = sparse,
+				Mesh = hasMesh ? mesh : null,
+				FaceUvs = hasMesh ? uvs : null,
+				Atlas = hasMesh ? atlas : null,
+				PreviewMesh = hasMesh ? MeshBridge.ToAggMesh(mesh, atlas, uvs) : null,
+				WorkspacePath = workspace,
+			};
+		}
+
+		/// <summary>
+		/// Writes <paramref name="result"/>'s mesh to <paramref name="path"/>: a ".ply" path gets a
+		/// PLY, anything else an OBJ (plus an MTL of the same name). A textured mesh also gets
+		/// texture.png beside it; an untextured OBJ carries vertex colors instead.
+		/// </summary>
+		public static void SaveMesh(SessionResult result, string path)
+		{
+			if (result?.Mesh == null)
+			{
+				throw new InvalidOperationException("There is no mesh to save yet.");
+			}
+
+			var texturedMesh = new PlyTexturedMesh(result.Mesh);
+			if (result.IsTextured)
+			{
+				texturedMesh.FaceUvs = result.FaceUvs.ToList();
+				texturedMesh.TextureFile = AutomaticReconstructionController.TextureFileName;
+				string texturePath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(path)), texturedMesh.TextureFile);
+				ImageIO.SaveImageData(texturePath, result.Atlas);
+			}
+
+			if (string.Equals(Path.GetExtension(path), ".ply", StringComparison.OrdinalIgnoreCase))
+			{
+				// COLMAP's textured PLY: per-face texcoord lists and a TextureFile comment.
+				Ply.WriteBinaryPlyMesh(path, texturedMesh);
+			}
+			else if (result.IsTextured)
+			{
+				ObjWriter.WriteTexturedObj(path, texturedMesh);
+			}
+			else
+			{
+				ObjWriter.WriteObj(path, result.Mesh);
+			}
+		}
+
+		// A run whose texturing was skipped still leaves the Poisson mesh on disk.
+		private static PlyMesh ReadFirstMesh(string workspace)
+		{
+			string meshPath = Path.Combine(workspace, "dense", "0", "meshed-poisson.ply");
+			return File.Exists(meshPath) ? Ply.ReadPlyMesh(meshPath).Mesh : null;
+		}
+
+		// Progress<T> would post to a SynchronizationContext; the listeners marshal themselves.
+		private sealed class SyncProgress : IProgress<ControllerProgress>
+		{
+			private readonly Action<ControllerProgress> report;
+
+			public SyncProgress(Action<ControllerProgress> report) => this.report = report;
+
+			public void Report(ControllerProgress value) => this.report(value);
+		}
+	}
+}
