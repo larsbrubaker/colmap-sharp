@@ -32,6 +32,10 @@
 		window.aggHostStatus = message => {
 			document.getElementById('status').textContent = message;
 		};
+		// The query string, for BrowserDevHook.cs (?demo=autorun).
+		window.colmapDemoQuery = () => location.search;
+		// BrowserYield.cs: a promise that settles on a new task, so the page renders between two units of a run.
+		window.colmapDemoYield = () => new Promise(resolve => setTimeout(resolve, 0));
 	</script>
 
 	<!-- No Blazor components: Blazor only boots the runtime; Program.cs does the rest. PlatformBrowser's JS

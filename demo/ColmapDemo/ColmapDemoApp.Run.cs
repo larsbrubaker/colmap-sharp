@@ -2,11 +2,14 @@
 //
 // ColmapDemoApp.Run: the Run / Cancel / Save mesh controls, the stage list's live progress and
 // the status line. A run is a ReconstructionSession (ReconstructionSession.cs) started off the
-// UI thread; its events arrive on the worker and are marshalled here with UiThread.RunOnIdle.
+// UI thread on the Mac (RunOnUiThread false), or on the UI thread in the browser, where there
+// is no other; its events are marshalled here with UiThread.RunOnIdle either way. Each stage's
+// wall time goes to the console as "COLMAP_DEMO stage <name>: <s>" for comparing heads.
 // The layout of the rest of the panel is in ColmapDemoApp.cs.
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -51,6 +54,35 @@ namespace ColmapDemo
 
 		private string activeStage;
 
+		// The stage the timing log is on (any progress stage, "Loading photos" included) and when it began.
+		private string timedStage;
+
+		private readonly Stopwatch stageClock = new Stopwatch();
+
+		private readonly Stopwatch runClock = new Stopwatch();
+
+		/// <summary>
+		/// Whether a run shares the UI thread instead of going to the thread pool. The browser has one
+		/// thread, so there the run awaits <see cref="YieldAsync"/> between units of work to let the
+		/// page paint; the Mac leaves this false so the window never waits on the pipeline.
+		/// </summary>
+		public bool RunOnUiThread { get; set; }
+
+		/// <summary>Passed to the run as <see cref="SessionSettings.YieldAsync"/>; null for Task.Yield.</summary>
+		public Func<ValueTask> YieldAsync { get; set; }
+
+		/// <summary>The longer side photos are shrunk to before a run (<see cref="SessionSettings.MaxImageSize"/>).</summary>
+		public int MaxImageSize { get; set; } = new SessionSettings().MaxImageSize;
+
+		/// <summary>
+		/// Whether Save mesh offers one zip (mesh.obj, mesh.mtl, mesh.png) instead of loose files: the
+		/// browser's save is a single download.
+		/// </summary>
+		public bool SaveMeshAsZip { get; set; }
+
+		/// <summary>Each finished stage of the last run and its wall time in seconds, in order.</summary>
+		public List<(string Stage, double Seconds)> StageTimes { get; } = new List<(string Stage, double Seconds)>();
+
 		/// <summary>Raised on the UI thread once the sparse points are in the viewport.</summary>
 		public event Action SparseShown;
 
@@ -90,8 +122,16 @@ namespace ColmapDemo
 
 			this.statusLine.Text = "Starting…";
 			this.UpdatePhotoCount();
+			this.StageTimes.Clear();
+			this.timedStage = null;
+			this.runClock.Restart();
 
-			var session = new ReconstructionSession(new SessionSettings { ComputeDevice = this.computeDevice });
+			var session = new ReconstructionSession(new SessionSettings
+			{
+				ComputeDevice = this.computeDevice,
+				MaxImageSize = this.MaxImageSize,
+				YieldAsync = this.YieldAsync,
+			});
 			session.ProgressChanged += p => UiThread.RunOnIdle(() => this.OnProgress(p));
 			session.SparseReady += points => UiThread.RunOnIdle(() =>
 			{
@@ -100,9 +140,10 @@ namespace ColmapDemo
 			});
 			var photos = new List<string>(this.photoPaths);
 
-			// The pipeline is CPU work that runs synchronously between its awaits, so it goes to the
-			// thread pool; the UI thread only draws and handles input.
-			Task.Run(async () =>
+			// The pipeline is CPU work that runs synchronously between its awaits, so on a desktop it
+			// goes to the thread pool and the UI thread only draws and handles input. In the browser
+			// there is no pool thread to go to; the run starts here and its yields hand the page back.
+			Func<Task> run = async () =>
 			{
 				try
 				{
@@ -117,7 +158,18 @@ namespace ColmapDemo
 				{
 					UiThread.RunOnIdle(() => this.OnRunFinished(null, e, cancelled: false));
 				}
-			});
+			};
+
+			if (this.RunOnUiThread)
+			{
+				// Not awaited: run catches everything itself, and the click handler must return so
+				// the frame that shows "Starting..." can be drawn.
+				_ = run();
+			}
+			else
+			{
+				Task.Run(run);
+			}
 		}
 
 		/// <summary>Asks the run to stop (what Cancel does). The current step finishes first.</summary>
@@ -222,6 +274,13 @@ namespace ColmapDemo
 				return;
 			}
 
+			if (progress.Stage != this.timedStage)
+			{
+				this.EndTimedStage();
+				this.timedStage = progress.Stage;
+				this.stageClock.Restart();
+			}
+
 			if (this.stageRows.ContainsKey(progress.Stage) && progress.Stage != this.activeStage)
 			{
 				if (this.activeStage != null)
@@ -244,8 +303,22 @@ namespace ColmapDemo
 				: message;
 		}
 
+		// Closes the stage the timing log is on, if any.
+		private void EndTimedStage()
+		{
+			if (this.timedStage != null)
+			{
+				double seconds = this.stageClock.Elapsed.TotalSeconds;
+				this.StageTimes.Add((this.timedStage, seconds));
+				Console.WriteLine($"COLMAP_DEMO stage {this.timedStage}: {seconds:F1} s");
+				this.timedStage = null;
+			}
+		}
+
 		private void OnRunFinished(SessionResult result, Exception error, bool cancelled)
 		{
+			this.EndTimedStage();
+			Console.WriteLine($"COLMAP_DEMO run: {this.runClock.Elapsed.TotalSeconds:F1} s");
 			this.runCancel?.Dispose();
 			this.runCancel = null;
 			this.lastResult = result;
@@ -294,8 +367,11 @@ namespace ColmapDemo
 				return;
 			}
 
+			SaveFileDialogParams dialogParams = this.SaveMeshAsZip
+				? new SaveFileDialogParams("Zipped OBJ mesh|*.zip", title: "Save mesh") { FileName = "mesh.zip" }
+				: new SaveFileDialogParams("OBJ mesh|*.obj|PLY mesh|*.ply", title: "Save mesh") { FileName = "mesh.obj" };
 			AggContext.FileDialogs.SaveFileDialog(
-				new SaveFileDialogParams("OBJ mesh|*.obj|PLY mesh|*.ply", title: "Save mesh") { FileName = "mesh.obj" },
+				dialogParams,
 				saveParams =>
 				{
 					if (string.IsNullOrEmpty(saveParams.FileName))
@@ -303,9 +379,18 @@ namespace ColmapDemo
 						return;
 					}
 
-					string path = Path.HasExtension(saveParams.FileName) ? saveParams.FileName : saveParams.FileName + ".obj";
+					string defaultExtension = this.SaveMeshAsZip ? ".zip" : ".obj";
+					string path = Path.HasExtension(saveParams.FileName) ? saveParams.FileName : saveParams.FileName + defaultExtension;
 					try
 					{
+						if (string.Equals(Path.GetExtension(path), ".zip", StringComparison.OrdinalIgnoreCase))
+						{
+							// The browser downloads the staged file once it stops changing.
+							ReconstructionSession.SaveMeshZip(result, path);
+							this.statusLine.Text = $"Saved {Path.GetFileName(path)} (OBJ, MTL{(result.IsTextured ? " and texture" : string.Empty)})";
+							return;
+						}
+
 						ReconstructionSession.SaveMesh(result, path);
 						this.statusLine.Text = result.IsTextured && !path.EndsWith(".ply", StringComparison.OrdinalIgnoreCase)
 							? $"Saved {Path.GetFileName(path)} with its .mtl and {Path.GetFileNameWithoutExtension(path)}.png"

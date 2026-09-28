@@ -3,9 +3,11 @@
 // ReconstructionSession: one photos-to-mesh run, without any UI - decode the photos
 // (PhotoDecoder.cs), run the library's AutomaticReconstructionController in a fresh temp
 // workspace, and hand back the sparse points and the (textured) mesh, converted for the
-// viewport by MeshBridge.cs. ColmapDemoApp drives it from a background task on the Mac and
+// viewport by MeshBridge.cs. ColmapDemoApp drives it from a background task on the Mac, and on
+// the browser's one thread (where SessionSettings.YieldAsync hands the page its turns), and
 // marshals its events to the UI thread; tests and a headless try-out drive it directly.
-// SaveMesh writes the result as OBJ (+ MTL + <name>.png) or PLY. Each run's temp workspace is
+// SaveMesh writes the result as OBJ (+ MTL + <name>.png) or PLY; SaveMeshZip puts the OBJ's
+// files in one zip, since a browser download is one file. Each run's temp workspace is
 // deleted when the run ends (COLMAP_DEMO_KEEP_WORKSPACE=1 keeps it).
 //
 // Its events fire on whatever thread the run is on (the worker, on the Mac); listeners marshal.
@@ -13,6 +15,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -67,6 +70,13 @@ namespace ColmapDemo
 
 		/// <summary>The GPU for PatchMatch, or null to run it on the CPU.</summary>
 		public IComputeDevice ComputeDevice { get; set; }
+
+		/// <summary>
+		/// What the run awaits between units of work (each decoded photo, each pipeline stage, each
+		/// PatchMatch problem), or null for <see cref="Task.Yield"/>. A host whose run shares the UI
+		/// thread (the browser) supplies one that really gives the page a turn to paint.
+		/// </summary>
+		public Func<ValueTask> YieldAsync { get; set; }
 	}
 
 	/// <summary>What a finished run produced.</summary>
@@ -117,6 +127,7 @@ namespace ColmapDemo
 		/// </summary>
 		public async Task<SessionResult> RunAsync(IReadOnlyList<string> photoPaths, CancellationToken cancel)
 		{
+			Func<ValueTask> yieldToHost = this.settings.YieldAsync ?? YieldToEventLoop;
 			var images = new InMemoryImageSource();
 			var names = new HashSet<string>(StringComparer.Ordinal);
 			for (int i = 0; i < photoPaths.Count; i++)
@@ -133,6 +144,10 @@ namespace ColmapDemo
 				}
 
 				images.Add(name, bitmap);
+
+				// Decoding is the first long stretch of a run; on a shared UI thread the page would
+				// otherwise sit on "Starting..." until every photo is in.
+				await yieldToHost().ConfigureAwait(false);
 			}
 
 			return await this.RunAsync(images, cancel).ConfigureAwait(false);
@@ -188,6 +203,7 @@ namespace ColmapDemo
 			var controller = new AutomaticReconstructionController(options, models)
 			{
 				CancellationToken = cancel,
+				YieldAsync = this.settings.YieldAsync,
 			};
 
 			IReadOnlyList<ColoredPoint> sparse = null;
@@ -282,6 +298,34 @@ namespace ColmapDemo
 				ObjWriter.WriteObj(path, result.Mesh);
 			}
 		}
+
+		/// <summary>
+		/// Writes <paramref name="result"/>'s mesh as OBJ + MTL (+ PNG when textured) into one zip at
+		/// <paramref name="zipPath"/>, the entries named after the zip (mesh.zip holds mesh.obj,
+		/// mesh.mtl, mesh.png, as <see cref="SaveMesh"/> names them). The browser's save is a single
+		/// download, and three loose files would be three prompts.
+		/// </summary>
+		public static void SaveMeshZip(SessionResult result, string zipPath)
+		{
+			string staging = Path.Combine(Path.GetTempPath(), "ColmapDemo", "zip-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(staging);
+			try
+			{
+				SaveMesh(result, Path.Combine(staging, Path.GetFileNameWithoutExtension(zipPath) + ".obj"));
+				if (File.Exists(zipPath))
+				{
+					File.Delete(zipPath);
+				}
+
+				ZipFile.CreateFromDirectory(staging, zipPath, CompressionLevel.Optimal, includeBaseDirectory: false);
+			}
+			finally
+			{
+				Directory.Delete(staging, recursive: true);
+			}
+		}
+
+		private static async ValueTask YieldToEventLoop() => await Task.Yield();
 
 		// A run whose texturing was skipped still leaves the Poisson mesh on disk.
 		private static PlyMesh ReadFirstMesh(string workspace)

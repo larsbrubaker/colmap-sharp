@@ -2,7 +2,8 @@
 //
 // Tests of MeshBridge (demo/ColmapDemo/MeshBridge.cs) and ReconstructionSession.SaveMesh: the
 // library's PlyMesh reaches agg with its geometry, per-face colors or per-face texture UVs, and a
-// saved mesh is the set of files a viewer needs (OBJ + MTL + a PNG named after the OBJ when textured).
+// saved mesh is the set of files a viewer needs (OBJ + MTL + a PNG named after the OBJ when textured),
+// loose, or in one zip for the browser's single-file download.
 
 using ColmapSharp.Util;
 using MatterHackers.Agg;
@@ -92,6 +93,28 @@ public class MeshBridgeTests
 		await Assert.That(obj).DoesNotContain("mtllib");
 		await Assert.That(obj.Split('\n').Count(l => l.StartsWith("v "))).IsEqualTo(4);
 		await Assert.That(File.Exists(Path.Combine(dir, "model.png"))).IsFalse();
+		Directory.Delete(dir, recursive: true);
+	}
+
+	[Test]
+	public async Task SavingAsZipHoldsObjMtlAndTexture()
+	{
+		string dir = Directory.CreateTempSubdirectory("ColmapDemoTests").FullName;
+		var result = new SessionResult { Mesh = TwoTriangles(), FaceUvs = Uvs, Atlas = new ImageBuffer(4, 4) };
+		string zipPath = Path.Combine(dir, "mesh.zip");
+
+		ReconstructionSession.SaveMeshZip(result, zipPath);
+
+		using (System.IO.Compression.ZipArchive zip = System.IO.Compression.ZipFile.OpenRead(zipPath))
+		{
+			string[] names = zip.Entries.Select(e => e.FullName).OrderBy(n => n, StringComparer.Ordinal).ToArray();
+			await Assert.That(string.Join(",", names)).IsEqualTo("mesh.mtl,mesh.obj,mesh.png");
+			using var obj = new StreamReader(zip.GetEntry("mesh.obj")!.Open());
+			await Assert.That(obj.ReadToEnd()).Contains("mtllib mesh.mtl");
+		}
+
+		// Only the zip is left beside it: the loose files were staged elsewhere.
+		await Assert.That(Directory.GetFiles(dir).Length).IsEqualTo(1);
 		Directory.Delete(dir, recursive: true);
 	}
 
