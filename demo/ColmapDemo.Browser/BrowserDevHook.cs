@@ -7,6 +7,7 @@
 //                     the library tests' synthetic textured scene) and press Run
 //   ?demo=samples     only load them, for a person to press Run
 //   &yield=task       yield with Task.Yield instead of a setTimeout task (BrowserYield.cs)
+//   gpu=off           no GPU device: PatchMatch on the CPU (read by Program.cs at startup)
 //
 // Without a demo parameter it does nothing. Progress is read through Program.cs's RunState export.
 
@@ -26,6 +27,10 @@ namespace ColmapDemo
 	{
 		/// <summary>The bundled sample photos, under wwwroot/samples.</summary>
 		private static readonly string[] SampleNames = { "view0.png", "view1.png", "view2.png", "view3.png", "view4.png", "view5.png" };
+
+		/// <summary>Whether the page's query asks for no GPU device (?gpu=off).</summary>
+		public static bool GpuOff(IJSInProcessRuntime page)
+			=> (page?.Invoke<string>("colmapDemoQuery") ?? string.Empty).Contains("gpu=off", StringComparison.Ordinal);
 
 		/// <summary>Reads the query and, if asked, loads the samples and starts a run.</summary>
 		public static async Task AttachAsync(ColmapDemoApp app, string baseAddress, IJSInProcessRuntime page)

@@ -72,16 +72,24 @@ namespace ColmapDemo
 
 				// PatchMatch on the GPU when the page gets a WebGPU adapter; the browser can never block
 				// on the GPU, so the device is made (and later read back) asynchronously.
+				// ?gpu=off (BrowserDevHook.cs) skips it, to time and check the CPU path on the same page.
 				WebGpuComputeDevice gpu = null;
 				string computeNote;
-				try
+				if (BrowserDevHook.GpuOff(pageScript))
 				{
-					gpu = await WebGpuComputeDevice.CreateAsync(raiseComputeLimits: true, isBrowser: () => true);
-					computeNote = "Depth maps run on the GPU.";
+					computeNote = "GPU off (?gpu=off); depth maps run on the CPU.";
 				}
-				catch (Exception e)
+				else
 				{
-					computeNote = "No GPU (" + e.Message + "); depth maps run on the CPU.";
+					try
+					{
+						gpu = await WebGpuComputeDevice.CreateAsync(raiseComputeLimits: true, isBrowser: () => true);
+						computeNote = "Depth maps run on the GPU.";
+					}
+					catch (Exception e)
+					{
+						computeNote = "No GPU (" + e.Message + "); depth maps run on the CPU.";
+					}
 				}
 
 				Console.WriteLine("COLMAP_DEMO compute: " + computeNote);

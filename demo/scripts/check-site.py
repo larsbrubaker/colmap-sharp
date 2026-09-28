@@ -7,6 +7,7 @@
   demo/scripts/check-site.py --out /tmp/site.png        # serve it at /colmap-sharp/, wait for paint, screenshot
   demo/scripts/check-site.py --out /tmp/run.png --autorun               # ...then run the six bundled samples
   demo/scripts/check-site.py --out /tmp/run.png --autorun --task-yield  # the same, yielding with Task.Yield
+  demo/scripts/check-site.py --out /tmp/run.png --autorun --cpu         # the same, PatchMatch on the CPU
 
 The Chrome, CDP, static server and paint-wait plumbing is agg-sharp's (demo/agg-sharp/scripts/
 check-demo-site.py and run-browser-goldens.py), imported rather than copied; only the export it asks is
@@ -104,7 +105,7 @@ def run(arguments):
     page = None
     url = server.url + (subpath + "/" if subpath else "")
     if arguments.autorun:
-        url += "?demo=autorun" + ("&yield=task" if arguments.task_yield else "")
+        url += "?demo=autorun" + ("&yield=task" if arguments.task_yield else "") + ("&gpu=off" if arguments.cpu else "")
     try:
         page = chrome.open_page()
         page.call("Emulation.setDeviceMetricsOverride", {
@@ -151,6 +152,7 @@ def main():
                         help="serve the site under this path, as GitHub Pages does (default colmap-sharp; '' for the root)")
     parser.add_argument("--autorun", action="store_true", help="run the pipeline on the bundled sample photos")
     parser.add_argument("--task-yield", action="store_true", help="with --autorun: yield with Task.Yield, not setTimeout")
+    parser.add_argument("--cpu", action="store_true", help="with --autorun: no GPU device, PatchMatch on the CPU")
     return run(parser.parse_args())
 
 

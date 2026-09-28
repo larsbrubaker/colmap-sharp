@@ -343,6 +343,8 @@ namespace ColmapDemo
 			}
 			else
 			{
+				// The whole exception, for the developer console (the panel shows only the message).
+				Console.WriteLine("COLMAP_DEMO run failed: " + error);
 				this.statusLine.Text = "The run stopped with an error:";
 				this.errorLine.Text = error?.Message ?? "Unknown error";
 				this.errorLine.Visible = true;
