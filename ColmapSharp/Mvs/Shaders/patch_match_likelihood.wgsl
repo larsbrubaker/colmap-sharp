@@ -176,7 +176,7 @@ fn pm_transform_pdf_to_cdf(probs: ptr<function, array<f32, PM_NUM_SRC_IMAGES>>) 
 	// (which no sampling threshold exceeds). Written out, since WGSL leaves 1 / 0 open.
 	if ((bitcast<u32>(prob_sum) & 0x7FFFFFFFu) == 0u) {
 		for (var i = 0i; i < PM_NUM_SRC_IMAGES; i = i + 1i) {
-			(*probs)[i] = bitcast<f32>(PM_NAN_BITS);
+			(*probs)[i] = pm_quiet_nan();
 		}
 
 		return;

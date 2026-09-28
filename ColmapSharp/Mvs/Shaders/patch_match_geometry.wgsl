@@ -49,6 +49,15 @@
 // A quiet NaN. Which NaN C# produces (for 0 / 0) depends on the CPU; no caller looks at the bits.
 const PM_NAN_BITS: u32 = 0x7FC00000u;
 
+// That quiet NaN as a float. Never write bitcast<f32>(PM_NAN_BITS): it is a const-expression, and
+// WGSL makes a const-expression that evaluates to NaN a shader-creation error. Tint (the browser)
+// enforces that and naga (desktop wgpu) does not, so the kernels failed to compile only in the
+// browser. Loading the bits from a var makes the bitcast a runtime expression.
+fn pm_quiet_nan() -> f32 {
+	var bits = PM_NAN_BITS;
+	return bitcast<f32>(bits);
+}
+
 // a / b with IEEE-754's result for a zero divisor, which WGSL leaves indeterminate: NaN for
 // 0 / 0 or NaN / 0, otherwise an infinity whose sign is the XOR of the operands' signs.
 fn pm_div(a: f32, b: f32) -> f32 {
@@ -63,7 +72,7 @@ fn pm_div(a: f32, b: f32) -> f32 {
 	}
 
 	if ((a_bits & 0x7FFFFFFFu) == 0u) {
-		return bitcast<f32>(PM_NAN_BITS);
+		return pm_quiet_nan();
 	}
 
 	return bitcast<f32>(((a_bits ^ b_bits) & 0x80000000u) | 0x7F800000u);

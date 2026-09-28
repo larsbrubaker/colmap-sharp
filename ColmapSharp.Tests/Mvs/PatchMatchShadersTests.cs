@@ -194,6 +194,49 @@ public class PatchMatchShadersTests
 	private static string Words(ulong value)
 		=> string.Create(CultureInfo.InvariantCulture, $"vec2<u32>(0x{(uint)value:X8}u, 0x{(uint)(value >> 32):X8}u)");
 
+	// C#-only. WGSL makes a const-expression that evaluates to NaN or an infinity a shader-creation
+	// error. Dawn's Tint (the browser) enforces it; naga (wgpu, the desktop) accepted
+	// bitcast<f32>(PM_NAN_BITS), so every PatchMatch kernel failed to compile only in the browser
+	// ("value nan cannot be represented as 'f32'"). A non-finite f32 has to be built from a runtime value.
+	[Test]
+	public async Task Kernels_NeverBitcastAConstantToANonFiniteFloat()
+	{
+		var parts = PatchMatchGpuKernels.All.SelectMany(PatchMatchGpuKernels.Parts).Distinct().ToList();
+		// Comments stripped: the shaders explain the rule by quoting the forbidden form.
+		var texts = parts.Select(part => Regex.Replace(PatchMatchShaders.Load(part), "//[^\\n]*", string.Empty)).ToList();
+
+		var constants = new Dictionary<string, uint>(StringComparer.Ordinal);
+		foreach (Match match in texts.SelectMany(text => Regex.Matches(text, @"const\s+(\w+)\s*:\s*u32\s*=\s*0x([0-9A-Fa-f]+)u\s*;")))
+		{
+			constants[match.Groups[1].Value] = uint.Parse(match.Groups[2].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+		}
+
+		int constantBitcasts = 0;
+		for (int i = 0; i < parts.Count; i++)
+		{
+			foreach (Match match in Regex.Matches(texts[i], @"bitcast<f32>\(\s*(?:0x([0-9A-Fa-f]+)u|(\w+))\s*\)"))
+			{
+				uint bits;
+				if (match.Groups[1].Success)
+				{
+					bits = uint.Parse(match.Groups[1].Value, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+				}
+				else if (!constants.TryGetValue(match.Groups[2].Value, out bits))
+				{
+					continue;
+				}
+
+				constantBitcasts++;
+				await Assert.That((bits & 0x7F800000u) != 0x7F800000u)
+					.IsTrue()
+					.Because($"{parts[i]}: {match.Value} is a const-expression with non-finite bits 0x{bits:X8}");
+			}
+		}
+
+		// The finite literals in pm_random_next_uniform, so the scan is known to see bitcasts at all.
+		await Assert.That(constantBitcasts).IsGreaterThanOrEqualTo(2);
+	}
+
 	/// <summary>
 	/// An independent reading of FormatF32's literals: the significand and power of two as a
 	/// double (exact for every f32), narrowed to float (exact too).
