@@ -162,12 +162,15 @@ public sealed class AutomaticReconstructionOptions
 	public MesherType Mesher { get; set; } = MesherType.Poisson;
 
 	/// <summary>
-	/// The Poisson mesher's trim: surface parts whose sample density is below this are cut away.
-	/// COLMAP's automatic reconstruction always uses PoissonMeshingOptions' default (10), which
-	/// trims a small photo set's sparse fused cloud to nothing; C#-only so a host can lower it
-	/// (0 keeps the whole watertight surface).
+	/// The Poisson mesher's options (used when <see cref="Mesher"/> is Poisson). C#-only: COLMAP's
+	/// automatic reconstruction always meshes with PoissonMeshingOptions' defaults (depth 13,
+	/// trim 10), and trim 10 cuts a small photo set's fused cloud down to nothing, so a host needs
+	/// to lower it (0 keeps the whole watertight surface); a lower depth also meshes much faster.
+	/// No quality preset sets any of these fields, so PointWeight, Depth, Color and Trim reach the
+	/// mesher as the host leaves them; NumThreads is ignored here and replaced by
+	/// <see cref="NumThreads"/>, as COLMAP does. The defaults are COLMAP's.
 	/// </summary>
-	public double PoissonTrim { get; set; } = 10.0;
+	public PoissonMeshingOptions PoissonMeshing { get; } = new();
 
 	/// <summary>
 	/// Whether to texture each dense model's mesh with the photos' colors after meshing (only

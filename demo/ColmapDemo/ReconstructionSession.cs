@@ -45,6 +45,16 @@ namespace ColmapDemo
 		/// </summary>
 		public double PoissonTrim { get; set; } = 5;
 
+		/// <summary>
+		/// Poisson octree depth (COLMAP's default is 13). Measured on 6 synthetic 320x240 views
+		/// (8104 fused points, trim 5): depth 13 meshed in 48.8 s, depth 11 in 10.9 s with the very
+		/// same mesh (60805 faces; the octree adapts to the sampling, so the extra levels were
+		/// never used), depth 10 in 7.7 s with 60697 faces. On all three, 99.5% of the fused points
+		/// lie within 1% of the model's size from a mesh vertex. 11 keeps the full result on this set
+		/// and leaves headroom for the denser clouds of 1000 px photos, at a quarter of the time.
+		/// </summary>
+		public int PoissonDepth { get; set; } = 11;
+
 		/// <summary>The GPU for PatchMatch, or null to run it on the CPU.</summary>
 		public IComputeDevice ComputeDevice { get; set; }
 	}
@@ -132,10 +142,12 @@ namespace ColmapDemo
 				Quality = this.settings.Quality,
 				Dense = true,
 				Mesher = AutomaticReconstructionOptions.MesherType.Poisson,
-				PoissonTrim = this.settings.PoissonTrim,
 				Texture = true,
 				ComputeDevice = this.settings.ComputeDevice,
 			};
+
+			options.PoissonMeshing.Trim = this.settings.PoissonTrim;
+			options.PoissonMeshing.Depth = this.settings.PoissonDepth;
 
 			var models = new ReconstructionManager();
 			var controller = new AutomaticReconstructionController(options, models)

@@ -145,8 +145,13 @@ public sealed partial class AutomaticReconstructionController : BaseController
 			optionManager.FeatureMatching.GuidedMatching = false;
 		}
 
-		// C#-only (see AutomaticReconstructionOptions.PoissonTrim); no preset touches trim.
-		optionManager.PoissonMeshing.Trim = options.PoissonTrim;
+		// C#-only: the host's Poisson options (AutomaticReconstructionOptions.PoissonMeshing). No
+		// preset sets them; NumThreads comes from options.NumThreads just below, as in COLMAP.
+		PoissonMeshingOptions poisson = optionManager.PoissonMeshing;
+		poisson.PointWeight = options.PoissonMeshing.PointWeight;
+		poisson.Depth = options.PoissonMeshing.Depth;
+		poisson.Color = options.PoissonMeshing.Color;
+		poisson.Trim = options.PoissonMeshing.Trim;
 
 		optionManager.FeatureExtraction.NumThreads = options.NumThreads;
 		optionManager.FeatureMatching.NumThreads = options.NumThreads;
@@ -198,6 +203,9 @@ public sealed partial class AutomaticReconstructionController : BaseController
 	/// Done/Total count the units of the sub-stage reporting, so they restart when it changes.
 	/// </summary>
 	public IProgress<ControllerProgress>? Progress { get; set; }
+
+	/// <summary>The Poisson options the meshing step runs with (for tests).</summary>
+	internal PoissonMeshingOptions EffectivePoissonMeshing => optionManager.PoissonMeshing;
 
 	/// <summary>The database holding the features and matches.</summary>
 	public Database Database => database;

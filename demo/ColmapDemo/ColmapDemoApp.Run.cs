@@ -51,6 +51,15 @@ namespace ColmapDemo
 
 		private string activeStage;
 
+		/// <summary>Raised on the UI thread once the sparse points are in the viewport.</summary>
+		public event Action SparseShown;
+
+		/// <summary>
+		/// Raised on the UI thread when a run ends, after the viewport and panel show the outcome:
+		/// the result, or null when it was cancelled or failed.
+		/// </summary>
+		public event Action<SessionResult> RunFinished;
+
 		/// <summary>Whether a run is in progress.</summary>
 		public bool IsRunning => this.runCancel != null;
 
@@ -78,7 +87,11 @@ namespace ColmapDemo
 
 			var session = new ReconstructionSession(new SessionSettings { ComputeDevice = this.computeDevice });
 			session.ProgressChanged += p => UiThread.RunOnIdle(() => this.OnProgress(p));
-			session.SparseReady += points => UiThread.RunOnIdle(() => this.viewport.ShowPoints(points));
+			session.SparseReady += points => UiThread.RunOnIdle(() =>
+			{
+				this.viewport.ShowPoints(points);
+				this.SparseShown?.Invoke();
+			});
 			var photos = new List<string>(this.photoPaths);
 
 			// The pipeline is CPU work that runs synchronously between its awaits, so it goes to the
@@ -240,6 +253,7 @@ namespace ColmapDemo
 			}
 
 			this.UpdatePhotoCount();
+			this.RunFinished?.Invoke(result);
 		}
 
 		private void SetStageRow(string stage, string suffix, Color color)
