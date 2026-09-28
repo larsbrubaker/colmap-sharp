@@ -26,11 +26,8 @@ tests. Precedents: agg-sharp's `examples/AggSharpDemo` (three-project shape, Pag
 
 ## Phases (each step: tests green, reviewed, merged)
 
-1. **Skeleton + Mac pipeline.** Submodule, three projects building; UI: drop/open images, image
-   strip, Run, progress per stage, 3D viewport (agg `SceneDrawContext`, trackball) showing sparse
-   points then the mesh, Download (PLY/OBJ). Library side is done (`Util/ObjWriter`, `RunAsync` yields between
-   units). Demo: PLY → preview mesh bridge; when the texture atlas is empty write an
-   untextured OBJ (the controller still names `texture.png`, as COLMAP does).
+1. **Mac polish.** Phase 1 is in (Mac window runs photos → textured mesh, GPU PatchMatch, Save
+   OBJ/PLY with `<name>.png`). Not yet exercised in a live window: Cancel, Save, trackball.
 2. **Browser + Pages.** Browser head builds and links (`-p:LinkEmdawnWebGpu=true`), `.github/
    workflows/pages.yml` publishes `demo/ColmapDemo.Browser`, GPU compute device via `CreateAsync`
    (first real browser run of GPU PatchMatch — the C4 smoke check), download as a file (zip for
