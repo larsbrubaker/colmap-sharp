@@ -8,6 +8,7 @@ using ColmapSharp.Sensor;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Metadata.Profiles.Exif;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace ColmapDemo.Tests;
@@ -82,6 +83,29 @@ public class PhotoDecoderTests
 
 		await Assert.That(bitmap.Width).IsEqualTo(10);
 		await Assert.That(bitmap.Height).IsEqualTo(5);
+	}
+
+	[Test]
+	public async Task ShrinkingKeepsTheExifFocalLengthInPixelsTrue()
+	{
+		// A 4 mm lens on a sensor with 100 pixels per mm: 400 px at full size. Shrunk to a quarter
+		// of the width, the same lens is 100 px on the smaller image.
+		using var image = new Image<Rgba32>(400, 200, new Rgba32(90, 90, 90));
+		var exif = new ExifProfile();
+		exif.SetValue(ExifTag.FocalLength, new Rational(4, 1));
+		exif.SetValue(ExifTag.FocalPlaneXResolution, new Rational(100, 1));
+		exif.SetValue(ExifTag.FocalPlaneResolutionUnit, (ushort)4);
+		image.Metadata.ExifProfile = exif;
+		using var stream = new MemoryStream();
+		image.Save(stream, new JpegEncoder());
+		byte[] jpeg = stream.ToArray();
+
+		Bitmap full = PhotoDecoder.Decode(jpeg, maxImageSize: 0);
+		Bitmap shrunk = PhotoDecoder.Decode(jpeg, maxImageSize: 100);
+
+		await Assert.That(full.ExifFocalLength()).IsEqualTo(400.0);
+		await Assert.That(shrunk.Width).IsEqualTo(100);
+		await Assert.That(shrunk.ExifFocalLength()!.Value).IsEqualTo(100.0).Within(1e-4);
 	}
 
 	[Test]

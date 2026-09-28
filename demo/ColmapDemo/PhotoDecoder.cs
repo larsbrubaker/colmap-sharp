@@ -2,7 +2,7 @@
 //
 // PhotoDecoder: turns a photo file into the ColmapSharp.Sensor.Bitmap the library reads, and a
 // library Bitmap (the texture atlas) back into an agg ImageBuffer for the viewport and for
-// saving texture.png. The library decodes nothing itself (Sensor/Bitmap.cs), so the demo uses
+// saving the texture PNG. The library decodes nothing itself (Sensor/Bitmap.cs), so the demo uses
 // agg-sharp's ImageIO (ImageSharp) and ExifReader for the focal length.
 // Tests: demo/ColmapDemo.Tests/PhotoDecoderTests.cs.
 //
@@ -54,9 +54,17 @@ namespace ColmapDemo
 
 			if (maxImageSize > 0 && Math.Max(bitmap.Width, bitmap.Height) > maxImageSize)
 			{
-				// Thumbnail keeps the metadata; the EXIF focal length is in millimetres (or 35 mm
-				// equivalent), which the library turns into pixels from the bitmap's own size.
-				bitmap.Thumbnail(maxImageSize);
+				double scale = bitmap.Thumbnail(maxImageSize);
+
+				// The library turns EXIF into a focal length in pixels at the bitmap's current size
+				// only for the 35 mm-equivalent and sensor-database routes. The focal-plane route
+				// multiplies the lens's millimetres by FocalPlaneXResolution (pixels per unit on the
+				// sensor, at the original size), so that has to shrink with the image or the focal
+				// length would stay the full-size one.
+				if (bitmap.GetMetaData("Exif:FocalPlaneXResolution", out float focalPlaneXResolution))
+				{
+					bitmap.SetMetaData("Exif:FocalPlaneXResolution", (float)(focalPlaneXResolution * scale));
+				}
 			}
 
 			return bitmap;

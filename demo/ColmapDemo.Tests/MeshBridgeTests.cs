@@ -2,7 +2,7 @@
 //
 // Tests of MeshBridge (demo/ColmapDemo/MeshBridge.cs) and ReconstructionSession.SaveMesh: the
 // library's PlyMesh reaches agg with its geometry, per-face colors or per-face texture UVs, and a
-// saved mesh is the set of files a viewer needs (OBJ + MTL + texture.png when textured).
+// saved mesh is the set of files a viewer needs (OBJ + MTL + a PNG named after the OBJ when textured).
 
 using ColmapSharp.Util;
 using MatterHackers.Agg;
@@ -75,8 +75,8 @@ public class MeshBridgeTests
 		ReconstructionSession.SaveMesh(result, Path.Combine(dir, "model.obj"));
 
 		await Assert.That(File.Exists(Path.Combine(dir, "model.obj"))).IsTrue();
-		await Assert.That(File.ReadAllText(Path.Combine(dir, "model.mtl"))).Contains("map_Kd texture.png");
-		await Assert.That(File.Exists(Path.Combine(dir, "texture.png"))).IsTrue();
+		await Assert.That(File.ReadAllText(Path.Combine(dir, "model.mtl"))).Contains("map_Kd model.png");
+		await Assert.That(File.Exists(Path.Combine(dir, "model.png"))).IsTrue();
 		Directory.Delete(dir, recursive: true);
 	}
 
@@ -91,7 +91,7 @@ public class MeshBridgeTests
 		string obj = File.ReadAllText(Path.Combine(dir, "model.obj"));
 		await Assert.That(obj).DoesNotContain("mtllib");
 		await Assert.That(obj.Split('\n').Count(l => l.StartsWith("v "))).IsEqualTo(4);
-		await Assert.That(File.Exists(Path.Combine(dir, "texture.png"))).IsFalse();
+		await Assert.That(File.Exists(Path.Combine(dir, "model.png"))).IsFalse();
 		Directory.Delete(dir, recursive: true);
 	}
 

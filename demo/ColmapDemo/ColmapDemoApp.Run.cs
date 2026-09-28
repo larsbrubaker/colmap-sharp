@@ -60,6 +60,12 @@ namespace ColmapDemo
 		/// </summary>
 		public event Action<SessionResult> RunFinished;
 
+		/// <summary>The status line under the stage list.</summary>
+		public string StatusText => this.statusLine.Text;
+
+		/// <summary>Whether the Cancel button can be pressed.</summary>
+		public bool CanCancel => this.cancelButton.Enabled;
+
 		/// <summary>Whether a run is in progress.</summary>
 		public bool IsRunning => this.runCancel != null;
 
@@ -114,6 +120,22 @@ namespace ColmapDemo
 			});
 		}
 
+		/// <summary>Asks the run to stop (what Cancel does). The current step finishes first.</summary>
+		public void RequestCancel()
+		{
+			if (this.runCancel == null || this.runCancel.IsCancellationRequested)
+			{
+				return;
+			}
+
+			this.runCancel.Cancel();
+
+			// A long step (matching, the sparse mapper, meshing) only notices at its next check, so
+			// say the click registered rather than leave a live-looking button.
+			this.cancelButton.Enabled = false;
+			this.statusLine.Text = "Cancelling…";
+		}
+
 		private void AddRunControls(FlowLayoutWidget panel, ThemeConfig theme, string computeNote)
 		{
 			var runButtons = new FlowLayoutWidget(FlowDirection.LeftToRight)
@@ -125,7 +147,7 @@ namespace ColmapDemo
 			this.runButton.Click += (sender, e) => this.StartRun();
 			runButtons.AddChild(this.runButton);
 			this.cancelButton = new ThemedTextButton("Cancel", theme) { Name = "Cancel Button", Enabled = false };
-			this.cancelButton.Click += (sender, e) => this.runCancel?.Cancel();
+			this.cancelButton.Click += (sender, e) => this.RequestCancel();
 			runButtons.AddChild(this.cancelButton);
 			runButtons.AddChild(new HorizontalSpacer());
 			this.saveButton = new ThemedTextButton("Save mesh…", theme) { Name = "Save Mesh Button", Enabled = false };
@@ -187,14 +209,15 @@ namespace ColmapDemo
 			}
 
 			this.runButton.Enabled = !this.IsRunning && this.photoPaths.Count >= MinPhotosToRun;
-			this.cancelButton.Enabled = this.IsRunning;
+			this.cancelButton.Enabled = this.IsRunning && !this.runCancel.IsCancellationRequested;
 			this.saveButton.Enabled = !this.IsRunning && this.lastResult?.Mesh != null;
 			this.addButton.Enabled = !this.IsRunning;
 		}
 
 		private void OnProgress(ControllerProgress progress)
 		{
-			if (!this.IsRunning)
+			// Late reports from a stopping run must not overwrite "Cancelling…".
+			if (!this.IsRunning || this.runCancel.IsCancellationRequested)
 			{
 				return;
 			}
@@ -285,7 +308,7 @@ namespace ColmapDemo
 					{
 						ReconstructionSession.SaveMesh(result, path);
 						this.statusLine.Text = result.IsTextured && !path.EndsWith(".ply", StringComparison.OrdinalIgnoreCase)
-							? $"Saved {Path.GetFileName(path)} with its .mtl and texture.png"
+							? $"Saved {Path.GetFileName(path)} with its .mtl and {Path.GetFileNameWithoutExtension(path)}.png"
 							: $"Saved {Path.GetFileName(path)}";
 					}
 					catch (Exception e)

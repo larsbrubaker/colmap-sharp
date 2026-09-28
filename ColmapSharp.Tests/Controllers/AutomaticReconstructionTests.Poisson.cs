@@ -62,6 +62,7 @@ public partial class AutomaticReconstructionTests
 		await Assert.That(effective.Depth).IsEqualTo(13);
 		await Assert.That(effective.Trim).IsEqualTo(10.0);
 		await Assert.That(effective.PointWeight).IsEqualTo(1.0);
+		await Assert.That(effective.Color).IsTrue();
 		Directory.Delete(testDir, recursive: true);
 	}
 }

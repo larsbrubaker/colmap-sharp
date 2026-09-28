@@ -5,7 +5,8 @@
 // workspace, and hand back the sparse points and the (textured) mesh, converted for the
 // viewport by MeshBridge.cs. ColmapDemoApp drives it from a background task on the Mac and
 // marshals its events to the UI thread; tests and a headless try-out drive it directly.
-// SaveMesh writes the result as OBJ (+ MTL + texture.png) or PLY.
+// SaveMesh writes the result as OBJ (+ MTL + <name>.png) or PLY. Each run's temp workspace is
+// deleted when the run ends (COLMAP_DEMO_KEEP_WORKSPACE=1 keeps it).
 //
 // Its events fire on whatever thread the run is on (the worker, on the Mac); listeners marshal.
 
@@ -55,6 +56,15 @@ namespace ColmapDemo
 		/// </summary>
 		public int PoissonDepth { get; set; } = 11;
 
+		/// <summary>Where each run's temp workspace folder is made.</summary>
+		public string WorkspaceRoot { get; set; } = Path.Combine(Path.GetTempPath(), "ColmapDemo");
+
+		/// <summary>
+		/// Keep the run's workspace (depth maps, fused.ply, meshes) instead of deleting it when the
+		/// run ends: a developer option, on when COLMAP_DEMO_KEEP_WORKSPACE=1.
+		/// </summary>
+		public bool KeepWorkspace { get; set; } = Environment.GetEnvironmentVariable("COLMAP_DEMO_KEEP_WORKSPACE") == "1";
+
 		/// <summary>The GPU for PatchMatch, or null to run it on the CPU.</summary>
 		public IComputeDevice ComputeDevice { get; set; }
 	}
@@ -77,7 +87,7 @@ namespace ColmapDemo
 		/// <summary>The mesh converted for the viewport, or null.</summary>
 		public Mesh PreviewMesh { get; init; }
 
-		/// <summary>The workspace the run wrote into.</summary>
+		/// <summary>The workspace the run wrote into; deleted when the run ended unless KeepWorkspace.</summary>
 		public string WorkspacePath { get; init; }
 
 		/// <summary>Whether a textured mesh came out.</summary>
@@ -131,8 +141,33 @@ namespace ColmapDemo
 		/// <summary>Runs the pipeline on already-decoded photos.</summary>
 		public async Task<SessionResult> RunAsync(InMemoryImageSource images, CancellationToken cancel)
 		{
-			string workspace = Path.Combine(Path.GetTempPath(), "ColmapDemo", DateTime.Now.ToString("yyyyMMdd-HHmmss-fff"));
+			string workspace = Path.Combine(this.settings.WorkspaceRoot, DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N")[..8]);
 			Directory.CreateDirectory(workspace);
+			try
+			{
+				return await this.RunInWorkspaceAsync(images, workspace, cancel).ConfigureAwait(false);
+			}
+			finally
+			{
+				// The result holds everything the app shows and saves, so the depth maps and meshes
+				// on disk (tens of MB a run) go, however the run ended.
+				if (!this.settings.KeepWorkspace)
+				{
+					try
+					{
+						Directory.Delete(workspace, recursive: true);
+					}
+					catch (IOException e)
+					{
+						// Never let cleanup hide the run's own outcome; the OS temp cleaner gets it later.
+						Console.Error.WriteLine($"Could not delete the workspace {workspace}: {e.Message}");
+					}
+				}
+			}
+		}
+
+		private async Task<SessionResult> RunInWorkspaceAsync(InMemoryImageSource images, string workspace, CancellationToken cancel)
+		{
 
 			var options = new AutomaticReconstructionOptions
 			{
@@ -204,8 +239,9 @@ namespace ColmapDemo
 
 		/// <summary>
 		/// Writes <paramref name="result"/>'s mesh to <paramref name="path"/>: a ".ply" path gets a
-		/// PLY, anything else an OBJ (plus an MTL of the same name). A textured mesh also gets
-		/// texture.png beside it; an untextured OBJ carries vertex colors instead.
+		/// PLY, anything else an OBJ (plus an MTL of the same name). A textured mesh also gets its
+		/// texture beside it as a PNG of the same name (model.obj -> model.png), overwriting any
+		/// earlier one; an untextured OBJ carries vertex colors instead.
 		/// </summary>
 		public static void SaveMesh(SessionResult result, string path)
 		{
@@ -217,10 +253,19 @@ namespace ColmapDemo
 			var texturedMesh = new PlyTexturedMesh(result.Mesh);
 			if (result.IsTextured)
 			{
+				// The texture is named after the mesh (model.obj -> model.png) so two meshes saved in
+				// one folder do not share, or overwrite, one texture.png.
 				texturedMesh.FaceUvs = result.FaceUvs.ToList();
-				texturedMesh.TextureFile = AutomaticReconstructionController.TextureFileName;
+				texturedMesh.TextureFile = Path.GetFileNameWithoutExtension(path) + ".png";
 				string texturePath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(path)), texturedMesh.TextureFile);
-				ImageIO.SaveImageData(texturePath, result.Atlas);
+
+				// ImageIO.SaveImageData(string, ...) leaves an existing file alone and reports failure
+				// only through its result; a stream always overwrites, and a failure throws.
+				using var texture = new FileStream(texturePath, FileMode.Create, FileAccess.Write);
+				if (!ImageIO.SaveImageData(texture, ".png", result.Atlas))
+				{
+					throw new IOException($"Could not encode the texture {texturePath}.");
+				}
 			}
 
 			if (string.Equals(Path.GetExtension(path), ".ply", StringComparison.OrdinalIgnoreCase))
