@@ -2932,3 +2932,26 @@ point index; 1882 points, 4 images) but different shuffles (first eight indices
 `1420,1170,73,1630,...` vs `1061,1594,1533,740,...`), so `meshed-delaunay.ply` differed while
 `fused.ply`, `fused.ply.vis` and the depth/normal maps were byte-identical. The test now asserts
 the re-mesh is byte-identical to the first run's mesh, and fails without the reseed.
+
+## 138. AutomaticReconstructionController runs the sparse mapper from a fresh PRNG
+
+**What differs.** COLMAP's `AutomaticReconstructionController` is a `Thread`: `Run` executes on
+a new thread, and `mapper->Run()` runs inline there. With the default `random_seed` of -1,
+RANSAC does not seed, so the mapper draws from that thread's `thread_local` PRNG, which starts
+from the default seed on its first draw (extraction and matching ran on their own threads). The
+port's controller runs on the caller's thread, often a reused pool thread after an `await`, so
+the mapper continued whatever that thread drew before. `RunSparseMapper`
+(`Controllers/AutomaticReconstruction.cs`) now clears the thread's PRNG before building and
+running the mapper, and restores the caller's PRNG afterwards, the same choice as entries 71
+and 121.
+
+**Why.** The same photos must give the same model whatever ran before in the process;
+CLAUDE.md requires sequential and parallel runs to agree. The mapper now sees the stream a
+fresh COLMAP controller thread gives it, so only runs that inherited a used PRNG change.
+
+**Evidence.** `demo/ColmapDemo.Tests/SessionGpuFallbackTests` runs two sessions one after the
+other on pool threads; instrumented, each mapper left its thread with a used PRNG, and about one
+suite run in four the second session's sparse points differed
+(sum of x 191.4505 vs 191.6660, same 197 points), so the mesh had 30624 faces instead of 31843. `AutomaticReconstructionTests.CSharpOnly_UnseededSparseModelIgnoresTheCallersPrng`
+(C#-only) runs the sparse stages twice on one thread after seeding it differently; `cameras.bin`
+differed without the fresh PRNG, and all sparse files are byte-identical with it.

@@ -136,7 +136,7 @@ namespace ColmapDemo
 
 			if (await Task.WhenAny(request, Task.Delay(GpuCheckTimeout)) != request)
 			{
-				_ = request.ContinueWith(late => late.Result.Dispose(), TaskContinuationOptions.OnlyOnRanToCompletion);
+				_ = ReleaseLateDeviceAsync(request);
 				return (null, $"No GPU (it did not answer in {GpuCheckTimeout.TotalSeconds:0} s); depth maps run on the CPU.");
 			}
 
@@ -147,6 +147,20 @@ namespace ColmapDemo
 			catch (Exception e)
 			{
 				return (null, "No GPU (" + ColmapDemoApp.FirstLine(e.Message) + "); depth maps run on the CPU.");
+			}
+
+			// A device that settles after the timeout is not used, so it is released; a request that
+			// fails that late is only logged, so its fault is observed rather than left unobserved.
+			static async Task ReleaseLateDeviceAsync(Task<WebGpuComputeDevice> late)
+			{
+				try
+				{
+					(await late)?.Dispose();
+				}
+				catch (Exception e)
+				{
+					Console.WriteLine("COLMAP_DEMO late GPU request failed: " + ColmapDemoApp.FirstLine(e.Message));
+				}
 			}
 		}
 

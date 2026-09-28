@@ -32,9 +32,13 @@
 //   the stages listed on Progress.
 // - option_manager_.Write(sparse/project.ini) has no counterpart (no ini registry), and the
 //   vocabulary-tree matcher is never chosen (docs/CPP_DIVERGENCES.md entry 134).
+// - COLMAP's controller is its own new thread; this one runs on the caller's. The sparse
+//   mapper therefore gets a fresh thread PRNG (restoring the caller's after), so an unseeded
+//   run does not continue whatever the calling pool thread drew before (entry 138).
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Feature;
+using ColmapSharp.Mathematics;
 using ColmapSharp.Mvs;
 using ColmapSharp.Scene;
 using ColmapSharp.Sensor;
@@ -397,6 +401,26 @@ public sealed partial class AutomaticReconstructionController : BaseController
 			}
 		}
 
+		// COLMAP runs the mapper on the controller's own new thread, so an unseeded run
+		// (random_seed -1) draws from a PRNG that starts at the default seed. Here it runs on the
+		// caller's thread, often a reused pool thread, so it gets a fresh PRNG too, and the
+		// caller's own is restored afterwards (docs/CPP_DIVERGENCES.md entry 138).
+		Mt19937? callerPrng = RandomUtils.Prng;
+		RandomUtils.Prng = null;
+		try
+		{
+			RunMapper(sparsePath);
+		}
+		finally
+		{
+			RandomUtils.Prng = callerPrng;
+		}
+	}
+
+	// The body of RunSparseMapper after the resume check: builds the selected mapper, runs it
+	// and writes its models to sparsePath.
+	private void RunMapper(string sparsePath)
+	{
 		Func<string, Bitmap?> readImage = options.Images!.Read;
 		BaseController mapper;
 		switch (options.Mapper)
