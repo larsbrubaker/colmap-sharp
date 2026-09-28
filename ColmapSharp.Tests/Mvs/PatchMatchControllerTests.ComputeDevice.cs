@@ -71,22 +71,11 @@ public partial class PatchMatchControllerTests
 			ComputeDevice = device,
 		};
 
-		var messages = new List<(LogLevel Level, string Message)>();
-		Action<LogLevel, string>? previousSink = Log.Sink;
-		Log.Sink = (level, message) =>
-		{
-			lock (messages)
-			{
-				messages.Add((level, message));
-			}
-		};
-		try
+		IReadOnlyList<(LogLevel Level, string Message)> messages;
+		using (var capture = new LogCapture())
 		{
 			await controller.RunAsync(progress: new SynchronousProgress<ControllerProgress>(reports));
-		}
-		finally
-		{
-			Log.Sink = previousSink;
+			messages = capture.Messages;
 		}
 
 		Dictionary<string, byte[]> fallbackMaps = TakeMaps(fixture);

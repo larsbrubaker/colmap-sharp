@@ -514,16 +514,8 @@ public partial class PatchMatchControllerTests
 	[NotInParallel(nameof(Log))]
 	public async Task Warnings_GoToTheLog()
 	{
-		var messages = new List<(LogLevel Level, string Message)>();
-		Action<LogLevel, string>? previousSink = Log.Sink;
-		Log.Sink = (level, message) =>
-		{
-			lock (messages)
-			{
-				messages.Add((level, message));
-			}
-		};
-		try
+		IReadOnlyList<(LogLevel Level, string Message)> messages;
+		using (var capture = new LogCapture())
 		{
 			var fixture = new Fixture();
 			fixture.WriteConfig(fixture.Names[0], "__auto__, 3", fixture.Names[1], fixture.Names[0] + ", " + fixture.Names[2]);
@@ -533,10 +525,7 @@ public partial class PatchMatchControllerTests
 			options.AllowMissingFiles = true;
 			PatchMatchController controller = fixture.Open(options);
 			controller.SetUpProblem(options, 0);
-		}
-		finally
-		{
-			Log.Sink = previousSink;
+			messages = capture.Messages;
 		}
 
 		await Assert.That(messages).Contains(m => m.Level == LogLevel.Warning && m.Message.StartsWith("Ignoring reference image ", StringComparison.Ordinal));

@@ -89,25 +89,14 @@ public partial class AutomaticReconstructionTests
 		var twin = new ReferenceComputeDevice();
 		(Dictionary<string, byte[]> gpu, List<string> gpuMessages) = RunDense(resume: true, device: twin);
 
-		var warnings = new List<string>();
-		Action<LogLevel, string>? previousSink = Log.Sink;
-		Log.Sink = (level, message) =>
-		{
-			lock (warnings)
-			{
-				warnings.Add(message);
-			}
-		};
 		Dictionary<string, byte[]> nonBlocking;
 		List<string> nonBlockingMessages;
+		List<string> warnings;
 		var browserTwin = new ReferenceComputeDevice { SupportsBlockingWait = false };
-		try
+		using (var capture = new LogCapture())
 		{
 			(nonBlocking, nonBlockingMessages) = RunDense(resume: true, device: browserTwin);
-		}
-		finally
-		{
-			Log.Sink = previousSink;
+			warnings = capture.Messages.Select(entry => entry.Message).ToList();
 		}
 
 		try

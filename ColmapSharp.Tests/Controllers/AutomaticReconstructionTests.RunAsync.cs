@@ -55,24 +55,15 @@ public partial class AutomaticReconstructionTests
 		File.Delete(Path.Combine(densePath, "meshed-delaunay.ply"));
 		var browserTwin = new ReferenceComputeDevice { SupportsBlockingWait = false };
 		var messages = new List<string>();
-		var warnings = new List<string>();
-		Action<LogLevel, string>? previousSink = Log.Sink;
-		Log.Sink = (level, message) =>
-		{
-			lock (warnings)
-			{
-				warnings.Add(message);
-			}
-		};
-		try
+		// LogCapture keeps only this run's warnings; a plain sink also collected the export and
+		// texturing warnings of tests running in parallel and made the check below flaky.
+		List<string> warnings;
+		using (var capture = new LogCapture())
 		{
 			AutomaticReconstructionController gpuController = NewAsyncTestController(
 				asyncWorkspace, images, resume: true, device: browserTwin, new MessageCollector(messages));
 			await gpuController.RunAsync();
-		}
-		finally
-		{
-			Log.Sink = previousSink;
+			warnings = capture.Messages.Select(entry => entry.Message).ToList();
 		}
 
 		Dictionary<string, byte[]> gpuFiles = WorkspaceFiles(asyncWorkspace);
