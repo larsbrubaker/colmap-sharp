@@ -58,8 +58,9 @@ public sealed partial class AutomaticReconstructionController
 
 	// Port of RunDenseMapper. An iterator, so that the synchronous and asynchronous entries share
 	// it (see RunStages): it yields each model's PatchMatchController for the caller to run and
-	// goes on with that model's fusion when resumed. A yield break is COLMAP's return.
-	private IEnumerable<PatchMatchController> RunDenseMapper(bool deviceIsAwaited)
+	// goes on with that model's fusion when resumed, and yields null after each other step (a
+	// yield point for RunAsync, which Run skips). A yield break is COLMAP's return.
+	private IEnumerable<PatchMatchController?> RunDenseMapper(bool deviceIsAwaited)
 	{
 		Heading(DenseStage);
 
@@ -123,6 +124,7 @@ public sealed partial class AutomaticReconstructionController
 				};
 				undistorter.SetCheckIfStoppedFunc(CheckIfStopped);
 				undistorter.Run();
+				yield return null;
 			}
 
 			if (CheckIfStopped())
@@ -144,10 +146,18 @@ public sealed partial class AutomaticReconstructionController
 					ComputeDevice = deviceIsAwaited ? options.ComputeDevice : BlockingComputeDevice(),
 				};
 
-				if (!RunFusionAndMeshing(i, densePath, fusedPath, meshingPath, bitmaps))
+				if (!RunFusion(i, densePath, fusedPath, bitmaps))
 				{
 					yield break;
 				}
+
+				yield return null;
+				if (!RunMeshing(densePath, fusedPath, meshingPath))
+				{
+					yield break;
+				}
+
+				yield return null;
 			}
 
 			if (CheckIfStopped())
@@ -160,14 +170,14 @@ public sealed partial class AutomaticReconstructionController
 			if (needTexture && File.Exists(meshingPath))
 			{
 				RunTexturing(i, densePath, meshingPath, undistortedImages);
+				yield return null;
 			}
 		}
 	}
 
-	// Fusion and meshing of model i: the part of RunDenseMapper's loop after PatchMatch.
-	// Returns false where that loop returns (once stopped, and after the advancing-front
-	// warning).
-	private bool RunFusionAndMeshing(int i, string densePath, string fusedPath, string meshingPath, IBitmapSource bitmaps)
+	// Fusion of model i: the part of RunDenseMapper's loop after PatchMatch. Returns false
+	// where that loop returns (once stopped).
+	private bool RunFusion(int i, string densePath, string fusedPath, IBitmapSource bitmaps)
 	{
 		if (CheckIfStopped())
 		{
@@ -190,6 +200,13 @@ public sealed partial class AutomaticReconstructionController
 			StereoFusion.WritePointsVisibility(fusedPath + ".vis", fuser.GetFusedPointsVisibility());
 		}
 
+		return true;
+	}
+
+	// Meshing of model i: the part of RunDenseMapper's loop after fusion. Returns false where
+	// that loop returns (once stopped, and after the advancing-front warning).
+	private bool RunMeshing(string densePath, string fusedPath, string meshingPath)
+	{
 		if (CheckIfStopped())
 		{
 			return false;

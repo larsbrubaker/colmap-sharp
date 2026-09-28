@@ -19,7 +19,11 @@
 // - RunAsync (C#-only) runs the same stages and awaits PatchMatch on the host's compute device,
 //   for a device that cannot be waited on synchronously (the browser). Both share RunStages,
 //   an iterator that yields each PatchMatchController for its caller to run blocking or
-//   awaited, so the two entries differ only in that step.
+//   awaited, so the two entries differ only in that step. RunStages also yields null at the
+//   boundaries between units of work (stages, dense steps and models); Run ignores those and
+//   RunAsync awaits YieldAsync there (and PatchMatch awaits it between problems), so a
+//   single-threaded host (the browser) gets its event loop back. The yields do no work, so
+//   Run and RunAsync still write the same bytes.
 // - database.db is a Database (InMemoryDatabase unless the host passes one), so a re-run only
 //   skips extraction and matching when the host passes the same database back.
 // - COLMAP's LOG_HEADING1 lines become Progress reports whose Stage names the step. Every
@@ -227,12 +231,26 @@ public sealed partial class AutomaticReconstructionController : BaseController
 	public override void Run()
 	{
 		// PatchMatchController.Run is the one place this blocks on the device, and
-		// BlockingComputeDevice only hands it a device that allows that.
-		foreach (PatchMatchController patchMatch in RunStages(deviceIsAwaited: false))
+		// BlockingComputeDevice only hands it a device that allows that. The null steps are
+		// RunAsync's yield points; Run never gives the thread up.
+		foreach (PatchMatchController? patchMatch in RunStages(deviceIsAwaited: false))
 		{
-			patchMatch.Run(CancellationToken, Under(DenseStage));
+			patchMatch?.Run(CancellationToken, Under(DenseStage));
 		}
 	}
+
+	/// <summary>
+	/// C#-only: what <see cref="RunAsync"/> awaits between units of work - after each stage,
+	/// after each dense step of a model (undistortion, fusion, meshing, texturing) and after
+	/// each PatchMatch problem - so a single-threaded host (the browser, where .NET has one
+	/// thread) can render and handle input while a reconstruction runs. Null (the default)
+	/// awaits <see cref="Task.Yield"/>. A stop requested while it is awaited (through
+	/// <see cref="BaseController.CancellationToken"/> or the stop function) takes effect before
+	/// the next unit starts. <see cref="Run"/> never calls it. The work between two yields is
+	/// one whole step: a stage that is a single long call (e.g. feature matching or the sparse
+	/// mapper) does not yield inside.
+	/// </summary>
+	public Func<ValueTask>? YieldAsync { get; set; }
 
 	/// <summary>
 	/// <see cref="Run"/>, awaiting PatchMatch on
@@ -240,22 +258,35 @@ public sealed partial class AutomaticReconstructionController : BaseController
 	/// device works, including one that cannot be waited on synchronously: the entry point for a
 	/// host in the browser. The stages, their order, outputs, progress and stop semantics
 	/// (<see cref="BaseController.CancellationToken"/> and the stop function) are those of Run.
-	/// Every stage but PatchMatch on the device is CPU work that runs synchronously inside this
-	/// call, so a UI host should start it off its UI thread where it has one.
+	/// Between units of work it awaits <see cref="YieldAsync"/> (by default
+	/// <see cref="Task.Yield"/>), so the host's event loop runs; each unit itself is CPU work that
+	/// runs synchronously, so a UI host with more than one thread should still start it off its
+	/// UI thread.
 	/// </summary>
 	public async Task RunAsync()
 	{
-		foreach (PatchMatchController patchMatch in RunStages(deviceIsAwaited: true))
+		Func<ValueTask> yieldToHost = YieldAsync ?? YieldToEventLoop;
+		foreach (PatchMatchController? patchMatch in RunStages(deviceIsAwaited: true))
 		{
+			if (patchMatch is null)
+			{
+				await yieldToHost().ConfigureAwait(false);
+				continue;
+			}
+
+			patchMatch.YieldHook = yieldToHost;
 			await patchMatch.RunAsync(CancellationToken, Under(DenseStage)).ConfigureAwait(false);
 		}
 	}
 
+	private static async ValueTask YieldToEventLoop() => await Task.Yield();
+
 	// The body of COLMAP's Run, shared by Run and RunAsync: every stage runs here except
 	// PatchMatch, whose controller is yielded for the caller to run (blocking or awaiting)
-	// before the enumeration resumes with fusion. deviceIsAwaited says which the caller does,
-	// and so whether the host's device may be used when it cannot be waited on synchronously.
-	private IEnumerable<PatchMatchController> RunStages(bool deviceIsAwaited)
+	// before the enumeration resumes with fusion. A null is a yield point between units of work
+	// (see YieldAsync). deviceIsAwaited says which the caller does, and so whether the host's
+	// device may be used when it cannot be waited on synchronously.
+	private IEnumerable<PatchMatchController?> RunStages(bool deviceIsAwaited)
 	{
 		if (CheckIfStopped())
 		{
@@ -265,6 +296,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		if (options.Extraction)
 		{
 			RunFeatureExtraction();
+			yield return null;
 		}
 
 		if (CheckIfStopped())
@@ -275,6 +307,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		if (options.Matching)
 		{
 			RunFeatureMatching();
+			yield return null;
 		}
 
 		if (CheckIfStopped())
@@ -285,6 +318,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		if (options.Sparse)
 		{
 			RunSparseMapper();
+			yield return null;
 		}
 
 		if (CheckIfStopped())
@@ -294,7 +328,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 
 		if (options.Dense)
 		{
-			foreach (PatchMatchController patchMatch in RunDenseMapper(deviceIsAwaited))
+			foreach (PatchMatchController? patchMatch in RunDenseMapper(deviceIsAwaited))
 			{
 				yield return patchMatch;
 			}

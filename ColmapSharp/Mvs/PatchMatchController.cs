@@ -35,7 +35,9 @@
 //   PatchMatch run itself parallel (NumThreads on the CPU, or on the one device), which
 //   gives the same outputs (docs/CPP_DIVERGENCES.md, entry 122).
 // - Run blocks; RunAsync awaits the compute device, for a host (the browser) whose device
-//   cannot be waited on synchronously.
+//   cannot be waited on synchronously. RunAsync also awaits YieldHook (C#-only, set by
+//   AutomaticReconstructionController.RunAsync) after each problem, so a single-threaded host
+//   gets its event loop back between problems; Run never sets it.
 // - Cancellation is COLMAP's CheckIfStopped, checked before each problem; as in COLMAP a
 //   stop is not an error, so Run returns normally. Unlike COLMAP, which finishes the
 //   problem in flight, the token also reaches PatchMatch.RunAsync, so a stop aborts the running
@@ -177,6 +179,7 @@ public sealed class PatchMatchController
 				}
 
 				progress?.Report(new ControllerProgress("PatchMatch photometric", ++done, total, ProblemMessage(problemIdx, backend)));
+				await YieldToHostAsync().ConfigureAwait(false);
 			}
 		}
 
@@ -191,8 +194,19 @@ public sealed class PatchMatchController
 
 			string stage = options.GeomConsistency ? "PatchMatch geometric" : "PatchMatch photometric";
 			progress?.Report(new ControllerProgress(stage, ++done, total, ProblemMessage(problemIdx, backend)));
+			await YieldToHostAsync().ConfigureAwait(false);
 		}
 	}
+
+	/// <summary>
+	/// C#-only: awaited by <see cref="RunAsync"/> after each problem, so a single-threaded host
+	/// (the browser) gets its event loop back between problems. Null (the default, and always
+	/// under <see cref="Run"/>, which blocks on RunAsync and must not wait on a yield) does
+	/// nothing. It runs no PatchMatch work, so the outputs are the same with or without it.
+	/// </summary>
+	internal Func<ValueTask>? YieldHook { get; set; }
+
+	private ValueTask YieldToHostAsync() => YieldHook?.Invoke() ?? ValueTask.CompletedTask;
 
 	/// <summary>
 	/// Processes problem <paramref name="problemIdx"/> under <paramref name="problemOptions"/>
