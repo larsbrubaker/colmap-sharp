@@ -58,8 +58,10 @@ public sealed class RecordingComputeDevice : IComputeDevice
 
 	/// <summary>
 	/// What the double reports. When false (a browser device) <see cref="FlushAsync"/> and
-	/// <see cref="ReadBufferAsync"/> complete asynchronously, so a caller that blocks on them
-	/// instead of awaiting is caught; when true they complete before returning.
+	/// <see cref="ReadBufferAsync"/> stay pending until the caller awaits them (like a map that
+	/// completes only once control returns to the JS event loop), so a caller that blocks on
+	/// them instead of awaiting is caught (DeferredCompletion.cs); when true they complete
+	/// before returning.
 	/// </summary>
 	public bool SupportsBlockingWait { get; set; } = true;
 
@@ -398,7 +400,8 @@ public sealed class RecordingComputeDevice : IComputeDevice
 	{
 		if (!this.SupportsBlockingWait)
 		{
-			return new ValueTask(CompleteLater(fault, canceled, cancellationToken, onSuccess));
+			var deferred = new DeferredCompletion(fault, canceled, cancellationToken, onSuccess);
+			return new ValueTask(deferred, 0);
 		}
 
 		if (fault != null)
@@ -413,23 +416,6 @@ public sealed class RecordingComputeDevice : IComputeDevice
 
 		onSuccess?.Invoke();
 		return default;
-	}
-
-	// The browser's completion: control returns to the caller (the JS event loop) first.
-	private static async Task CompleteLater(Exception? fault, bool canceled, CancellationToken cancellationToken, Action? onSuccess)
-	{
-		await Task.Yield();
-		if (fault != null)
-		{
-			throw fault;
-		}
-
-		if (canceled)
-		{
-			throw new OperationCanceledException(cancellationToken);
-		}
-
-		onSuccess?.Invoke();
 	}
 
 	private void ValidateEntry(RecordingComputeKernel kernel, int group, in ComputeBufferBinding entry, ComputeBindingType type)

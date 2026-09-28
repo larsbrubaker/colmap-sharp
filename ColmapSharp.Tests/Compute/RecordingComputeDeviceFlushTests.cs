@@ -224,6 +224,12 @@ public class RecordingComputeDeviceFlushTests
 		var destination = new byte[4];
 		var read = s.Device.ReadBufferAsync(s.Storage, 0, destination);
 
+		// Like the browser's event loop, nothing completes while the caller keeps running
+		// without yielding, however long that takes. (The double once completed on a pool
+		// thread after Task.Yield, which raced this check and failed it about one run in five.)
+		SpinWait.SpinUntil(() => read.IsCompleted, TimeSpan.FromMilliseconds(100));
+		await Assert.That(read.IsCompleted).IsFalse();
+
 		// Nothing lands in the destination before the task completes, and a write queued after
 		// the read was submitted does not reach it.
 		await Assert.That(destination).IsEquivalentTo(new byte[4], CollectionOrdering.Matching);
