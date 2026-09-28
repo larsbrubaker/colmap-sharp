@@ -28,12 +28,17 @@ tests. Precedents: agg-sharp's `examples/AggSharpDemo` (three-project shape, Pag
 
 1. **Skeleton + Mac pipeline.** Submodule, three projects building; UI: drop/open images, image
    strip, Run, progress per stage, 3D viewport (agg `SceneDrawContext`, trackball) showing sparse
-   points then the mesh, Download (PLY). Library: OBJ(+MTL+texture) writer; `RunAsync`
-   cooperative yields; PLY → preview mesh bridge in the demo.
+   points then the mesh, Download (PLY/OBJ). Library side is done (`Util/ObjWriter`, `RunAsync` yields between
+   units). Demo: PLY → preview mesh bridge; when the texture atlas is empty write an
+   untextured OBJ (the controller still names `texture.png`, as COLMAP does).
 2. **Browser + Pages.** Browser head builds and links (`-p:LinkEmdawnWebGpu=true`), `.github/
    workflows/pages.yml` publishes `demo/ColmapDemo.Browser`, GPU compute device via `CreateAsync`
    (first real browser run of GPU PatchMatch — the C4 smoke check), download as a file (zip for
-   mesh + texture), a Playwright/headless smoke check of the published page.
+   mesh + texture), a Playwright/headless smoke check of the published page. Check that the
+   default `Task.Yield` actually lets the page paint; if not, supply a requestAnimationFrame-
+   backed `YieldAsync`, otherwise make that hook internal. Long single calls still hold the
+   frame: extraction, matching, the sparse mapper (longest), undistortion, CPU PatchMatch per
+   problem, fusion, meshing, texturing.
 3. **Browser drop + video files.** agg-sharp: page-level drag-and-drop into `FileDropDispatcher`;
    video → frames (browser `<video>` seek + canvas; Mac AVFoundation `AVAssetImageGenerator`).
    Demo: frame sampling (every Nth / target count), `DataType.Video`.
@@ -47,5 +52,7 @@ tests. Precedents: agg-sharp's `examples/AggSharpDemo` (three-project shape, Pag
 
 - Browser CPU stages (SIFT, matching, bundle adjustment) run 20–50× slower than desktop; long
   single steps still hold the frame even with yields between units.
+- ImageSharp (agg-sharp's decoder) uses the Six Labors Split License — check before shipping
+  binaries.
 - Nesting agg-sharp inside colmap-sharp means a recursive MatterCAD clone pulls a second
   agg-sharp; MatterCAD should not recurse into `Submodules/colmap-sharp/demo/agg-sharp`.
