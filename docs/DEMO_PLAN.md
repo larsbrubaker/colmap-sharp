@@ -47,7 +47,5 @@ tests. Precedents: agg-sharp's `examples/AggSharpDemo` (three-project shape, Pag
 
 - Browser CPU stages (SIFT, matching, bundle adjustment) run 20–50× slower than desktop; long
   single steps still hold the frame even with yields between units.
-- ImageSharp (agg-sharp's decoder) uses the Six Labors Split License — check before shipping
-  binaries.
 - Nesting agg-sharp inside colmap-sharp means a recursive MatterCAD clone pulls a second
   agg-sharp; MatterCAD should not recurse into `Submodules/colmap-sharp/demo/agg-sharp`.
