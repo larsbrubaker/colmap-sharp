@@ -11,6 +11,12 @@ name: Demo site
 on:
   push:
     branches: [main]
+    # Changes that cannot change the site do not redeploy it.
+    paths-ignore:
+      - 'docs/**'
+      - 'oracle/**'
+      - '**/*.md'
+      - 'ColmapSharp.Tests/**'
   workflow_dispatch:
 
 permissions:

@@ -4,7 +4,9 @@
 // the status line. A run is a ReconstructionSession (ReconstructionSession.cs) started off the
 // UI thread on the Mac (RunOnUiThread false), or on the UI thread in the browser, where there
 // is no other; its events are marshalled here with UiThread.RunOnIdle either way. Each stage's
-// wall time goes to the console as "COLMAP_DEMO stage <name>: <s>" for comparing heads.
+// wall time (StageTimer.cs, stamped on the run's thread) goes to the console as
+// "COLMAP_DEMO stage <name>: <s>" for comparing heads. A GPU that fails mid-run is dropped for
+// the rest of the session (the run itself finishes on the CPU, in ReconstructionSession).
 // The layout of the rest of the panel is in ColmapDemoApp.cs.
 
 using System;
@@ -34,7 +36,13 @@ namespace ColmapDemo
 
 		private readonly Dictionary<string, TextWidget> stageRows = new Dictionary<string, TextWidget>();
 
-		private readonly IComputeDevice computeDevice;
+		// Mutable: the browser hands its device over once the asynchronous request settles, and a GPU
+		// that fails a run is dropped.
+		private IComputeDevice computeDevice;
+
+		private WrappedTextWidget computeNoteLine;
+
+		private bool computeCheckPending;
 
 		private readonly ModelViewport viewport;
 
@@ -46,7 +54,7 @@ namespace ColmapDemo
 
 		private TextWidget statusLine;
 
-		private TextWidget errorLine;
+		private WrappedTextWidget errorLine;
 
 		private CancellationTokenSource runCancel;
 
@@ -54,10 +62,8 @@ namespace ColmapDemo
 
 		private string activeStage;
 
-		// The stage the timing log is on (any progress stage, "Loading photos" included) and when it began.
-		private string timedStage;
-
-		private readonly Stopwatch stageClock = new Stopwatch();
+		// Every progress stage ("Loading photos" included), timed by when each report was made.
+		private readonly StageTimer stageTimer = new StageTimer();
 
 		private readonly Stopwatch runClock = new Stopwatch();
 
@@ -81,7 +87,32 @@ namespace ColmapDemo
 		public bool SaveMeshAsZip { get; set; }
 
 		/// <summary>Each finished stage of the last run and its wall time in seconds, in order.</summary>
-		public List<(string Stage, double Seconds)> StageTimes { get; } = new List<(string Stage, double Seconds)>();
+		public IReadOnlyList<(string Stage, double Seconds)> StageTimes => this.stageTimer.Times;
+
+		/// <summary>
+		/// Whether the head is still finding out if there is a GPU. Run stays disabled meanwhile, so a
+		/// run never starts on the CPU a moment before the GPU would have been there.
+		/// </summary>
+		public bool ComputeCheckPending
+		{
+			get => this.computeCheckPending;
+			set
+			{
+				this.computeCheckPending = value;
+				this.UpdateRunButtons();
+			}
+		}
+
+		/// <summary>
+		/// Sets the GPU later runs use (null for the CPU) and the note under the Run button saying so,
+		/// and ends <see cref="ComputeCheckPending"/>.
+		/// </summary>
+		public void SetComputeDevice(IComputeDevice device, string note)
+		{
+			this.computeDevice = device;
+			this.computeNoteLine.Text = note ?? string.Empty;
+			this.ComputeCheckPending = false;
+		}
 
 		/// <summary>Raised on the UI thread once the sparse points are in the viewport.</summary>
 		public event Action SparseShown;
@@ -104,7 +135,7 @@ namespace ColmapDemo
 		/// <summary>Starts a run over the listed photos (what the Run button does).</summary>
 		public void StartRun()
 		{
-			if (this.IsRunning || this.photoPaths.Count < MinPhotosToRun)
+			if (this.IsRunning || this.computeCheckPending || this.photoPaths.Count < MinPhotosToRun)
 			{
 				return;
 			}
@@ -122,8 +153,7 @@ namespace ColmapDemo
 
 			this.statusLine.Text = "Starting…";
 			this.UpdatePhotoCount();
-			this.StageTimes.Clear();
-			this.timedStage = null;
+			this.stageTimer.Reset();
 			this.runClock.Restart();
 
 			var session = new ReconstructionSession(new SessionSettings
@@ -132,7 +162,14 @@ namespace ColmapDemo
 				MaxImageSize = this.MaxImageSize,
 				YieldAsync = this.YieldAsync,
 			});
-			session.ProgressChanged += p => UiThread.RunOnIdle(() => this.OnProgress(p));
+			// Stamped here, on the run's thread as the report is made: the UI thread may get to it much
+			// later (in the browser, not before the run's next yield).
+			session.ProgressChanged += p =>
+			{
+				TimeSpan at = this.runClock.Elapsed;
+				UiThread.RunOnIdle(() => this.OnProgress(p, at));
+			};
+			session.GpuFailed += fault => UiThread.RunOnIdle(() => this.OnGpuFailed(fault));
 			session.SparseReady += points => UiThread.RunOnIdle(() =>
 			{
 				this.viewport.ShowPoints(points);
@@ -148,15 +185,18 @@ namespace ColmapDemo
 				try
 				{
 					SessionResult result = await session.RunAsync(photos, cancel.Token).ConfigureAwait(false);
-					UiThread.RunOnIdle(() => this.OnRunFinished(result, null, cancelled: false));
+					TimeSpan endedAt = this.runClock.Elapsed;
+					UiThread.RunOnIdle(() => this.OnRunFinished(result, null, cancelled: false, endedAt));
 				}
 				catch (OperationCanceledException)
 				{
-					UiThread.RunOnIdle(() => this.OnRunFinished(null, null, cancelled: true));
+					TimeSpan endedAt = this.runClock.Elapsed;
+					UiThread.RunOnIdle(() => this.OnRunFinished(null, null, cancelled: true, endedAt));
 				}
 				catch (Exception e)
 				{
-					UiThread.RunOnIdle(() => this.OnRunFinished(null, e, cancelled: false));
+					TimeSpan endedAt = this.runClock.Elapsed;
+					UiThread.RunOnIdle(() => this.OnRunFinished(null, e, cancelled: false, endedAt));
 				}
 			};
 
@@ -207,15 +247,13 @@ namespace ColmapDemo
 			runButtons.AddChild(this.saveButton);
 			panel.AddChild(runButtons);
 
-			if (!string.IsNullOrEmpty(computeNote))
+			// Wrapped: a GPU failure's note can be longer than the panel is wide.
+			this.computeNoteLine = new WrappedTextWidget(computeNote ?? string.Empty, pointSize: 9, textColor: HintColor)
 			{
-				panel.AddChild(new TextWidget(computeNote, pointSize: 9, textColor: HintColor)
-				{
-					HAnchor = HAnchor.Left,
-					Margin = new BorderDouble(0, 0, 0, 4),
-					AutoExpandBoundsToText = true,
-				});
-			}
+				HAnchor = HAnchor.Stretch,
+				Margin = new BorderDouble(0, 0, 0, 4),
+			};
+			panel.AddChild(this.computeNoteLine);
 
 			panel.AddChild(new TextWidget("Stages", pointSize: 11, bold: true)
 			{
@@ -242,11 +280,11 @@ namespace ColmapDemo
 			};
 			panel.AddChild(this.statusLine);
 
-			this.errorLine = new TextWidget(string.Empty, pointSize: 9, textColor: ErrorColor)
+			// Wrapped within the panel; FirstLine keeps it to a line or two.
+			this.errorLine = new WrappedTextWidget(string.Empty, pointSize: 9, textColor: ErrorColor)
 			{
-				HAnchor = HAnchor.Left,
+				HAnchor = HAnchor.Stretch,
 				Margin = new BorderDouble(0, 0, 0, 4),
-				AutoExpandBoundsToText = true,
 				Visible = false,
 			};
 			panel.AddChild(this.errorLine);
@@ -260,13 +298,13 @@ namespace ColmapDemo
 				return;
 			}
 
-			this.runButton.Enabled = !this.IsRunning && this.photoPaths.Count >= MinPhotosToRun;
+			this.runButton.Enabled = !this.IsRunning && !this.computeCheckPending && this.photoPaths.Count >= MinPhotosToRun;
 			this.cancelButton.Enabled = this.IsRunning && !this.runCancel.IsCancellationRequested;
 			this.saveButton.Enabled = !this.IsRunning && this.lastResult?.Mesh != null;
 			this.addButton.Enabled = !this.IsRunning;
 		}
 
-		private void OnProgress(ControllerProgress progress)
+		private void OnProgress(ControllerProgress progress, TimeSpan at)
 		{
 			// Late reports from a stopping run must not overwrite "Cancelling…".
 			if (!this.IsRunning || this.runCancel.IsCancellationRequested)
@@ -274,12 +312,7 @@ namespace ColmapDemo
 				return;
 			}
 
-			if (progress.Stage != this.timedStage)
-			{
-				this.EndTimedStage();
-				this.timedStage = progress.Stage;
-				this.stageClock.Restart();
-			}
+			this.stageTimer.Observe(progress.Stage, at);
 
 			if (this.stageRows.ContainsKey(progress.Stage) && progress.Stage != this.activeStage)
 			{
@@ -303,22 +336,27 @@ namespace ColmapDemo
 				: message;
 		}
 
-		// Closes the stage the timing log is on, if any.
-		private void EndTimedStage()
+		// The session goes on on the CPU; this drops the GPU for the rest of the app's life, since a
+		// device that failed once is not worth a second failed run.
+		private void OnGpuFailed(Exception fault)
 		{
-			if (this.timedStage != null)
-			{
-				double seconds = this.stageClock.Elapsed.TotalSeconds;
-				this.StageTimes.Add((this.timedStage, seconds));
-				Console.WriteLine($"COLMAP_DEMO stage {this.timedStage}: {seconds:F1} s");
-				this.timedStage = null;
-			}
+			(this.computeDevice as IDisposable)?.Dispose();
+			this.computeDevice = null;
+			this.computeNoteLine.Text = $"The GPU failed ({FirstLine(fault.Message)}); depth maps now run on the CPU.";
 		}
 
-		private void OnRunFinished(SessionResult result, Exception error, bool cancelled)
+		/// <summary>The first line of <paramref name="message"/>, cut to fit a panel line or two.</summary>
+		public static string FirstLine(string message)
 		{
-			this.EndTimedStage();
-			Console.WriteLine($"COLMAP_DEMO run: {this.runClock.Elapsed.TotalSeconds:F1} s");
+			const int MaxLength = 160;
+			string line = (message ?? string.Empty).Split('\n')[0].TrimEnd('\r');
+			return line.Length > MaxLength ? line.Substring(0, MaxLength - 1) + "…" : line;
+		}
+
+		private void OnRunFinished(SessionResult result, Exception error, bool cancelled, TimeSpan endedAt)
+		{
+			this.stageTimer.Finish(endedAt);
+			Console.WriteLine($"COLMAP_DEMO run: {endedAt.TotalSeconds:F1} s");
 			this.runCancel?.Dispose();
 			this.runCancel = null;
 			this.lastResult = result;
@@ -346,7 +384,8 @@ namespace ColmapDemo
 				// The whole exception, for the developer console (the panel shows only the message).
 				Console.WriteLine("COLMAP_DEMO run failed: " + error);
 				this.statusLine.Text = "The run stopped with an error:";
-				this.errorLine.Text = error?.Message ?? "Unknown error";
+				// The panel has room for a line; the whole exception went to the console.
+				this.errorLine.Text = FirstLine(error?.Message ?? "Unknown error");
 				this.errorLine.Visible = true;
 			}
 
@@ -400,7 +439,7 @@ namespace ColmapDemo
 					}
 					catch (Exception e)
 					{
-						this.errorLine.Text = "Could not save: " + e.Message;
+						this.errorLine.Text = "Could not save: " + FirstLine(e.Message);
 						this.errorLine.Visible = true;
 					}
 				});

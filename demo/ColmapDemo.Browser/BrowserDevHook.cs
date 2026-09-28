@@ -3,11 +3,18 @@
 // BrowserDevHook: the browser twin of ColmapDemo.Mac/DevAutoRun.cs, driven by the page's query
 // string so demo/scripts/check-site.py can run the pipeline unattended:
 //
-//   ?demo=autorun     load the bundled sample photos (wwwroot/samples, six 320x240 renders of
-//                     the library tests' synthetic textured scene) and press Run
+//   ?demo=autorun     load the bundled sample photos (wwwroot/samples) and press Run
 //   ?demo=samples     only load them, for a person to press Run
 //   &yield=task       yield with Task.Yield instead of a setTimeout task (BrowserYield.cs)
 //   gpu=off           no GPU device: PatchMatch on the CPU (read by Program.cs at startup)
+//
+// The samples are our own synthetic renders, not photos: views 0-5 of 6 at 320x240 from
+// RenderTexturedScene in ColmapSharp.Tests/Controllers/AutomaticReconstructionTests.CSharpOnly.cs
+// (a ray-traced unit sphere before a wall, both carrying a 3D value-noise texture; cameras 12
+// degrees apart on an arc). To regenerate them, call that method as
+// RenderTexturedScene(i, numViews: 6, width: 320, height: 240) for i = 0..5 from a scratch
+// program (it is private to the test class, so copy it or make it internal) and write each
+// Bitmap as wwwroot/samples/view{i}.png. ColmapDemo.Tests runs the pipeline on them too.
 //
 // Without a demo parameter it does nothing. Progress is read through Program.cs's RunState export.
 

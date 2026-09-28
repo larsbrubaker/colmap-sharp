@@ -9,6 +9,8 @@
 // SaveMesh writes the result as OBJ (+ MTL + <name>.png) or PLY; SaveMeshZip puts the OBJ's
 // files in one zip, since a browser download is one file. Each run's temp workspace is
 // deleted when the run ends (COLMAP_DEMO_KEEP_WORKSPACE=1 keeps it).
+// When the GPU fails during the dense stage, the run goes on without it: GpuFailed is raised and
+// the dense stage is run again on the CPU in the same workspace, from the sparse model on disk.
 //
 // Its events fire on whatever thread the run is on (the worker, on the Mac); listeners marshal.
 
@@ -19,6 +21,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ColmapDemo.Compute;
 using ColmapSharp.Compute;
 using ColmapSharp.Controllers;
 using ColmapSharp.Scene;
@@ -121,6 +124,12 @@ namespace ColmapDemo
 		public event Action<IReadOnlyList<ColoredPoint>> SparseReady;
 
 		/// <summary>
+		/// The GPU failed during the run, with the fault; the run goes on on the CPU. The session
+		/// never uses the device again; the host owns it, and should dispose it and stop offering it.
+		/// </summary>
+		public event Action<Exception> GpuFailed;
+
+		/// <summary>
 		/// Decodes <paramref name="photoPaths"/> and runs the whole pipeline, synchronously on the
 		/// calling thread between awaits (call it from a background task in a desktop UI).
 		/// Throws <see cref="OperationCanceledException"/> when <paramref name="cancel"/> fires.
@@ -130,6 +139,9 @@ namespace ColmapDemo
 			Func<ValueTask> yieldToHost = this.settings.YieldAsync ?? YieldToEventLoop;
 			var images = new InMemoryImageSource();
 			var names = new HashSet<string>(StringComparer.Ordinal);
+
+			// A turn for the host before the first decode too, so "Starting..." gets painted.
+			await yieldToHost().ConfigureAwait(false);
 			for (int i = 0; i < photoPaths.Count; i++)
 			{
 				cancel.ThrowIfCancellationRequested();
@@ -183,46 +195,26 @@ namespace ColmapDemo
 
 		private async Task<SessionResult> RunInWorkspaceAsync(InMemoryImageSource images, string workspace, CancellationToken cancel)
 		{
-
-			var options = new AutomaticReconstructionOptions
-			{
-				WorkspacePath = workspace,
-				Images = images,
-				Data = AutomaticReconstructionOptions.DataType.Individual,
-				Quality = this.settings.Quality,
-				Dense = true,
-				Mesher = AutomaticReconstructionOptions.MesherType.Poisson,
-				Texture = true,
-				ComputeDevice = this.settings.ComputeDevice,
-			};
-
-			options.PoissonMeshing.Trim = this.settings.PoissonTrim;
-			options.PoissonMeshing.Depth = this.settings.PoissonDepth;
-
-			var models = new ReconstructionManager();
-			var controller = new AutomaticReconstructionController(options, models)
-			{
-				CancellationToken = cancel,
-				YieldAsync = this.settings.YieldAsync,
-			};
-
+			FaultWatchingComputeDevice gpu = this.settings.ComputeDevice == null ? null : new FaultWatchingComputeDevice(this.settings.ComputeDevice);
 			IReadOnlyList<ColoredPoint> sparse = null;
-			controller.Progress = new SyncProgress(p =>
+			ReconstructionManager models;
+			AutomaticReconstructionController controller = this.CreateController(images, workspace, gpu, cancel, retry: false, s => sparse = s, () => sparse, out models);
+			try
 			{
-				// The dense stage's heading is the first report after the sparse mapper finished and
-				// wrote the models, so the points are complete here (reported on the run's thread,
-				// which is the only one touching the models).
-				if (sparse == null && p.Stage == AutomaticReconstructionController.DenseStage)
-				{
-					sparse = MeshBridge.SparsePoints(models);
-					this.SparseReady?.Invoke(sparse);
-				}
+				await controller.RunAsync().ConfigureAwait(false);
+			}
+			catch (Exception e) when (gpu?.Fault != null && !cancel.IsCancellationRequested && sparse != null)
+			{
+				// The GPU failed in the dense stage (the sparse points are out, so the mapper is done).
+				// The sparse model is on disk and every finished depth map too, so a controller that
+				// skips extraction and matching reads the model back and PatchMatch skips the problems
+				// that have their maps; what is left runs on the CPU.
+				Console.WriteLine("COLMAP_DEMO GPU failed, retrying the dense stage on the CPU: " + e);
+				this.GpuFailed?.Invoke(gpu.Fault);
+				controller = this.CreateController(images, workspace, null, cancel, retry: true, s => sparse = s, () => sparse, out models);
+				await controller.RunAsync().ConfigureAwait(false);
+			}
 
-				this.ProgressChanged?.Invoke(p);
-			});
-
-			controller.Setup();
-			await controller.RunAsync().ConfigureAwait(false);
 			cancel.ThrowIfCancellationRequested();
 
 			if (sparse == null)
@@ -251,6 +243,68 @@ namespace ColmapDemo
 				PreviewMesh = hasMesh ? MeshBridge.ToAggMesh(mesh, atlas, uvs) : null,
 				WorkspacePath = workspace,
 			};
+		}
+
+		// A controller for the run, or (retry) for re-running only the sparse read-back and the dense
+		// stage in the workspace a first controller left: extraction and matching are off, and the
+		// progress it repeats from before the dense stage is not reported again.
+		private AutomaticReconstructionController CreateController(
+			InMemoryImageSource images,
+			string workspace,
+			IComputeDevice device,
+			CancellationToken cancel,
+			bool retry,
+			Action<IReadOnlyList<ColoredPoint>> setSparse,
+			Func<IReadOnlyList<ColoredPoint>> getSparse,
+			out ReconstructionManager modelsOut)
+		{
+			var options = new AutomaticReconstructionOptions
+			{
+				WorkspacePath = workspace,
+				Images = images,
+				Data = AutomaticReconstructionOptions.DataType.Individual,
+				Quality = this.settings.Quality,
+				Dense = true,
+				Mesher = AutomaticReconstructionOptions.MesherType.Poisson,
+				Texture = true,
+				ComputeDevice = device,
+				Extraction = !retry,
+				Matching = !retry,
+			};
+
+			options.PoissonMeshing.Trim = this.settings.PoissonTrim;
+			options.PoissonMeshing.Depth = this.settings.PoissonDepth;
+
+			var models = new ReconstructionManager();
+			modelsOut = models;
+			var controller = new AutomaticReconstructionController(options, models)
+			{
+				CancellationToken = cancel,
+				YieldAsync = this.settings.YieldAsync,
+			};
+
+			controller.Progress = new SyncProgress(p =>
+			{
+				if (retry && p.Stage == AutomaticReconstructionController.SparseStage)
+				{
+					return;
+				}
+
+				// The dense stage's heading is the first report after the sparse mapper finished and
+				// wrote the models, so the points are complete here (reported on the run's thread,
+				// which is the only one touching the models).
+				if (getSparse() == null && p.Stage == AutomaticReconstructionController.DenseStage)
+				{
+					IReadOnlyList<ColoredPoint> points = MeshBridge.SparsePoints(models);
+					setSparse(points);
+					this.SparseReady?.Invoke(points);
+				}
+
+				this.ProgressChanged?.Invoke(p);
+			});
+
+			controller.Setup();
+			return controller;
 		}
 
 		/// <summary>

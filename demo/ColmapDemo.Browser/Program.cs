@@ -4,7 +4,8 @@
 // twin of ColmapDemo.Mac/Program.cs. Set up as agg-sharp's
 // examples/AggSharpDemo/AggSharpDemo.Browser/Program.cs is (demo/agg-sharp/examples/BrowserHost/
 // README.md says why each piece is here), plus what a pipeline run needs on a page: one thread,
-// so the run shares it and yields (BrowserYield.cs); the GPU device made asynchronously; small
+// so the run shares it and yields (BrowserYield.cs); the GPU device made asynchronously after
+// the window is up, with a timeout (Run waits for it); small
 // photos; saves as one zip download. BrowserDevHook.cs is the scripted-run hook (?demo=autorun)
 // and the RunState export demo/scripts/check-site.py polls.
 
@@ -36,6 +37,9 @@ namespace ColmapDemo
 		/// still gives SIFT enough texture to match (the Mac default is 1000).
 		/// </summary>
 		public const int BrowserMaxImageSize = 640;
+
+		/// <summary>How long the GPU request may take before the app goes on without a GPU.</summary>
+		private static readonly TimeSpan GpuCheckTimeout = TimeSpan.FromSeconds(10);
 
 		/// <summary>The page's status line writer; null outside a browser.</summary>
 		private static IJSInProcessRuntime pageScript;
@@ -70,46 +74,29 @@ namespace ColmapDemo
 				// "This browser cannot run WebGPU" arrives before there is a canvas to draw it on.
 				BrowserSystemWindow.ReportStatus = Report;
 
-				// PatchMatch on the GPU when the page gets a WebGPU adapter; the browser can never block
-				// on the GPU, so the device is made (and later read back) asynchronously.
-				// ?gpu=off (BrowserDevHook.cs) skips it, to time and check the CPU path on the same page.
-				WebGpuComputeDevice gpu = null;
-				string computeNote;
-				if (BrowserDevHook.GpuOff(pageScript))
-				{
-					computeNote = "GPU off (?gpu=off); depth maps run on the CPU.";
-				}
-				else
-				{
-					try
-					{
-						gpu = await WebGpuComputeDevice.CreateAsync(raiseComputeLimits: true, isBrowser: () => true);
-						computeNote = "Depth maps run on the GPU.";
-					}
-					catch (Exception e)
-					{
-						computeNote = "No GPU (" + e.Message + "); depth maps run on the CPU.";
-					}
-				}
-
-				Console.WriteLine("COLMAP_DEMO compute: " + computeNote);
-
 				var systemWindow = new SystemWindow(1200, 800)
 				{
 					Title = "ColmapSharp — photos to mesh",
 				};
 				// The browser host does not deliver dropped files yet (docs/DEMO_PLAN.md phase 3).
-				app = new ColmapDemoApp(fileDropSupported: false, gpu, computeNote)
+				// The window comes up before the GPU check, which can take a while (or never answer),
+				// and Run waits for the check.
+				app = new ColmapDemoApp(fileDropSupported: false, null, "Checking for a GPU…")
 				{
 					RunOnUiThread = true,
 					YieldAsync = BrowserYield.YieldAsync,
 					MaxImageSize = BrowserMaxImageSize,
 					SaveMeshAsZip = true,
+					ComputeCheckPending = true,
 				};
 				systemWindow.AddChild(app);
 				systemWindow.ShowAsSystemWindow();
 
 				Report(string.Empty);
+
+				(WebGpuComputeDevice gpu, string computeNote) = await CreateGpuAsync();
+				Console.WriteLine("COLMAP_DEMO compute: " + computeNote);
+				app.SetComputeDevice(gpu, computeNote);
 
 				await BrowserDevHook.AttachAsync(app, baseAddress, pageScript);
 			}
@@ -121,6 +108,46 @@ namespace ColmapDemo
 			}
 
 			await host.RunAsync();
+		}
+
+		/// <summary>
+		/// The GPU PatchMatch runs on, or null and why not. The browser can never block on the GPU, so
+		/// the device is made (and later read back) asynchronously; a request that has not settled in
+		/// <see cref="GpuCheckTimeout"/> counts as no GPU, and a device that arrives after that is
+		/// released. ?gpu=off (BrowserDevHook.cs) skips the request, to time the CPU path.
+		/// </summary>
+		[SupportedOSPlatform("browser")]
+		private static async Task<(WebGpuComputeDevice Device, string Note)> CreateGpuAsync()
+		{
+			if (BrowserDevHook.GpuOff(pageScript))
+			{
+				return (null, "GPU off (?gpu=off); depth maps run on the CPU.");
+			}
+
+			Task<WebGpuComputeDevice> request;
+			try
+			{
+				request = WebGpuComputeDevice.CreateAsync(raiseComputeLimits: true, isBrowser: () => true).AsTask();
+			}
+			catch (Exception e)
+			{
+				return (null, "No GPU (" + ColmapDemoApp.FirstLine(e.Message) + "); depth maps run on the CPU.");
+			}
+
+			if (await Task.WhenAny(request, Task.Delay(GpuCheckTimeout)) != request)
+			{
+				_ = request.ContinueWith(late => late.Result.Dispose(), TaskContinuationOptions.OnlyOnRanToCompletion);
+				return (null, $"No GPU (it did not answer in {GpuCheckTimeout.TotalSeconds:0} s); depth maps run on the CPU.");
+			}
+
+			try
+			{
+				return (await request, "Depth maps run on the GPU.");
+			}
+			catch (Exception e)
+			{
+				return (null, "No GPU (" + ColmapDemoApp.FirstLine(e.Message) + "); depth maps run on the CPU.");
+			}
 		}
 
 		/// <summary>

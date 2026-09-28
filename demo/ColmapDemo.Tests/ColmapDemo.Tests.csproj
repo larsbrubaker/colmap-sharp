@@ -23,4 +23,9 @@
 		<ProjectReference Include="..\ColmapDemo\ColmapDemo.csproj" />
 	</ItemGroup>
 
+	<!-- The browser head's bundled sample photos, for the session tests that run the whole pipeline. -->
+	<ItemGroup>
+		<None Include="..\ColmapDemo.Browser\wwwroot\samples\*.png" Link="samples\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
+
 </Project>
