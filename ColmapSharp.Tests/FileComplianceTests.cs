@@ -7,8 +7,9 @@
 // Differences from MatterCAD's copy: the root is found by walking up to ColmapSharp.sln
 // (not a fixed ../../.. from this file), scripts (.py, .sh) and the oracle's C/C++ harnesses
 // (.c, .cc, .cpp, .h) are measured as well as .cs, and the excluded trees are this repo's:
-// build output, the C++ reference checkout and the oracle's Python venv. It also fails on
-// git conflict markers left in any text file (a merge once let them slip into a doc), and
+// build output, the C++ reference checkout, the oracle's Python venv and the demo's agg-sharp
+// submodule (the demo's own projects under demo/ are measured like the library). It also fails
+// on git conflict markers left in any text file (a merge once let them slip into a doc), and
 // checks the WGSL shader header convention (see WgslHeaderProblem). WGSL shaders
 // (ColmapSharp/Mvs/Shaders/*.wgsl) are measured against the same 800-line limit.
 
@@ -68,6 +69,8 @@ public class FileComplianceTests
 		"cpp-reference",
 		// The oracle's Python venv, which holds pycolmap and numpy.
 		"oracle/.venv",
+		// The demo's agg-sharp submodule: a separate repository with its own rules.
+		"demo/agg-sharp",
 	};
 
 	/// <summary>
@@ -340,11 +343,13 @@ public class FileComplianceTests
 			WriteSourceFile(Path.Combine(root, "cpp-reference", "src", "Reference.cs"));
 			WriteSourceFile(Path.Combine(root, "oracle", ".venv", "lib", "Vendored.py"));
 			WriteSourceFile(Path.Combine(root, "obj", "Generated.cs"));
+			WriteSourceFile(Path.Combine(root, "demo", "agg-sharp", "Foreign.cs"));
+			WriteSourceFile(Path.Combine(root, "demo", "ColmapDemo", "Demo.cs"));
 
 			var files = GetAllProjectFiles(root);
 
 			await Assert.That(files.Select(f => Path.GetFileName(f)).OrderBy(f => f, StringComparer.Ordinal).ToList())
-				.IsEquivalentTo(new List<string> { "Harness.c", "Harness.cc", "Harness.cpp", "Harness.h", "Kept.cs", "Kept.py", "Kernel.wgsl" });
+				.IsEquivalentTo(new List<string> { "Demo.cs", "Harness.c", "Harness.cc", "Harness.cpp", "Harness.h", "Kept.cs", "Kept.py", "Kernel.wgsl" });
 		}
 		finally
 		{

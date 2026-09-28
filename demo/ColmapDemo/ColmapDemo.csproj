@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- The demo app itself: layout, image list and (later) the pipeline run and 3D preview. Both heads
+	     consume this one assembly, so nothing here may reference a platform project - that would pull a
+	     desktop window host into the wasm publish, or the browser host into the mac build (the same rule
+	     as agg-sharp's examples/AggSharpDemo/AggSharpDemo, which this copies). -->
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>disable</Nullable>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<RootNamespace>ColmapDemo</RootNamespace>
+		<Company>Lars Brubaker</Company>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\ColmapSharp\ColmapSharp.csproj" />
+		<ProjectReference Include="..\agg-sharp\agg\Agg.csproj" />
+		<ProjectReference Include="..\agg-sharp\Gui\Gui.csproj" />
+		<ProjectReference Include="..\agg-sharp\VectorMath\VectorMath.csproj" />
+	</ItemGroup>
+
+</Project>

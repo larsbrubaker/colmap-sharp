@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+	<!-- The browser head: ColmapDemoApp on a canvas, set up exactly as agg-sharp's
+	     examples/AggSharpDemo/AggSharpDemo.Browser is (demo/agg-sharp/examples/BrowserHost/README.md says
+	     why each piece is here). Publish with -p:LinkEmdawnWebGpu=true for a build that paints; without
+	     it the WebGPU entry points are unbacked and the page says it cannot render. -->
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>disable</Nullable>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<RootNamespace>ColmapDemo</RootNamespace>
+		<Company>Lars Brubaker</Company>
+		<!-- The [JSExport] on PaintState: the interop generator emits unsafe marshalling code, so the switch
+		     is required for a single attribute (SYSLIB1075). -->
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.11" />
+		<!-- Only so `dotnet run` has a static file server to serve the app out of; never published. -->
+		<PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.11" PrivateAssets="all" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\ColmapDemo\ColmapDemo.csproj" />
+		<ProjectReference Include="..\agg-sharp\PlatformBrowser\PlatformBrowser.csproj" />
+	</ItemGroup>
+
+	<!-- Declares PlatformBrowser's JS modules as this project's static web assets; a ProjectReference alone
+	     only copies them to the output folder, which Blazor does not serve. -->
+	<Import Project="..\agg-sharp\PlatformBrowser\build\PlatformBrowser.targets" />
+
+	<!-- Links emdawnwebgpu when asked (-p:LinkEmdawnWebGpu=true) and always filters the desktop wgpu-native
+	     library back out of the browser output. -->
+	<Import Project="..\agg-sharp\WebGpu\build\WebGpuBrowser.targets" />
+
+</Project>
