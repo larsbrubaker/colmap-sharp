@@ -62,14 +62,10 @@ blocks (the top and side sweeps), and the split model shares no images with the 
      already ported), Individual vs Video, single camera, CLAHE. Results go in
      `docs/BENCHMARK.md`, and the demo's defaults may change from them.
 1. **Silhouettes.**
-   - 1a: automatic segmentation in `Segmentation/`:
-     - background model: the per-pixel temporal median, with an Otsu threshold on L* as the
-       fallback;
-     - a trimap;
-     - a GrabCut-style GMM plus Potts refinement via `MinSTGraphCut`;
-     - opening sized to the object's width, to drop the cable;
-     - the largest component, with holes filled.
-     It outputs an `IImageSource` of masks. Accept: IoU ≥ 0.97 against the true masks.
+   - 1a is in (`Segmentation/SilhouetteSegmenter`). Open: check IoU ≥ 0.97 against the 0a
+     true masks; on the mouse, frames 096–099 (f120) still lose a notch where the lit underside
+     matches the wall. A close-up object filling the frame is reported as not found (unmasked).
+     GPU twin for stage 10: `BackgroundModel.Build`.
    - 1a+: temporal consistency for video (Lars's idea). A single-frame error — a bite where the
      lit underside matches the wall, a channel cut by label text — rarely repeats in the
      neighbouring frames.
