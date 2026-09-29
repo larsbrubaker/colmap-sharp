@@ -44,6 +44,19 @@ blocks (the top and side sweeps), and the split model shares no images with the 
      tolerance. Report each metric over several mapper seeds (mean and worst): on the CLAHE
      mouse frames both our mapper and pycolmap split into two models on roughly 1 in 10–20
      seeds, so a single seed can mislead.
+   - 0d (Lars's plan): 3D-printed reference models, so real captures have a true mesh.
+     - Design a set that spans the hard cases:
+       - the same shape in black matte, white and multicolour filament;
+       - concavities and thin parts;
+       - a smooth featureless blob;
+       - a mouse-like body.
+     - Score: align the reconstruction to the source mesh (Sim3, then ICP, since real captures
+       have no true poses), then report accuracy, completeness and F-score as for synthetic
+       scenes.
+     - Check each print against its mesh at a few measured points (calipers), so print error
+       (~0.1–0.2 mm, shrink) is known and the F-score τ sits above it.
+     - Watch for layer lines: they add texture a real object may lack. Include a sanded or
+       painted copy of one shape.
    - 0c: real captures (the mouse at f40/f80/f120, stored as a release asset with a checksummed
      manifest, not in git). A baseline matrix: Low / High / Extreme (affine + DSP + guided, all
      already ported), Individual vs Video, single camera, CLAHE. Results go in
