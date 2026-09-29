@@ -11,7 +11,7 @@ tests. Precedents: agg-sharp's `examples/AggSharpDemo` (three-project shape, Pag
 - Lives in this repo under `demo/`, with agg-sharp as a git submodule at `demo/agg-sharp`. The
   library (`ColmapSharp/`) never references agg-sharp; only the demo does.
 - Projects copying AggSharpDemo's shape: `demo/ColmapDemo` (shared app, no platform references),
-  `demo/ColmapDemo.Mac` (Exe + PlatformMac), `demo/ColmapDemo.Windows` (Exe + PlatformWin32,
+  `demo/ColmapDemo.Mac` (Exe + PlatformMac), `demo/ColmapDemo.Windows` (WinExe + PlatformWin32,
   `net10.0-windows`), `demo/ColmapDemo.Browser` (Blazor WASM + PlatformBrowser,
   both agg `.targets` imports, `index.html` with `<base href="./">`).
 - Generic platform capabilities go to agg-sharp (MatterCAD's litmus test: would a DemoRunner in the

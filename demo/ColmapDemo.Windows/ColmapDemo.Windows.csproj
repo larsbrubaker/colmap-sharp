@@ -1,9 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<!-- The Windows head: a window around ColmapDemoApp, nothing else, the twin of ColmapDemo.Mac.
-	     agg-sharp's WinForms host needs net10.0-windows. Exe rather than WinExe keeps the console,
-	     where the COLMAP_DEMO_* and AGG_SMOKE_* runs print their results. The library itself stays
-	     pure managed; only this head reaches native code, through agg-sharp's platform project. -->
+	     agg-sharp's WinForms host needs net10.0-windows. WinExe, so launching it from Visual Studio or
+	     Explorer opens only the app window, not an empty console beside it. The COLMAP_DEMO_* and
+	     AGG_SMOKE_* runs still print their results: Program.cs keeps redirected output and otherwise
+	     attaches to the terminal it was started from (PowerShell and cmd don't wait for a WinExe;
+	     use Start-Process -Wait there, or Git Bash, which does). The library itself stays pure
+	     managed; only this head reaches native code, through agg-sharp's platform project and the
+	     console attach. -->
 
 	<PropertyGroup>
 		<TargetFramework>net10.0-windows</TargetFramework>
@@ -11,7 +15,7 @@
 		     on demo/ColmapDemo.sln fails on a Mac. With it this head compiles anywhere but still only
 		     runs on Windows, just as ColmapDemo.Mac compiles anywhere but only runs on a Mac. -->
 		<EnableWindowsTargeting>true</EnableWindowsTargeting>
-		<OutputType>Exe</OutputType>
+		<OutputType>WinExe</OutputType>
 		<Nullable>disable</Nullable>
 		<ImplicitUsings>disable</ImplicitUsings>
 		<RootNamespace>ColmapDemo</RootNamespace>
