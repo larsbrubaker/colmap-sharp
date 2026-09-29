@@ -34,16 +34,10 @@ blocks (the top and side sweeps), and the split model shares no images with the 
 0. **Benchmark harness.**
    - 0a is in: `Mvs/Testing/SyntheticObjectScene` (DarkObject, TexturedSphere, TexturelessBox;
      frames, one camera, object-fixed CamFromWorld, mesh, true masks).
-   - 0b: metrics and a runner (`ColmapSharp.Benchmarks` console project plus a fast test):
-     - registered fraction;
-     - pose error after Sim3;
-     - Chamfer, and F-score at τ (Tanks and Temples);
-     - silhouette IoU as the proxy for real captures;
-     - runtime per stage.
-     Results are written as JSON, with `benchmarks/baseline.json` checked in and a regression
-     tolerance. Report each metric over several mapper seeds (mean and worst): on the CLAHE
-     mouse frames both our mapper and pycolmap split into two models on roughly 1 in 10–20
-     seeds, so a single seed can mislead.
+   - 0b is in (`Mvs/Testing/Benchmark`, `ColmapSharp.Benchmarks`, `benchmarks/baseline.json`,
+     ~30 min). Findings: the realistic sphere places 85% but self-calibration collapses the
+     focal (ratio ~0.73, F ~0.01); with true intrinsics F is 0.46 and rotation error 0.38°.
+     DarkObject and TexturelessBox place 0 of 40 at 480x360 (pycolmap too).
    - 0d (Lars's plan): 3D-printed reference models, so real captures have a true mesh.
      - Design a set that spans the hard cases:
        - the same shape in black matte, white and multicolour filament;
