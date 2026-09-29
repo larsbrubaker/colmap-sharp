@@ -9,7 +9,7 @@
 //
 // With --compare it also checks the summary against an earlier JSON (benchmarks/baseline.json)
 // and exits with 1 on a regression (BenchmarkSummary.Regressions: more failed runs, a worst gone
-// null, or a mean worse by more than the tolerance), or 2 when the reports' settings differ.
+// null, or a mean worse than its metric's allowance), or 2 when the reports' settings differ.
 // Without --out the JSON is still built, and compared, but not written.
 //
 // Usage: dotnet run -c Release --project ColmapSharp.Benchmarks -- [options]; --help lists them.
@@ -59,6 +59,7 @@ foreach ((string caseName, SyntheticObjectKind kind, double motion, bool knownIn
 				MapperSeed = mapperSeed,
 				UseTrueMasks = config.UseTrueMasks,
 				KnownIntrinsics = knownIntrinsics,
+				Dense = config.Dense,
 			};
 			options.Surface.TauFraction = config.TauFraction;
 			Console.Error.Write($"{caseName} {kind} scene seed {sceneSeed} mapper seed {mapperSeed} ... ");

@@ -2,7 +2,8 @@
 //
 // AutomaticReconstructionTests (continued): C#-only, not a port. Also pins that the host's
 // BaRefineFocalLength / BaRefineExtraParams (divergence 141) reach the mapper under every
-// preset, defaulting to COLMAP's refinement. Pins that the host's Poisson
+// preset, defaulting to COLMAP's refinement, and that turning them off under the global mapper
+// (which cannot honour them) is refused rather than silently ignored. Pins that the host's Poisson
 // options (AutomaticReconstructionOptions.PoissonMeshing, which COLMAP's controller does not
 // have) reach the meshing step under every quality preset, and that NumThreads still comes from
 // the controller's own NumThreads as in COLMAP. The step passes EffectivePoissonMeshing straight
@@ -79,6 +80,40 @@ public partial class AutomaticReconstructionTests
 		await Assert.That(byDefault.EffectiveMapper.BaRefineExtraParams).IsTrue();
 		await Assert.That(known.EffectiveMapper.BaRefineFocalLength).IsFalse();
 		await Assert.That(known.EffectiveMapper.BaRefineExtraParams).IsFalse();
+		Directory.Delete(testDir, recursive: true);
+	}
+
+	[Test]
+	[Arguments(false, true)]
+	[Arguments(true, false)]
+	public async Task CSharpOnly_BaRefineOffIsRefusedUnderGlobalMapper(bool refineFocal, bool refineExtra)
+	{
+		string testDir = CreateTestDir();
+		AutomaticReconstructionOptions Options(AutomaticReconstructionOptions.MapperType mapper) => new()
+		{
+			WorkspacePath = testDir,
+			Images = new InMemoryImageSource(),
+			Mapper = mapper,
+			BaRefineFocalLength = refineFocal,
+			BaRefineExtraParams = refineExtra,
+		};
+
+		var refused = Assert.Throws<ArgumentException>(
+			() => new AutomaticReconstructionController(Options(AutomaticReconstructionOptions.MapperType.Global), new ReconstructionManager()));
+		await Assert.That(refused!.Message).Contains("incremental and hierarchical mappers only");
+
+		// The mappers that honour the options still accept them, and the global mapper still
+		// accepts COLMAP's default of refining everything.
+		_ = new AutomaticReconstructionController(Options(AutomaticReconstructionOptions.MapperType.Incremental), new ReconstructionManager());
+		_ = new AutomaticReconstructionController(Options(AutomaticReconstructionOptions.MapperType.Hierarchical), new ReconstructionManager());
+		_ = new AutomaticReconstructionController(
+			new AutomaticReconstructionOptions
+			{
+				WorkspacePath = testDir,
+				Images = new InMemoryImageSource(),
+				Mapper = AutomaticReconstructionOptions.MapperType.Global,
+			},
+			new ReconstructionManager());
 		Directory.Delete(testDir, recursive: true);
 	}
 

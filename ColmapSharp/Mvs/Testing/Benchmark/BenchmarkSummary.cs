@@ -15,8 +15,21 @@
 // and per metric of the baseline:
 // - more failed runs than the baseline;
 // - a worst that was a number and is now null (NaN);
-// - a mean worse than the baseline's by more than max(tolerance, tolerance x |baseline|), or a
-//   mean that became null.
+// - a mean worse than the baseline's by more than the metric's allowance (Allowance), or a mean
+//   that became null.
+// The allowance depends on the kind of metric, because one number cannot suit both: a relative
+// 5% with a 0.05 floor let F fall 0.463 -> 0.414 and registration 0.85 -> 0.80 (two lost frames)
+// through unflagged, both of which are real losses.
+// - Counts (registered_fraction, num_models): any change of one unit in one run is flagged, so
+//   the allowance is half of that unit in the mean over the mapper seeds: 0.5 / (frames x seeds)
+//   for the registered fraction, 0.5 / seeds for the model count.
+// - Scores in [0, 1] (precision, recall, f_score, silhouette IoU, excluded_fraction): an absolute
+//   ScoreAllowance (0.02). They are already normalized, so a relative bound would be loose on
+//   high scores and meaningless near 0.
+// - Errors (focal_log_error, rotation_*, position_*, accuracy_pct, completeness_pct): relative,
+//   tolerance x |baseline| (the --tolerance option, 0.05 by default), with an absolute floor of
+//   ErrorFloor (0.01 in the metric's unit: degrees, % of the diagonal, or log focal ratio) so a
+//   baseline of 0 or nearly 0 does not flag noise.
 // Timings are not compared (they depend on the machine). Reports whose "config" blocks differ
 // (frames, size, quality, tau, masks, scene kinds, motion, seeds) are not comparable at all, and
 // Regressions refuses them.
@@ -55,10 +68,43 @@ public static class BenchmarkSummary
 		return summary;
 	}
 
+	/// <summary>Absolute allowance of a mean score in [0, 1] (F-score, IoU, precision, recall).</summary>
+	public const double ScoreAllowance = 0.02;
+
+	/// <summary>Absolute floor under the relative allowance of an error metric, in its own unit.</summary>
+	public const double ErrorFloor = 0.01;
+
+	/// <summary>
+	/// How far the mean of <paramref name="metric"/> may worsen from <paramref name="baseline"/>
+	/// before it counts as a regression (see the file header), for reports over
+	/// <paramref name="frames"/> frames and <paramref name="seeds"/> mapper seeds.
+	/// <paramref name="relativeTolerance"/> applies to error metrics only.
+	/// </summary>
+	public static double Allowance(string metric, double baseline, double relativeTolerance, int frames, int seeds)
+	{
+		switch (metric)
+		{
+			case "registered_fraction":
+				return 0.5 / (Math.Max(frames, 1) * Math.Max(seeds, 1));
+			case "num_models":
+				return 0.5 / Math.Max(seeds, 1);
+			case "precision":
+			case "recall":
+			case "f_score":
+			case "excluded_fraction":
+			case "silhouette_iou_mean":
+			case "silhouette_iou_min":
+				return ScoreAllowance;
+			default:
+				return Math.Max(ErrorFloor, relativeTolerance * Math.Abs(baseline));
+		}
+	}
+
 	/// <summary>
 	/// The regressions of <paramref name="currentJson"/> against <paramref name="baselineJson"/>
-	/// (see the file header), one line each. Throws <see cref="InvalidOperationException"/> when
-	/// the two reports' config blocks differ.
+	/// (see the file header), one line each. <paramref name="tolerance"/> is the relative
+	/// allowance of the error metrics. Throws <see cref="InvalidOperationException"/> when the
+	/// two reports' config blocks differ.
 	/// </summary>
 	public static List<string> Regressions(string baselineJson, string currentJson, double tolerance)
 	{
@@ -73,6 +119,10 @@ public static class BenchmarkSummary
 
 		// Which direction is better, by metric name (the names and directions do not depend on
 		// the values).
+		// The configs are equal, so either report's frame and seed counts do. A report without
+		// them counts as one run of one frame.
+		int frames = Int(baseline["config"]?["frames"]);
+		int seeds = baseline["config"]?["mapper_seeds"]?.AsArray().Count ?? 1;
 		Dictionary<string, bool> higherIsBetter = new BenchmarkMetrics().Values().ToDictionary(v => v.Name, v => v.HigherIsBetter);
 		Dictionary<string, JsonObject> currentCases = Cases(current);
 		var regressions = new List<string>();
@@ -109,7 +159,7 @@ public static class BenchmarkSummary
 				}
 
 				double? mean = Number(now?["mean"]);
-				double allowed = Math.Max(tolerance, tolerance * Math.Abs(b));
+				double allowed = Allowance(metric, b, tolerance, frames, seeds);
 				if (mean is not double m || (higher ? m < b - allowed : m > b + allowed))
 				{
 					regressions.Add($"{key} {metric}: mean {Format(b)} -> {Format(mean)}");

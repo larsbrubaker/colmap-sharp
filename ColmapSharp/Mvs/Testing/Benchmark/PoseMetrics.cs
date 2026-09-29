@@ -170,11 +170,28 @@ public static class PoseMetrics
 		return sorted.Length % 2 == 1 ? sorted[m] : 0.5 * (sorted[m - 1] + sorted[m]);
 	}
 
-	// The chordal L2 mean of the selected rotations: U diag(1, 1, det(U V^T)) V^T for the SVD
-	// U S V^T of their summed rotation matrices.
+	// The chordal L2 mean of the selected rotations, as a quaternion.
 	private static bool TryChordalMean(Quaterniond[] rotations, bool[] use, out Quaterniond mean)
 	{
 		mean = Quaterniond.Identity;
+		if (!TryChordalMeanMatrix(rotations, use, out Matrix3d matrix))
+		{
+			return false;
+		}
+
+		mean = Quaterniond.FromRotationMatrix(matrix).Normalized();
+		return true;
+	}
+
+	/// <summary>
+	/// The chordal L2 mean of the selected rotations as a matrix: U diag(1, 1, det(U V^T)) V^T
+	/// for the SVD U S V^T of their summed rotation matrices. The det(U V^T) factor keeps the
+	/// result a proper rotation (det +1) when the sum's nearest orthogonal matrix is a
+	/// reflection (e.g. Rx(pi) + Ry(pi) + Rz(pi) = -I); without it U V^T would be -I.
+	/// </summary>
+	internal static bool TryChordalMeanMatrix(Quaterniond[] rotations, bool[] use, out Matrix3d mean)
+	{
+		mean = Matrix3d.Identity;
 		Matrix3d sum = Matrix3d.Zero;
 		int count = 0;
 		for (int i = 0; i < rotations.Length; i++)
@@ -199,7 +216,7 @@ public static class PoseMetrics
 
 		Matrix3d u = svd.MatrixU, vt = svd.MatrixV.Transpose();
 		double d = (u * vt).Determinant() < 0 ? -1 : 1;
-		mean = Quaterniond.FromRotationMatrix(u * Matrix3d.FromDiagonal(new Vector3d(1, 1, d)) * vt).Normalized();
+		mean = u * Matrix3d.FromDiagonal(new Vector3d(1, 1, d)) * vt;
 		return true;
 	}
 

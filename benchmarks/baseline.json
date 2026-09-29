@@ -28,7 +28,8 @@
     ],
     "camera_model": "SIMPLE_PINHOLE",
     "tau_fraction": 0.01,
-    "true_masks": false
+    "true_masks": false,
+    "dense": true
   },
   "cases": [
     {

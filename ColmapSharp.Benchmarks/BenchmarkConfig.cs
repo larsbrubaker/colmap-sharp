@@ -18,6 +18,12 @@
 //   the true intrinsics given and bundle adjustment's focal refinement off
 //   (SyntheticBenchmarkOptions.KnownIntrinsics), as with a calibrated camera or a trusted EXIF
 //   focal. The self-calibrating cases collapse the focal on this small object (divergence 141).
+//
+// --quick is the everyday check (benchmarks/baseline-quick.json): sparse only (no dense stages,
+// so the surface and silhouette metrics are 0 or null and only registration, focal and pose
+// are measured), the realistic and known cases of TexturedSphere and DarkObject, no fast case,
+// and mapper seeds 1 and 2. Options after --quick still override it. Its report records
+// "dense": false, so --compare refuses to set it against the full baseline.
 
 using System.Globalization;
 
@@ -55,7 +61,12 @@ internal sealed class BenchmarkConfig
 		  --masks                give the reconstruction the true masks
 		  --out <path>           write the JSON report here
 		  --compare <path>       compare with an earlier JSON report; exit 1 on a regression
-		  --tolerance <t>        allowed worsening of a mean: max(t, t * |baseline|) (default 0.05)
+		  --tolerance <t>        allowed relative worsening of an error metric's mean,
+		                         max(0.01, t * |baseline|) (default 0.05); scores in [0, 1] may
+		                         drop 0.02, and any lost frame or extra model is flagged
+		  --quick                everyday check in a few minutes: sparse only, TexturedSphere and
+		                         DarkObject (realistic and known), no fast case, mapper seeds 1,2;
+		                         compare with benchmarks/baseline-quick.json
 		  --help                 show this text
 		""";
 
@@ -83,6 +94,9 @@ internal sealed class BenchmarkConfig
 
 	public List<int> MapperSeeds { get; private set; } = [1, 2, 3];
 
+	/// <summary>Whether to run the dense stages (depth maps, fusion, meshing); --quick turns them off.</summary>
+	public bool Dense { get; private set; } = true;
+
 	public double TauFraction { get; private set; } = new SurfaceMetricOptions().TauFraction;
 
 	public bool UseTrueMasks { get; private set; }
@@ -105,6 +119,13 @@ internal sealed class BenchmarkConfig
 				case "--help":
 				case "-h":
 					config.ShowHelp = true;
+					break;
+				case "--quick":
+					config.Dense = false;
+					config.Kinds = [SyntheticObjectKind.TexturedSphere, SyntheticObjectKind.DarkObject];
+					config.FastKinds = [];
+					config.KnownKinds = [SyntheticObjectKind.TexturedSphere, SyntheticObjectKind.DarkObject];
+					config.MapperSeeds = [1, 2];
 					break;
 				case "--kinds":
 					config.Kinds = [.. List(Next()).Select(Enum.Parse<SyntheticObjectKind>)];

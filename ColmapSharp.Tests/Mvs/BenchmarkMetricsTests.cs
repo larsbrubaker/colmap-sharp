@@ -213,6 +213,30 @@ public class BenchmarkMetricsTests
 		await Assert.That(scores.MaxPositionPct).IsLessThan(2.0);
 	}
 
+	// Rx(pi) + Ry(pi) + Rz(pi) = -I, whose nearest orthogonal matrix U V^T is -I, a reflection.
+	// The chordal mean must flip the last singular direction to stay a proper rotation.
+	[Test]
+	public async Task CSharpOnly_ChordalMeanOfHalfTurnsIsAProperRotation()
+	{
+		Quaterniond[] halfTurns =
+		[
+			Quaterniond.FromAngleAxis(new AngleAxisd(Math.PI, Vector3d.UnitX)),
+			Quaterniond.FromAngleAxis(new AngleAxisd(Math.PI, Vector3d.UnitY)),
+			Quaterniond.FromAngleAxis(new AngleAxisd(Math.PI, Vector3d.UnitZ)),
+		];
+
+		await Assert.That(PoseMetrics.TryChordalMeanMatrix(halfTurns, [true, true, true], out Matrix3d mean)).IsTrue();
+		await Assert.That(Math.Abs(mean.Determinant() - 1)).IsLessThan(1e-12);
+		Matrix3d gram = mean.Transpose() * mean;
+		for (int r = 0; r < 3; r++)
+		{
+			for (int c = 0; c < 3; c++)
+			{
+				await Assert.That(Math.Abs(gram[r, c] - (r == c ? 1 : 0))).IsLessThan(1e-12);
+			}
+		}
+	}
+
 	[Test]
 	public async Task CSharpOnly_TooFewPosesAreNotAligned()
 	{

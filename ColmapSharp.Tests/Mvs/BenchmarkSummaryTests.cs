@@ -3,8 +3,8 @@
 // BenchmarkSummaryTests: C#-only tests (not ports; COLMAP has no reconstruction benchmark).
 // They pin ColmapSharp/Mvs/Testing/Benchmark/BenchmarkSummary.cs and BenchmarkEvaluator's
 // bookkeeping: failed runs are counted and make the worst null instead of improving the mean;
-// the regression check follows each metric's direction, flags more failed runs and a worst that
-// went null, and refuses reports made with different settings; and Evaluate maps images to
+// the regression check follows each metric's direction and its kind's allowance (counts, scores
+// in [0, 1], errors), flags more failed runs and a worst that went null, and refuses reports made with different settings; and Evaluate maps images to
 // frames by name (not id or order), skips unknown names and scores the largest model.
 
 using ColmapSharp.Geometry;
@@ -22,7 +22,7 @@ namespace ColmapSharp.Tests.Mvs;
 
 public class BenchmarkSummaryTests
 {
-	private const string Config = """{"frames": 40, "width": 480}""";
+	private const string Config = """{"frames": 40, "width": 480, "mapper_seeds": [1, 2, 3]}""";
 
 	[Test]
 	public async Task CSharpOnly_FailedRunsAreCountedAndMakeTheWorstNull()
@@ -55,14 +55,51 @@ public class BenchmarkSummaryTests
 		// Better in both directions: no regression.
 		await Assert.That(BenchmarkSummary.Regressions(baseline, Report(("f_score", 0.6, 0.5, 0), ("accuracy_pct", 1.0, 2.0, 0)), 0.05).Count).IsEqualTo(0);
 
-		// Within tolerance: max(0.05, 0.05 * 2.0) = 0.1 for accuracy, 0.05 for F.
-		await Assert.That(BenchmarkSummary.Regressions(baseline, Report(("f_score", 0.46, 0.4, 0), ("accuracy_pct", 2.09, 3.0, 0)), 0.05).Count).IsEqualTo(0);
+		// Within tolerance: max(0.01, 0.05 * 2.0) = 0.1 for accuracy, an absolute 0.02 for F.
+		await Assert.That(BenchmarkSummary.Regressions(baseline, Report(("f_score", 0.49, 0.4, 0), ("accuracy_pct", 2.09, 3.0, 0)), 0.05).Count).IsEqualTo(0);
 
 		// Worse in each direction.
-		List<string> worse = BenchmarkSummary.Regressions(baseline, Report(("f_score", 0.44, 0.4, 0), ("accuracy_pct", 2.2, 3.0, 0)), 0.05);
+		List<string> worse = BenchmarkSummary.Regressions(baseline, Report(("f_score", 0.47, 0.4, 0), ("accuracy_pct", 2.2, 3.0, 0)), 0.05);
 		await Assert.That(worse.Count).IsEqualTo(2);
 		await Assert.That(worse.Any(r => r.Contains("f_score"))).IsTrue();
 		await Assert.That(worse.Any(r => r.Contains("accuracy_pct"))).IsTrue();
+	}
+
+	// Drops measured on real benchmark runs that the old max(t, t x |baseline|) allowance let
+	// through: each must be flagged.
+	[Test]
+	[Arguments("f_score", 0.463, 0.414)]
+	[Arguments("registered_fraction", 0.85, 0.80)]
+	[Arguments("rotation_error_median_deg", 0.377, 0.427)]
+	public async Task CSharpOnly_MeasuredMissesAreRegressions(string metric, double before, double after)
+	{
+		List<string> regressions = BenchmarkSummary.Regressions(Report((metric, before, before, 0)), Report((metric, after, after, 0)), 0.05);
+		await Assert.That(regressions.Count).IsEqualTo(1);
+		await Assert.That(regressions[0]).Contains(metric);
+	}
+
+	[Test]
+	public async Task CSharpOnly_EachMetricKindHasItsOwnAllowance()
+	{
+		// One frame lost in one of the three seeds' runs of 40 frames is flagged; an unchanged
+		// fraction is not.
+		string registered = Report(("registered_fraction", 0.85, 0.8, 0));
+		await Assert.That(BenchmarkSummary.Regressions(registered, Report(("registered_fraction", 0.85 - (1.0 / 120), 0.8, 0)), 0.05).Count).IsEqualTo(1);
+		await Assert.That(BenchmarkSummary.Regressions(registered, Report(("registered_fraction", 0.85, 0.8, 0)), 0.05).Count).IsEqualTo(0);
+
+		// So is one more model in one run.
+		string models = Report(("num_models", 1.0, 1.0, 0));
+		await Assert.That(BenchmarkSummary.Regressions(models, Report(("num_models", 4.0 / 3, 2.0, 0)), 0.05).Count).IsEqualTo(1);
+
+		// IoU: an absolute 0.02.
+		string iou = Report(("silhouette_iou_mean", 0.9, 0.85, 0));
+		await Assert.That(BenchmarkSummary.Regressions(iou, Report(("silhouette_iou_mean", 0.885, 0.85, 0)), 0.05).Count).IsEqualTo(0);
+		await Assert.That(BenchmarkSummary.Regressions(iou, Report(("silhouette_iou_mean", 0.875, 0.85, 0)), 0.05).Count).IsEqualTo(1);
+
+		// An error metric at 0 has the absolute floor, not a zero allowance.
+		string zero = Report(("position_error_median_pct", 0.0, 0.0, 0));
+		await Assert.That(BenchmarkSummary.Regressions(zero, Report(("position_error_median_pct", 0.005, 0.005, 0)), 0.05).Count).IsEqualTo(0);
+		await Assert.That(BenchmarkSummary.Regressions(zero, Report(("position_error_median_pct", 0.02, 0.02, 0)), 0.05).Count).IsEqualTo(1);
 	}
 
 	[Test]

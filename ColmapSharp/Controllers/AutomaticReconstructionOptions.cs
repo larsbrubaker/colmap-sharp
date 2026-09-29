@@ -21,7 +21,8 @@
 // in place of use_gpu / gpu_index.
 // - BaRefineFocalLength / BaRefineExtraParams are C#-only: they reach the mapper's options of
 //   the same names, so a host that knows its camera (CameraParams from a calibration or EXIF)
-//   can keep bundle adjustment from refining it (divergence 141).
+//   can keep bundle adjustment from refining it (divergence 141). The global mapper cannot honour
+//   them (view-graph calibration re-estimates focal), so the controller refuses false under it.
 // - `int /= 1.5` in ModifyForMediumQuality converts to double and truncates back, as C++
 //   does; the casts below reproduce that.
 
@@ -144,12 +145,16 @@ public sealed class AutomaticReconstructionOptions
 	/// COLMAP's automatic reconstruction always refines it. Turn it off, with the true
 	/// focal in <see cref="CameraParams"/>, for a calibrated camera: on a small object in a
 	/// narrow view, refinement trades focal length against depth and can collapse the focal.
+	/// Only the incremental and hierarchical mappers honour false; the controller throws an
+	/// <see cref="ArgumentException"/> if it is combined with <see cref="MapperType.Global"/>,
+	/// whose view-graph calibration and bundle adjustment always re-estimate the focal.
 	/// </summary>
 	public bool BaRefineFocalLength { get; set; } = true;
 
 	/// <summary>
 	/// Whether bundle adjustment refines the camera model's extra (distortion) parameters.
-	/// C#-only, like <see cref="BaRefineFocalLength"/>.
+	/// C#-only, like <see cref="BaRefineFocalLength"/>, and likewise refused as false under
+	/// <see cref="MapperType.Global"/>.
 	/// </summary>
 	public bool BaRefineExtraParams { get; set; } = true;
 

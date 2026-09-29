@@ -487,5 +487,14 @@ low, and pycolmap 4.2.0 does the same (focal 96.6). With the true focal given in
 and refinement off, the rotations match the truth. A phone's EXIF focal or a calibrated camera
 (MatterCAD's planned calibration target) is that case.
 
-**Evidence.** `AutomaticReconstructionTests.CSharpOnly_BaRefineOptionsReachTheMapper`; the
-benchmark's known-intrinsics case in `benchmarks/baseline.json`.
+The options only reach the incremental and hierarchical mappers. Under `MapperType.Global`
+the controller's constructor throws an `ArgumentException` when either is false: the global
+path runs `ViewGraphCalibration`, which re-estimates every focal length, and
+`GlobalMapperOptions`' bundle adjustment has no switch for intrinsics, so the setting would be
+silently ignored. Honouring it there would mean skipping view-graph calibration and threading
+the refine flags through `GlobalPipelineOptions`, a larger change than the known-camera case
+needs today.
+
+**Evidence.** `AutomaticReconstructionTests.CSharpOnly_BaRefineOptionsReachTheMapper` and
+`CSharpOnly_BaRefineOffIsRefusedUnderGlobalMapper`; the benchmark's known-intrinsics case in
+`benchmarks/baseline.json`.

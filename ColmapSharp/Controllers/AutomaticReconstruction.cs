@@ -106,6 +106,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		}
 
 		Check.That(CameraModels.ExistsCameraModelWithName(options.CameraModel));
+		ThrowIfCameraKeptFixedUnderGlobalMapper(options);
 
 		// Set feature type first so quality modifiers can query EffMaxImageSize().
 		switch (options.Feature)
@@ -425,6 +426,34 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		finally
 		{
 			RandomUtils.Prng = callerPrng;
+		}
+	}
+
+	// Divergence 141: the global mapper cannot keep a known camera fixed. ViewGraphCalibration
+	// re-estimates every focal length before the mapper runs, and GlobalMapperOptions' bundle
+	// adjustment always refines intrinsics. Rather than silently refining a camera the host
+	// asked to keep, refuse the combination up front.
+	private static void ThrowIfCameraKeptFixedUnderGlobalMapper(AutomaticReconstructionOptions options)
+	{
+		if (options.Mapper != AutomaticReconstructionOptions.MapperType.Global)
+		{
+			return;
+		}
+
+		if (!options.BaRefineFocalLength)
+		{
+			throw new ArgumentException(
+				"Keeping the camera fixed (BaRefineFocalLength = false) works with the incremental and hierarchical mappers only. "
+				+ "Use MapperType.Incremental or MapperType.Hierarchical, or let the focal length be refined.",
+				nameof(options));
+		}
+
+		if (!options.BaRefineExtraParams)
+		{
+			throw new ArgumentException(
+				"Keeping the lens distortion fixed (BaRefineExtraParams = false) works with the incremental and hierarchical mappers only. "
+				+ "Use MapperType.Incremental or MapperType.Hierarchical, or let the distortion be refined.",
+				nameof(options));
 		}
 	}
 

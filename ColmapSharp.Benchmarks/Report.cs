@@ -61,6 +61,7 @@ internal static class Report
 				["camera_model"] = "SIMPLE_PINHOLE",
 				["tau_fraction"] = config.TauFraction,
 				["true_masks"] = config.UseTrueMasks,
+				["dense"] = config.Dense,
 			},
 		};
 
