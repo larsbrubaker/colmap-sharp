@@ -12,6 +12,8 @@
 		<ImplicitUsings>disable</ImplicitUsings>
 		<RootNamespace>ColmapDemo</RootNamespace>
 		<Company>Lars Brubaker</Company>
+		<!-- For Application.SetHighDpiMode in Program.cs. -->
+		<UseWindowsForms>true</UseWindowsForms>
 	</PropertyGroup>
 
 	<ItemGroup>

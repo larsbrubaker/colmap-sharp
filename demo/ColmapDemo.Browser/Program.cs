@@ -74,10 +74,9 @@ namespace ColmapDemo
 				// "This browser cannot run WebGPU" arrives before there is a canvas to draw it on.
 				BrowserSystemWindow.ReportStatus = Report;
 
-				var systemWindow = new SystemWindow(1200, 800)
-				{
-					Title = "ColmapSharp — photos to mesh",
-				};
+				// Widgets at the page's devicePixelRatio (the browser provider reports it), set before the app
+				// is built; see DemoDisplayScale.
+				SystemWindow systemWindow = DemoDisplayScale.CreateWindow("ColmapSharp — photos to mesh");
 				// The browser host stages files dropped on the canvas into the wasm file system and the
 				// receiver frees them (ColmapDemoApp.Drop.cs); there is no video reader in the browser
 				// yet, so a video gets a note pointing at photos or the desktop app.

@@ -18,10 +18,8 @@ namespace ColmapDemo
 		{
 			// No provider setup: AggContext's per-OS defaults pick the AppKit host on a Mac, and this
 			// project references PlatformMac so that host is in the output folder to be found.
-			var systemWindow = new SystemWindow(1200, 800)
-			{
-				Title = "ColmapSharp — photos to mesh",
-			};
+			// Widgets at the display's scale (2 on Retina) and a window sized to match; see DemoDisplayScale.
+			SystemWindow systemWindow = DemoDisplayScale.CreateWindow("ColmapSharp — photos to mesh");
 			// PatchMatch runs on the GPU when wgpu gives us a device; otherwise on the CPU, and the
 			// panel says why so a slow run is not a mystery.
 			WebGpuComputeDevice gpu = null;
