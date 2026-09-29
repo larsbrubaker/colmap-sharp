@@ -36,7 +36,7 @@ namespace ColmapDemo
 				computeNote = "No GPU (" + e.Message + "); depth maps run on the CPU.";
 			}
 
-			// The AppKit host delivers dropped files (agg's FileDropDispatcher).
+			// The AppKit host delivers dropped files (agg's FileDropDispatcher) and reads video (AVFoundation, AggContext's default reader on a Mac).
 			var app = new ColmapDemoApp(fileDropSupported: true, gpu, computeNote);
 			systemWindow.AddChild(app);
 			DevAutoRun.Attach(systemWindow, app);

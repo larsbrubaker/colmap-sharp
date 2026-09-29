@@ -5,8 +5,8 @@
 // with "Reading video frames 12/40…" in the status line and Cancel stopping it; then the frames
 // join the photo list as one line ("40 frames from clip.mp4") and a run treats them like any photo,
 // except that a run of one video's frames alone gives them one shared camera (ColmapDemoApp.Placement.cs).
-// Where agg has no video reader (Mac and browser today) the panel says so in the reader's own
-// words. The frame folders are deleted by Clear and when the window closes (the one being read
+// Where agg has no video reader (the browser today) the panel says so: in the head's own note
+// when it gives one (NoVideoReaderNote), otherwise in the reader's words. The frame folders are deleted by Clear and when the window closes (the one being read
 // too: its read never gets back to the UI thread once the window is gone).
 // The rest of the panel is in ColmapDemoApp.cs; Run and Cancel in ColmapDemoApp.Run.cs.
 
@@ -37,6 +37,19 @@ namespace ColmapDemo
 		private string readingFolder;
 
 		private const string StillReadingMessage = "A video is still being read. Add more once it is done.";
+
+		/// <summary>
+		/// What the panel says, as a note rather than an error, when a video is added where agg has no
+		/// video reader; null shows the reader's own reason as an error. The browser head sets
+		/// <see cref="BrowserNoVideoNote"/>: there a video is a known gap, not something that went wrong.
+		/// </summary>
+		public string NoVideoReaderNote { get; set; }
+
+		/// <summary>The browser head's <see cref="NoVideoReaderNote"/>.</summary>
+		public const string BrowserNoVideoNote = "Video isn't supported in the browser yet. Add photos instead, or use the desktop app for video.";
+
+		/// <summary>The note line's text when it is shown (skipped files, no video reader), otherwise empty.</summary>
+		public string NoteText => this.noteLine.Visible ? this.noteLine.Text : string.Empty;
 
 		/// <summary>How many frames each added video is cut into.</summary>
 		public int TargetFramesPerVideo { get; set; } = VideoFrameSampler.DefaultTargetFrames;
@@ -82,7 +95,15 @@ namespace ColmapDemo
 			IVideoFrameReader reader = AggContext.VideoFrames;
 			if (!reader.IsSupported)
 			{
-				this.ShowError(reader.UnsupportedReason ?? UnsupportedVideoFrameReader.DefaultReason);
+				if (this.NoVideoReaderNote != null)
+				{
+					this.ShowNote(this.NoVideoReaderNote);
+				}
+				else
+				{
+					this.ShowError(reader.UnsupportedReason ?? UnsupportedVideoFrameReader.DefaultReason);
+				}
+
 				return;
 			}
 
@@ -211,6 +232,13 @@ namespace ColmapDemo
 			this.errorLine.Visible = true;
 		}
 
+		// Below whatever the add already noted (files skipped), so neither hides the other.
+		private void ShowNote(string message)
+		{
+			this.noteLine.Text = this.noteLine.Visible && this.noteLine.Text.Length > 0 ? this.noteLine.Text + "\n" + message : message;
+			this.noteLine.Visible = true;
+		}
+
 		private static void DeleteFolder(string folder)
 		{
 			try
@@ -241,6 +269,7 @@ namespace ColmapDemo
 			}
 
 			this.DeleteVideoFrames();
+			this.DeleteDroppedPhotos();
 			base.OnClosed(e);
 		}
 	}

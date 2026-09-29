@@ -6,7 +6,7 @@
 // README.md says why each piece is here), plus what a pipeline run needs on a page: one thread,
 // so the run shares it and yields (BrowserYield.cs); the GPU device made asynchronously after
 // the window is up, with a timeout (Run waits for it); small
-// photos; saves as one zip download. BrowserDevHook.cs is the scripted-run hook (?demo=autorun)
+// photos; dropped files released after use; saves as one zip download. BrowserDevHook.cs is the scripted-run hook (?demo=autorun)
 // and the RunState export demo/scripts/check-site.py polls.
 
 using System;
@@ -78,11 +78,15 @@ namespace ColmapDemo
 				{
 					Title = "ColmapSharp — photos to mesh",
 				};
-				// The browser host does not deliver dropped files yet (docs/DEMO_PLAN.md phase 3).
+				// The browser host stages files dropped on the canvas into the wasm file system and the
+				// receiver frees them (ColmapDemoApp.Drop.cs); there is no video reader in the browser
+				// yet, so a video gets a note pointing at photos or the desktop app.
 				// The window comes up before the GPU check, which can take a while (or never answer),
 				// and Run waits for the check.
-				app = new ColmapDemoApp(fileDropSupported: false, null, "Checking for a GPU…")
+				app = new ColmapDemoApp(fileDropSupported: true, null, "Checking for a GPU…")
 				{
+					ReleaseDroppedFile = BrowserFileStaging.Release,
+					NoVideoReaderNote = ColmapDemoApp.BrowserNoVideoNote,
 					RunOnUiThread = true,
 					YieldAsync = BrowserYield.YieldAsync,
 					MaxImageSize = BrowserMaxImageSize,

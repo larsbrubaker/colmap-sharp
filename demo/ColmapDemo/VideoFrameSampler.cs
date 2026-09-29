@@ -2,7 +2,7 @@
 //
 // VideoFrameSampler: the demo's policy for turning a video into photos - which moments to take
 // (PickFrameTimes) and writing each decoded frame as a PNG (ExtractFramesAsync). The decoding
-// itself is agg-sharp's (AggContext.VideoFrames: Media Foundation on Windows); the panel side -
+// itself is agg-sharp's (AggContext.VideoFrames: Media Foundation on Windows, AVFoundation on the mac); the panel side -
 // progress, cancel, the photo list - is in ColmapDemoApp.Video.cs.
 // Tests: demo/ColmapDemo.Tests/VideoIntakeTests.cs.
 

@@ -21,6 +21,9 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\ColmapDemo\ColmapDemo.csproj" />
+		<!-- For BrowserFileStaging (plain net10.0, runs on a desktop): DropIntakeTests stages a drop and
+		     frees it exactly as the browser head does. -->
+		<ProjectReference Include="..\agg-sharp\PlatformBrowser\PlatformBrowser.csproj" />
 	</ItemGroup>
 
 	<!-- The browser head's bundled sample photos, for the session tests that run the whole pipeline. -->

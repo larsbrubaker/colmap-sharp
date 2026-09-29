@@ -37,11 +37,15 @@ tests. Precedents: agg-sharp's `examples/AggSharpDemo` (three-project shape, Pag
    backed `YieldAsync`, otherwise make that hook internal. Long single calls still hold the
    frame: extraction, matching, the sparse mapper (longest), undistortion, CPU PatchMatch per
    problem, fusion, meshing, texturing.
-3. **Browser drop + video files.** agg-sharp: page-level drag-and-drop into `FileDropDispatcher`;
-   `IVideoFrameReader` providers for the browser (`<video>` seek + canvas, or WebCodecs) and Mac
-   (AVFoundation `AVAssetImageGenerator`) — Windows (Media Foundation) and the demo's video intake
-   are in; the Mac reader and the browser drop are coming from agg-sharp. Windows: hardware decode
-   (D3D11 device manager) is the remaining read-speed lever. A phone clip of a black matte mouse
+3. **Browser video + Windows decode speed.** agg-sharp: an `IVideoFrameReader` for the browser
+   (`<video>` seek + canvas, or WebCodecs); until then a video dropped or picked in the browser
+   gets a note pointing at photos or the desktop app (`ColmapDemoApp.BrowserNoVideoNote`), and a
+   reader landing there also needs that note dropped from the browser head. When it lands, a
+   window close mid-read must still release the staged video (`BrowserFileStaging.Release`),
+   since `ReceiveDropAsync`'s release never runs once the closed window's pump stops. Browser drop is in
+   but has only been exercised by unit tests: check a real drop of photos and of a video on the
+   published page (by hand or Playwright). Windows: hardware decode (D3D11 device manager) is the
+   remaining read-speed lever. A phone clip of a black matte mouse
    spinning on its cable placed 24 of 40 frames, the same frames pycolmap places: a capture limit
    (only the textured underside matches), not a port bug. Denser sampling adds frames of the sides
    already seen, not the unseen ones; the demo's capture tips cover what does help.

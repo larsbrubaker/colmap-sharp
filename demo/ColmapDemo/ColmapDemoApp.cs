@@ -5,12 +5,14 @@
 // examples/AggSharpDemo/AggSharpDemo/AggSharpDemoApp.cs. The left panel gives capture tips, collects the photos
 // and lists the pipeline's stages; the right is the 3D viewport (ModelViewport.cs). Running,
 // progress, cancel and saving are in ColmapDemoApp.Run.cs; turning a video into photos is in
-// ColmapDemoApp.Video.cs; marking which photos a run placed is in ColmapDemoApp.Placement.cs.
+// ColmapDemoApp.Video.cs; taking dropped files (and freeing the browser's staged copies) is in
+// ColmapDemoApp.Drop.cs; marking which photos a run placed is in ColmapDemoApp.Placement.cs.
 
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using ColmapSharp.Controllers;
 using MatterHackers.Agg;
 using MatterHackers.Agg.Platform;
@@ -50,15 +52,15 @@ namespace ColmapDemo
 
 		private readonly FlowLayoutWidget photoList;
 
-		private readonly TextWidget skippedNote;
+		// Hint-colored, not an error: files skipped from an add, or that video is not read here.
+		private readonly WrappedTextWidget noteLine;
 
 		private readonly ThemedTextButton clearButton;
 
 		private readonly ThemedTextButton addButton;
 
-		/// <param name="fileDropSupported">Whether the head delivers dropped files to the window. The
-		/// mac host does; the browser host does not yet (docs/DEMO_PLAN.md phase 3), and the drop hint
-		/// is only shown where a drop works.</param>
+		/// <param name="fileDropSupported">Whether the head delivers dropped files to the window (the
+		/// mac and browser hosts do); the drop hint is only shown where a drop works.</param>
 		/// <param name="computeDevice">The GPU PatchMatch runs on, or null for the CPU.</param>
 		/// <param name="computeNote">One line on where PatchMatch runs and, on the CPU, why.</param>
 		public ColmapDemoApp(bool fileDropSupported, ColmapSharp.Compute.IComputeDevice computeDevice = null, string computeNote = "")
@@ -135,14 +137,13 @@ namespace ColmapDemo
 			photoScroll.AddChild(this.photoList);
 			panel.AddChild(photoScroll);
 
-			this.skippedNote = new TextWidget(string.Empty, pointSize: 9, textColor: HintColor)
+			this.noteLine = new WrappedTextWidget(string.Empty, pointSize: 9, textColor: HintColor)
 			{
-				HAnchor = HAnchor.Left,
+				HAnchor = HAnchor.Stretch,
 				Margin = new BorderDouble(0, 0, 0, 4),
-				AutoExpandBoundsToText = true,
 				Visible = false,
 			};
-			panel.AddChild(this.skippedNote);
+			panel.AddChild(this.noteLine);
 
 			this.AddRunControls(panel, theme, computeNote);
 
@@ -200,10 +201,20 @@ namespace ColmapDemo
 		/// </summary>
 		public void AddPhotos(IEnumerable<string> paths)
 		{
+			// Not awaited: the video reading reports its own outcome in the panel and never throws.
+			_ = this.AddFilesAsync(paths);
+		}
+
+		/// <summary>
+		/// <see cref="AddPhotos"/>, returning the reading of the videos among <paramref name="paths"/>,
+		/// so a caller that must know when the videos are done with (a browser drop) can wait for it.
+		/// </summary>
+		private Task AddFilesAsync(IEnumerable<string> paths)
+		{
 			if (this.IsRunning)
 			{
 				// The run already took its photo list; changing it mid-run would only mislead.
-				return;
+				return Task.CompletedTask;
 			}
 
 			int skipped = 0;
@@ -222,7 +233,7 @@ namespace ColmapDemo
 					continue;
 				}
 
-				if (this.photoPaths.Contains(path))
+				if (this.photoPaths.Contains(path) || this.IsStagedDuplicate(path))
 				{
 					continue;
 				}
@@ -231,12 +242,11 @@ namespace ColmapDemo
 				this.AddListEntry(this.AddListLine(Path.GetFileName(path)), new[] { path });
 			}
 
-			this.skippedNote.Text = skipped == 1 ? "1 file skipped: not a photo or video" : $"{skipped} files skipped: not photos or videos";
-			this.skippedNote.Visible = skipped > 0;
+			this.noteLine.Text = skipped == 1 ? "1 file skipped: not a photo or video" : $"{skipped} files skipped: not photos or videos";
+			this.noteLine.Visible = skipped > 0;
 			this.UpdatePhotoCount();
 
-			// Not awaited: it reports its own outcome in the panel and never throws.
-			_ = this.AddVideosAsync(videoPaths);
+			return this.AddVideosAsync(videoPaths);
 		}
 
 		// Always visible: a first-time user needs them before the first capture, not after a poor run.
@@ -269,28 +279,6 @@ namespace ColmapDemo
 			return line;
 		}
 
-		/// <summary>A drag over the window is taken when it carries at least one photo or video.</summary>
-		public override void OnMouseMove(MouseEventArgs mouseEvent)
-		{
-			if (mouseEvent.DragFiles?.Any(p => IsPhotoPath(p) || IsVideoPath(p)) == true)
-			{
-				mouseEvent.AcceptDrop = true;
-			}
-
-			base.OnMouseMove(mouseEvent);
-		}
-
-		/// <summary>The drop itself arrives as a mouse up carrying the files (agg's FileDropDispatcher).</summary>
-		public override void OnMouseUp(MouseEventArgs mouseEvent)
-		{
-			if (mouseEvent.DragFiles?.Count > 0)
-			{
-				this.AddPhotos(mouseEvent.DragFiles);
-			}
-
-			base.OnMouseUp(mouseEvent);
-		}
-
 		private void ShowAddPhotosDialog()
 		{
 			// The callback can come after this returns (the browser answers from its picker's change
@@ -314,10 +302,11 @@ namespace ColmapDemo
 			}
 
 			this.DeleteVideoFrames();
+			this.DeleteDroppedPhotos();
 			this.photoPaths.Clear();
 			this.listEntries.Clear();
 			this.photoList.CloseChildren();
-			this.skippedNote.Visible = false;
+			this.noteLine.Visible = false;
 			this.UpdatePhotoCount();
 		}
 
