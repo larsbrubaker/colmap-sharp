@@ -1,8 +1,8 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // BinaryMorphology: the binary-mask operations of the segmentation pipeline - exact Euclidean
-// distance transform, disk erosion/dilation/opening, largest connected component, hole filling
-// and the Otsu threshold. Not a COLMAP port. Sources (papers only, no code read):
+// distance transform, disk erosion/dilation/opening, largest connected component, morphological
+// reconstruction, hole filling and the Otsu threshold. Not a COLMAP port. Sources (papers only, no code read):
 // - P. Felzenszwalb and D. Huttenlocher, "Distance Transforms of Sampled Functions", Theory of
 //   Computing 8, 2012: the squared Euclidean distance transform as two passes of the 1D lower
 //   envelope of parabolas. Erosion and dilation by a disk of radius r are then thresholds of
@@ -377,6 +377,44 @@ internal static class BinaryMorphology
 		}
 
 		return count == 0 ? 0.0 : (double)set / count;
+	}
+
+	/// <summary>
+	/// Morphological reconstruction: the 8-connected components of <paramref name="mask"/> that
+	/// hold at least one pixel of <paramref name="marker"/>.
+	/// </summary>
+	public static bool[] Reconstruct(bool[] mask, bool[] marker, int width, int height)
+	{
+		var label = new int[mask.Length];
+		var stack = new Stack<int>();
+		for (int seed = 0; seed < mask.Length; ++seed)
+		{
+			if (mask[seed] && marker[seed] && label[seed] == 0)
+			{
+				Flood(mask, true, label, 1, seed, width, height, eightConnected: true, stack);
+			}
+		}
+
+		var result = new bool[mask.Length];
+		for (int i = 0; i < mask.Length; ++i)
+		{
+			result[i] = label[i] != 0;
+		}
+
+		return result;
+	}
+
+	/// <summary>The pixels of the mask that lie on the image border.</summary>
+	public static bool[] BorderPixels(bool[] mask, int width, int height)
+	{
+		var result = new bool[mask.Length];
+		for (int p = 0; p < mask.Length; ++p)
+		{
+			int x = p % width, y = p / width;
+			result[p] = mask[p] && (x == 0 || y == 0 || x == width - 1 || y == height - 1);
+		}
+
+		return result;
 	}
 
 	public static bool[] Not(bool[] mask)

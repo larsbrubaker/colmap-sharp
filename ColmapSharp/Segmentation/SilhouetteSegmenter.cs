@@ -6,8 +6,9 @@
 // of docs/QUALITY_PLAN.md. Pipeline, per frame at working resolution (LabImage):
 // 1. Background model (BackgroundModel): the per-pixel temporal median of a sample of the frames
 //    when there are enough of one size and the camera is near-static; otherwise (or when an
-//    object that barely moves survived into the median) N. Otsu's threshold on L* (IEEE SMC 1979).
-//    The initial mask is the pixels far from the background.
+//    object that barely moves survived into the median) N. Otsu's threshold on L* (IEEE SMC 1979),
+//    grown by enclosed textured regions (a textured object's half that Otsu put with the smooth
+//    wall). The initial mask is the pixels far from the background.
 // 2. Trimap: the eroded initial mask is sure-foreground; the dilated initial mask and the convex
 //    hull of the initial object (opened, largest component) are unknown; the rest is sure-
 //    background. The hull matters on real footage: a lit grey underside matches the wall, and
