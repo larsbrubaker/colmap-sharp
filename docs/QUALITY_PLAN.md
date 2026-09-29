@@ -83,8 +83,12 @@ blocks (the top and side sweeps), and the split model shares no images with the 
    - 3c: per-pixel hull depth bounds for PatchMatch, CPU and WGSL.
    - Accept: silhouette IoU > 0.95 and a closed mesh on the mouse; completeness F-score +30 on 0a.
 4. **Silhouette pose for the frames that are still unplaced.**
-   - 4a: initialize by SLERP between neighbours in time.
-   - 4b: silhouette-coherence refinement (Hernández, Schmitt and Cipolla 2007), then global BA.
+   - 4a/4b are in as opt-in library code (`Sfm/Silhouette/SilhouettePoseRegistration`, not wired
+     into the controller): SLERP or turntable starts, contour refinement against the hull, turn
+     limit, consistency gate. DarkObject gap: 20/20 at 4.1°. Mouse f40: only 3 of 18 missing
+     frames pass the gate, because the missing sweep is a flip, not a spin. Open: joint
+     refinement of all unplaced poses with the hull (the published silhouette-coherence form)
+     instead of one frame at a time; global BA after placement.
    - 4c: join split models via shared tracks or silhouette-consistent Sim3.
    - Accept: 100% of the mouse frames placed.
 5. **Turntable prior.** Fit the rotation axis from the registered poses; use it for 4a and as a
