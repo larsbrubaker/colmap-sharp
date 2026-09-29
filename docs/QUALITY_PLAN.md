@@ -32,12 +32,8 @@ blocks (the top and side sweeps), and the split model shares no images with the 
 ## Stages (one implementer deliverable each; "accept" is the benchmark bar)
 
 0. **Benchmark harness.**
-   - 0a: a synthetic object-scene generator in `Mvs/Testing/SyntheticObjectScene.cs`, lifted from
-     the ray tracer in `AutomaticReconstructionTests.CSharpOnly.cs`. Scenes: a dark, near-textureless
-     superellipsoid "mouse" with a label patch and seam grooves on a plain grey wall, turning about a
-     vertical axis on a twisting-pendulum θ(t) with a slightly jittered static camera; plus a
-     textured sphere and a textureless box. It outputs the images, true cameras, mesh and masks,
-     deterministically.
+   - 0a is in: `Mvs/Testing/SyntheticObjectScene` (DarkObject, TexturedSphere, TexturelessBox;
+     frames, one camera, object-fixed CamFromWorld, mesh, true masks).
    - 0b: metrics and a runner (`ColmapSharp.Benchmarks` console project plus a fast test):
      - registered fraction;
      - pose error after Sim3;
