@@ -140,4 +140,7 @@ any device (RNG/conversion probes, kernel probes, four Tier C runs incl. a bande
 
 ### Phase 14 — MatterCAD integration (not started; needs Lars)
 Reference `ColmapSharp` from MatterCAD, host-side image decoding into the library's pixel
-buffer, a "photos → mesh" design operation with progress and cancel.
+buffer, a "photos → mesh" design operation with progress and cancel. Ship a printable
+calibration target with MatterCAD (a checkerboard, or a ChArUco/AprilTag board) and a
+"calibrate this camera" flow that saves intrinsics per camera, so users can pin their camera's
+focal length and distortion instead of relying on self-calibration (Lars, 2026-09-28).

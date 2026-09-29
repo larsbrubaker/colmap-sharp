@@ -61,6 +61,18 @@ blocks (the top and side sweeps), and the split model shares no images with the 
      - opening sized to the object's width, to drop the cable;
      - the largest component, with holes filled.
      It outputs an `IImageSource` of masks. Accept: IoU ≥ 0.97 against the true masks.
+   - 1a+: temporal consistency for video (Lars's idea). A single-frame error — a bite where the
+     lit underside matches the wall, a channel cut by label text — rarely repeats in the
+     neighbouring frames.
+     - Score each mask against its time neighbours with a shape distance: mean squared distance
+       between the contours after aligning the centroid and scale.
+     - Replace outlier regions with the neighbours' consensus: a per-pixel foreground
+       probability, averaged over a small time window and thresholded with hysteresis (a high
+       threshold to add a pixel, a low one to drop it), so a one-frame dropout doesn't flip a
+       pixel.
+     - The object turns between samples, so align the neighbours first: a similarity transform
+       from contour moments, or KLT flow once stage 2a lands. The denser the sampling, the more
+       this works.
    - 1b: drop keypoints on specular highlights; CLAHE only inside the mask. Accept: the inlier
      ratio rises and the registered count doesn't fall.
 2. **Video tracking.**
