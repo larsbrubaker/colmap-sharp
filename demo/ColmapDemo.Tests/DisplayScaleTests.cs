@@ -1,13 +1,17 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
-// Tests of the demo's display-scale policy (demo/ColmapDemo/DemoDisplayScale.cs): the heads set
-// GuiWidget.DeviceScale to the display's scale before building ColmapDemoApp, so on a 2x (Retina)
-// display the window, the panel and its fonts come out at twice the device pixels - the same
-// physical size as on a 1x display - instead of half size.
+// Tests of the demo's display scale (demo/ColmapDemo/DemoDisplayScale.cs, ColmapDemoApp.Rescale.cs):
+// the heads compose GuiWidget.DeviceScale with agg's UiScale before building ColmapDemoApp, so on a 2x
+// (Retina) display the panel and its fonts come out at twice the device pixels, and a move to a
+// display with another scale rebuilds the app there without losing what the user had set up. The
+// policy itself (the window size and its clamp, unusable scales, the startup echo, coalescing) is
+// agg's and is pinned by agg-sharp's UiScaleTests.
 
+using System.Diagnostics;
 using MatterHackers.Agg;
 using MatterHackers.Agg.Platform;
 using MatterHackers.Agg.UI;
+using static ColmapSharp.Controllers.AutomaticReconstructionOptions;
 
 namespace ColmapDemo.Tests;
 
@@ -26,52 +30,9 @@ public class DisplayScaleTests
 	}
 
 	[Test]
-	[Arguments(1.0, 1200, 800)]
-	[Arguments(2.0, 2400, 1600)]
-	[Arguments(1.5, 1800, 1200)]
-	public async Task TheWindowIsTheDesignSizeInPoints(double displayScale, int width, int height)
-	{
-		double saved = GuiWidget.DeviceScale;
-		try
-		{
-			SystemWindow window = DemoDisplayScale.CreateWindow("test", displayScale, new Point2D(3840, 2160));
-
-			await Assert.That(GuiWidget.DeviceScale).IsEqualTo(displayScale);
-			await Assert.That((int)window.Width).IsEqualTo(width);
-			await Assert.That((int)window.Height).IsEqualTo(height);
-		}
-		finally
-		{
-			GuiWidget.DeviceScale = saved;
-		}
-	}
-
-	[Test]
-	public async Task TheWindowFitsOnASmallDesktop()
-	{
-		// A 150% laptop: 1800 x 1200 wanted, 1920 x 1040 available.
-		await Assert.That(DemoDisplayScale.WindowSize(1.5, new Point2D(1920, 1040))).IsEqualTo((1800, 1040));
-
-		// A host that cannot measure its desktop reports zero, which is no limit.
-		await Assert.That(DemoDisplayScale.WindowSize(2, new Point2D(0, 0))).IsEqualTo((2400, 1600));
-	}
-
-	[Test]
-	[Arguments(0.0)]
-	[Arguments(-1.0)]
-	[Arguments(double.NaN)]
-	[Arguments(double.PositiveInfinity)]
-	public async Task AnUnusableDisplayScaleIsOne(double displayScale)
-	{
-		await Assert.That(DemoDisplayScale.Usable(displayScale)).IsEqualTo(1.0);
-	}
-
-	[Test]
 	public async Task ThePanelAndItsFontsScaleWithTheDisplay()
 	{
-		AggContext.OsInformation ??= new HeadlessOs();
-		double saved = GuiWidget.DeviceScale;
-		try
+		await WithScaleRestored(async () =>
 		{
 			(double panelWidth, double titleEm, double hintEm) atOne = BuildAt(1);
 			(double panelWidth, double titleEm, double hintEm) atTwo = BuildAt(2);
@@ -81,18 +42,127 @@ public class DisplayScaleTests
 			await Assert.That(atOne.titleEm).IsEqualTo(16);
 			await Assert.That(atTwo.titleEm).IsEqualTo(32);
 			await Assert.That(atTwo.hintEm).IsEqualTo(2 * atOne.hintEm);
+		});
+	}
+
+	[Test]
+	public async Task AScaleChangeRebuildsAtTheNewScaleAndKeepsTheSetup()
+	{
+		await WithScaleRestored(async () =>
+		{
+			StartAt(1);
+			var window = new SystemWindow(1200, 800);
+			var app = new ColmapDemoApp(fileDropSupported: false);
+			window.AddChild(app);
+			DemoDisplayScale.Follow(window, app);
+
+			string[] photos = { "a.png", "b.png", "c.png" };
+			app.AddPhotos(photos.Select(n => Path.Combine(Path.GetTempPath(), n)));
+			((SegmentedControl)app.FindDescendant("Fast Setting")).SelectedIndex = 2;
+			app.FindDescendant("One object Card").InvokeClick();
+			app.SettingsOpen = true;
+			GuiWidget panelBefore = app.Children[0];
+
+			MoveToDisplay(window, 2);
+
+			await Assert.That(GuiWidget.DeviceScale).IsEqualTo(2.0);
+			await Assert.That(app.Children[0]).IsNotSameReferenceAs(panelBefore).Because("the widgets are built again at the new scale");
+			await Assert.That(app.Children[0].Width).IsEqualTo(560);
+			await Assert.That(app.PhotoPaths.Select(Path.GetFileName)).IsEquivalentTo(photos);
+			await Assert.That(app.PhotoListLines).IsEquivalentTo(photos);
+			await Assert.That(app.SettingsOpen).IsTrue();
+			await Assert.That(app.Settings.Quality).IsEqualTo(QualityLevel.High);
+			await Assert.That(app.Settings.Subject).IsEqualTo(SubjectType.Object);
+			await Assert.That(((SegmentedControl)app.FindDescendant("Fast Setting")).SelectedIndex).IsEqualTo(2).Because("the new controls show the kept settings");
+			await Assert.That(((SelectableCard)app.FindDescendant("One object Card")).Selected).IsTrue();
+			await Assert.That(app.FindDescendant("Run Button").Enabled).IsTrue();
+			window.Close();
+		});
+	}
+
+	[Test]
+	public async Task AScaleChangeDuringARunWaitsForTheRunToEnd()
+	{
+		await WithScaleRestored(async () =>
+		{
+			StartAt(1);
+			var window = new SystemWindow(1200, 800);
+
+			// The run shares this thread and parks at its first yield, so it is running until released.
+			var gate = new TaskCompletionSource();
+			var app = new ColmapDemoApp(fileDropSupported: false) { RunOnUiThread = true, YieldAsync = () => new ValueTask(gate.Task) };
+			window.AddChild(app);
+			DemoDisplayScale.Follow(window, app);
+			app.AddPhotos(new[] { "a.png", "b.png", "c.png" }.Select(n => Path.Combine(Path.GetTempPath(), n)));
+			app.StartRun();
+			GuiWidget panelBefore = app.Children[0];
+
+			MoveToDisplay(window, 2);
+
+			await Assert.That(app.IsRunning).IsTrue();
+			await Assert.That(app.Children[0]).IsSameReferenceAs(panelBefore).Because("a run's progress writes into the widgets it started with");
+			await Assert.That(GuiWidget.DeviceScale).IsEqualTo(1.0).Because("the scale waits for the rebuild");
+
+			app.RequestCancel();
+			gate.SetResult();
+
+			// The run's end, then UiScale's retry, come through the idle queue; the retry is timed.
+			var clock = Stopwatch.StartNew();
+			while (app.Children[0] == panelBefore && clock.Elapsed < TimeSpan.FromSeconds(10))
+			{
+				UiThread.InvokePendingActions();
+				await Task.Delay(10);
+			}
+
+			await Assert.That(app.IsRunning).IsFalse();
+			await Assert.That(GuiWidget.DeviceScale).IsEqualTo(2.0);
+			await Assert.That(app.Children[0].Width).IsEqualTo(560);
+			await Assert.That(app.StatusText).IsEqualTo("Cancelled.").Because("what the run left on screen is kept");
+			window.Close();
+		});
+	}
+
+	// A head's startup on a display of displayScale: UiScale composed for it, before any widget is built.
+	private static void StartAt(double displayScale)
+	{
+		AggContext.OsInformation ??= new HeadlessOs();
+		UiScale.DisplayScaleOverride = displayScale;
+		UiScale.ApplyAtStartup();
+		UiScale.DisplayScaleOverride = null;
+	}
+
+	// The host reporting the window on a display of displayScale, delivered; held for the real host too,
+	// so a late report from this machine's own screen cannot move it back mid-test.
+	private static void MoveToDisplay(SystemWindow window, double displayScale)
+	{
+		SystemWindow.SimulatedDisplayScale = displayScale;
+		window.SetDisplayScale(displayScale);
+		UiThread.InvokePendingActions();
+	}
+
+	private static async Task WithScaleRestored(Func<Task> test)
+	{
+		double savedDeviceScale = GuiWidget.DeviceScale;
+		double savedDisplayScale = UiScale.CurrentDisplayScale;
+		try
+		{
+			await test();
 		}
 		finally
 		{
-			GuiWidget.DeviceScale = saved;
+			SystemWindow.SimulatedDisplayScale = null;
+			UiScale.DisplayScaleOverride = null;
+			UiScale.UpdateForDisplayScale(savedDisplayScale);
+			GuiWidget.DeviceScale = savedDeviceScale;
+			UiThread.ResetForTests();
 		}
 	}
 
 	// The left panel's width and the device em sizes of the title and the subtitle, built the way a
-	// head builds the app: DeviceScale first (through DemoDisplayScale), then the app.
+	// head builds the app: DeviceScale first (through UiScale), then the app.
 	private static (double PanelWidth, double TitleEm, double HintEm) BuildAt(double displayScale)
 	{
-		DemoDisplayScale.CreateWindow("test", displayScale, new Point2D(0, 0));
+		StartAt(displayScale);
 		var app = new ColmapDemoApp(fileDropSupported: false);
 		try
 		{

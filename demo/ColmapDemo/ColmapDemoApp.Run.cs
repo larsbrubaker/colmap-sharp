@@ -245,14 +245,14 @@ namespace ColmapDemo
 
 		private void AddRunControls(FlowLayoutWidget panel, ThemeConfig theme, string computeNote)
 		{
-			this.stageTimer.StageFinished += (stage, seconds) => Console.WriteLine($"COLMAP_DEMO stage {stage}: {seconds:F1} s");
-
 			var runButtons = new FlowLayoutWidget(FlowDirection.LeftToRight)
 			{
 				HAnchor = HAnchor.Stretch,
 				Margin = new BorderDouble(0, 0, 0, 12),
 			};
-			this.runButton = new ThemedTextButton("Run", theme) { Name = "Run Button", Enabled = false };
+			// The one action the panel leads to, so the theme's filled primary button (named "Run Button").
+			this.runButton = theme.CreatePrimaryButton("Run");
+			this.runButton.Enabled = false;
 			this.runButton.Click += (sender, e) => this.StartRun();
 			runButtons.AddChild(this.runButton);
 			this.cancelButton = new ThemedTextButton("Cancel", theme) { Name = "Cancel Button", Enabled = false };

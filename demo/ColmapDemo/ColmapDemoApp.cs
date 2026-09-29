@@ -7,7 +7,10 @@
 // progress, cancel and saving are in ColmapDemoApp.Run.cs; turning a video into photos is in
 // ColmapDemoApp.Video.cs; taking dropped files (and freeing the browser's staged copies) is in
 // ColmapDemoApp.Drop.cs; marking which photos a run placed is in ColmapDemoApp.Placement.cs; the
-// Settings panel on the right, opened by the Settings button, is in ColmapDemoApp.Settings.cs.
+// Settings panel on the right, opened by the Settings button, is in ColmapDemoApp.Settings.cs;
+// rebuilding the widgets at a new display scale, keeping everything they show, is in
+// ColmapDemoApp.Rescale.cs. Widget looks (buttons, fields, cards, the tinted box) come from
+// agg's ThemeConfig.Current; only the panels' background colours are the demo's own.
 
 using System;
 using System.Collections.Generic;
@@ -43,22 +46,26 @@ namespace ColmapDemo
 		/// <summary>The open dialog's filter, built from <see cref="PhotoExtensions"/> and the video extensions.</summary>
 		private static readonly string PhotoFilter = "Photos and videos|" + string.Join(";", PhotoExtensions.Concat(VideoExtensions).Select(e => "*" + e));
 
-		private static readonly Color PanelColor = new Color("#f2f2f2");
+		// Panel backgrounds, not widget style, so the demo's own (the design's side panel and settings sheet).
+		private static readonly Color PanelColor = new Color("#f4f3ef");
 
-		private static readonly Color HintColor = new Color("#707070");
+		private static readonly Color SettingsPanelColor = new Color("#fbfaf7");
 
 		private readonly List<string> photoPaths = new List<string>();
 
-		private readonly TextWidget photoCount;
+		private readonly bool fileDropSupported;
 
-		private readonly FlowLayoutWidget photoList;
+		// The widgets below are rebuilt by RebuildUi (ColmapDemoApp.Rescale.cs), so not readonly.
+		private TextWidget photoCount;
+
+		private FlowLayoutWidget photoList;
 
 		// Hint-colored, not an error: files skipped from an add, or that video is not read here.
-		private readonly WrappedTextWidget noteLine;
+		private WrappedTextWidget noteLine;
 
-		private readonly ThemedTextButton clearButton;
+		private ThemedTextButton clearButton;
 
-		private readonly ThemedTextButton addButton;
+		private ThemedTextButton addButton;
 
 		/// <param name="fileDropSupported">Whether the head delivers dropped files to the window (the
 		/// mac and browser hosts do); the drop hint is only shown where a drop works.</param>
@@ -67,8 +74,26 @@ namespace ColmapDemo
 		public ColmapDemoApp(bool fileDropSupported, ColmapSharp.Compute.IComputeDevice computeDevice = null, string computeNote = "")
 			: base(FlowDirection.LeftToRight)
 		{
+			this.fileDropSupported = fileDropSupported;
 			this.computeDevice = computeDevice;
 			this.AnchorAll();
+			this.stageTimer.StageFinished += (stage, seconds) => Console.WriteLine($"COLMAP_DEMO stage {stage}: {seconds:F1} s");
+
+			// Kept across rebuilds, so the model the user has turned stays as it is (RebuildUi).
+			this.viewport = new ModelViewport();
+			this.BuildUi(computeNote);
+		}
+
+		/// <summary>Secondary text: hints, notes and the stage list before a run, in the theme's muted ink.</summary>
+		private static Color HintColor => ThemeConfig.Current.MutedTextColor;
+
+		/// <summary>
+		/// Builds every widget at the current <see cref="GuiWidget.DeviceScale"/> from the retained model
+		/// (photos, settings, the viewport), empty of anything a run or an add has shown - the constructor
+		/// and <see cref="RebuildUi"/> fill that in.
+		/// </summary>
+		private void BuildUi(string computeNote)
+		{
 			ThemeConfig theme = ThemeConfig.Current;
 
 			var panel = new FlowLayoutWidget(FlowDirection.TopToBottom)
@@ -108,7 +133,7 @@ namespace ColmapDemo
 			photoButtons.AddChild(this.clearButton);
 			panel.AddChild(photoButtons);
 
-			if (fileDropSupported)
+			if (this.fileDropSupported)
 			{
 				panel.AddChild(new TextWidget("or drop photos or a video onto this window", pointSize: 9, textColor: HintColor)
 				{
@@ -154,7 +179,6 @@ namespace ColmapDemo
 
 			this.AddRunControls(panel, theme, computeNote);
 
-			this.viewport = new ModelViewport();
 			this.AddChild(this.viewport);
 
 			// On the right, over nothing the user needs while choosing settings; the viewport narrows.
