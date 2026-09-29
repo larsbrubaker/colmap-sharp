@@ -135,7 +135,7 @@ namespace ColmapDemo
 		/// <summary>Starts a run over the listed photos (what the Run button does).</summary>
 		public void StartRun()
 		{
-			if (this.IsRunning || this.computeCheckPending || this.photoPaths.Count < MinPhotosToRun)
+			if (this.IsRunning || this.IsReadingVideo || this.computeCheckPending || this.photoPaths.Count < MinPhotosToRun)
 			{
 				return;
 			}
@@ -212,9 +212,20 @@ namespace ColmapDemo
 			}
 		}
 
-		/// <summary>Asks the run to stop (what Cancel does). The current step finishes first.</summary>
+		/// <summary>
+		/// Asks the run, or the video being read, to stop (what Cancel does). The current step (or
+		/// frame) finishes first.
+		/// </summary>
 		public void RequestCancel()
 		{
+			if (this.videoCancel != null && !this.videoCancel.IsCancellationRequested)
+			{
+				this.videoCancel.Cancel();
+				this.cancelButton.Enabled = false;
+				this.statusLine.Text = "Cancelling…";
+				return;
+			}
+
 			if (this.runCancel == null || this.runCancel.IsCancellationRequested)
 			{
 				return;
@@ -300,8 +311,9 @@ namespace ColmapDemo
 				return;
 			}
 
-			this.runButton.Enabled = !this.IsRunning && !this.computeCheckPending && this.photoPaths.Count >= MinPhotosToRun;
-			this.cancelButton.Enabled = this.IsRunning && !this.runCancel.IsCancellationRequested;
+			this.runButton.Enabled = !this.IsRunning && !this.IsReadingVideo && !this.computeCheckPending && this.photoPaths.Count >= MinPhotosToRun;
+			this.cancelButton.Enabled = (this.IsRunning && !this.runCancel.IsCancellationRequested)
+				|| (this.IsReadingVideo && !this.videoCancel.IsCancellationRequested);
 			this.saveButton.Enabled = !this.IsRunning && this.lastResult?.Mesh != null;
 			this.addButton.Enabled = !this.IsRunning;
 		}

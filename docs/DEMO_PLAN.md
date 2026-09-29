@@ -38,8 +38,10 @@ tests. Precedents: agg-sharp's `examples/AggSharpDemo` (three-project shape, Pag
    frame: extraction, matching, the sparse mapper (longest), undistortion, CPU PatchMatch per
    problem, fusion, meshing, texturing.
 3. **Browser drop + video files.** agg-sharp: page-level drag-and-drop into `FileDropDispatcher`;
-   video → frames (browser `<video>` seek + canvas; Mac AVFoundation `AVAssetImageGenerator`).
-   Demo: frame sampling (every Nth / target count), `DataType.Video`.
+   `IVideoFrameReader` providers for the browser (`<video>` seek + canvas, or WebCodecs) and Mac
+   (AVFoundation `AVAssetImageGenerator`) — Windows (Media Foundation) and the demo's video intake
+   are in. Windows: hardware decode (D3D11 device manager) is the remaining read-speed lever;
+   only 24 of 40 frames of a phone clip registered, so check denser sampling.
 4. **Webcam (browser).** agg-sharp: `getUserMedia` preview + still capture + timed capture.
    Demo: capture flow (take photos around an object, or record → frames).
 5. **Distribution.** Mac `.app` bundle zip on GitHub Releases (unsigned; document Gatekeeper),

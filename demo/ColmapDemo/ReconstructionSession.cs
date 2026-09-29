@@ -296,6 +296,10 @@ namespace ColmapDemo
 				if (getSparse() == null && p.Stage == AutomaticReconstructionController.DenseStage)
 				{
 					IReadOnlyList<ColoredPoint> points = MeshBridge.SparsePoints(models);
+
+					// For comparing captures: how much of the input the mapper actually used.
+					var registered = Enumerable.Range(0, models.Size).Select(m => models.Get(m).NumRegImages);
+					Console.WriteLine($"COLMAP_DEMO sparse: {models.Size} model(s), registered images [{string.Join(", ", registered)}] of {images.ListNames().Count}, {points.Count} points");
 					setSparse(points);
 					this.SparseReady?.Invoke(points);
 				}

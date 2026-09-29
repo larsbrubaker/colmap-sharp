@@ -4,7 +4,8 @@
 // ColmapDemo.Browser) only has to put in a window - the shape of agg-sharp's
 // examples/AggSharpDemo/AggSharpDemo/AggSharpDemoApp.cs. The left panel collects the photos
 // and lists the pipeline's stages; the right is the 3D viewport (ModelViewport.cs). Running,
-// progress, cancel and saving are in ColmapDemoApp.Run.cs.
+// progress, cancel and saving are in ColmapDemoApp.Run.cs; turning a video into photos is in
+// ColmapDemoApp.Video.cs.
 
 using System;
 using System.Collections.Generic;
@@ -29,8 +30,15 @@ namespace ColmapDemo
 		/// </summary>
 		private static readonly string[] PhotoExtensions = { ".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff" };
 
-		/// <summary>The open dialog's filter, built from <see cref="PhotoExtensions"/>.</summary>
-		private static readonly string PhotoFilter = "Photos|" + string.Join(";", PhotoExtensions.Select(e => "*" + e));
+		/// <summary>
+		/// The video extensions the demo takes (ColmapDemoApp.Video.cs cuts them into frames), checked
+		/// like <see cref="PhotoExtensions"/>. Here rather than in that file because static fields
+		/// initialize in file order and <see cref="PhotoFilter"/> reads it.
+		/// </summary>
+		private static readonly string[] VideoExtensions = { ".mp4", ".mov", ".m4v", ".avi", ".wmv", ".mkv" };
+
+		/// <summary>The open dialog's filter, built from <see cref="PhotoExtensions"/> and the video extensions.</summary>
+		private static readonly string PhotoFilter = "Photos and videos|" + string.Join(";", PhotoExtensions.Concat(VideoExtensions).Select(e => "*" + e));
 
 		private static readonly Color PanelColor = new Color("#f2f2f2");
 
@@ -71,7 +79,7 @@ namespace ColmapDemo
 			this.AddChild(panel);
 
 			panel.AddChild(new TextWidget("ColmapSharp", pointSize: 16, bold: true) { HAnchor = HAnchor.Left });
-			panel.AddChild(new TextWidget("Photos to mesh", pointSize: 10, textColor: HintColor)
+			panel.AddChild(new TextWidget("Photos or a video to mesh", pointSize: 10, textColor: HintColor)
 			{
 				HAnchor = HAnchor.Left,
 				Margin = new BorderDouble(0, 10, 0, 0),
@@ -93,7 +101,7 @@ namespace ColmapDemo
 
 			if (fileDropSupported)
 			{
-				panel.AddChild(new TextWidget("or drop photos onto this window", pointSize: 9, textColor: HintColor)
+				panel.AddChild(new TextWidget("or drop photos or a video onto this window", pointSize: 9, textColor: HintColor)
 				{
 					HAnchor = HAnchor.Left,
 					Margin = new BorderDouble(0, 0, 0, 4),
@@ -171,7 +179,8 @@ namespace ColmapDemo
 
 		/// <summary>
 		/// Adds the photos among <paramref name="paths"/> to the list, skipping ones already there
-		/// and saying how many were not photos.
+		/// and saying how many were neither photos nor videos. Videos are cut into frames in the
+		/// background (<see cref="AddVideosAsync"/>).
 		/// </summary>
 		public void AddPhotos(IEnumerable<string> paths)
 		{
@@ -182,8 +191,15 @@ namespace ColmapDemo
 			}
 
 			int skipped = 0;
+			var videoPaths = new List<string>();
 			foreach (string path in paths)
 			{
+				if (IsVideoPath(path))
+				{
+					videoPaths.Add(path);
+					continue;
+				}
+
 				if (!IsPhotoPath(path))
 				{
 					skipped++;
@@ -196,22 +212,33 @@ namespace ColmapDemo
 				}
 
 				this.photoPaths.Add(path);
-				this.photoList.AddChild(new TextWidget(Path.GetFileName(path), pointSize: 10)
-				{
-					HAnchor = HAnchor.Left,
-					Margin = new BorderDouble(2, 1),
-				});
+				this.AddListLine(Path.GetFileName(path));
 			}
 
-			this.skippedNote.Text = skipped == 1 ? "1 file skipped: not a photo" : $"{skipped} files skipped: not photos";
+			this.skippedNote.Text = skipped == 1 ? "1 file skipped: not a photo or video" : $"{skipped} files skipped: not photos or videos";
 			this.skippedNote.Visible = skipped > 0;
 			this.UpdatePhotoCount();
+
+			// Not awaited: it reports its own outcome in the panel and never throws.
+			_ = this.AddVideosAsync(videoPaths);
 		}
 
-		/// <summary>A drag over the window is taken when it carries at least one photo.</summary>
+		private TextWidget AddListLine(string text)
+		{
+			var line = new TextWidget(text, pointSize: 10)
+			{
+				HAnchor = HAnchor.Left,
+				Margin = new BorderDouble(2, 1),
+				AutoExpandBoundsToText = true,
+			};
+			this.photoList.AddChild(line);
+			return line;
+		}
+
+		/// <summary>A drag over the window is taken when it carries at least one photo or video.</summary>
 		public override void OnMouseMove(MouseEventArgs mouseEvent)
 		{
-			if (mouseEvent.DragFiles?.Any(IsPhotoPath) == true)
+			if (mouseEvent.DragFiles?.Any(p => IsPhotoPath(p) || IsVideoPath(p)) == true)
 			{
 				mouseEvent.AcceptDrop = true;
 			}
@@ -235,7 +262,7 @@ namespace ColmapDemo
 			// The callback can come after this returns (the browser answers from its picker's change
 			// event), and never comes on cancel, so everything happens inside it.
 			AggContext.FileDialogs.OpenFileDialog(
-				new OpenFileDialogParams(PhotoFilter, multiSelect: true, title: "Add photos"),
+				new OpenFileDialogParams(PhotoFilter, multiSelect: true, title: "Add photos or a video"),
 				openParams =>
 				{
 					if (openParams.FileNames?.Length > 0)
@@ -247,11 +274,12 @@ namespace ColmapDemo
 
 		private void ClearPhotos()
 		{
-			if (this.IsRunning)
+			if (this.IsRunning || this.IsReadingVideo)
 			{
 				return;
 			}
 
+			this.DeleteVideoFrames();
 			this.photoPaths.Clear();
 			this.photoList.CloseChildren();
 			this.skippedNote.Visible = false;
@@ -262,7 +290,7 @@ namespace ColmapDemo
 		{
 			int count = this.photoPaths.Count;
 			this.photoCount.Text = count == 0 ? "No photos yet" : count == 1 ? "1 photo" : $"{count} photos";
-			this.clearButton.Enabled = count > 0 && !this.IsRunning;
+			this.clearButton.Enabled = count > 0 && !this.IsRunning && !this.IsReadingVideo;
 			this.UpdateRunButtons();
 		}
 	}

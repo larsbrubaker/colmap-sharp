@@ -6,8 +6,9 @@
 // screenshotted without a person clicking. Unset, it does nothing. The browser head does not call
 // it: a page has no environment variables to read.
 //
-//   COLMAP_DEMO_PHOTOS=<dir>              preload the photos in <dir> (sorted by name)
-//   COLMAP_DEMO_AUTORUN=1                 press Run once the window is up
+//   COLMAP_DEMO_PHOTOS=<dir>              preload the photos and videos in <dir> (sorted by name)
+//   COLMAP_DEMO_VIDEO=<file>              add a video (cut into frames, as a drop would)
+//   COLMAP_DEMO_AUTORUN=1                 press Run once the window is up (and the videos are read)
 //   COLMAP_DEMO_SCREENSHOT_SPARSE=<png>   screenshot when the sparse points appear
 //   COLMAP_DEMO_SCREENSHOT=<png>          screenshot when the run ends, then close the window
 //
@@ -15,6 +16,7 @@
 // this captures on the app's own events through SystemWindow.CaptureScreenshotAsync instead.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using MatterHackers.Agg.UI;
@@ -27,12 +29,26 @@ namespace ColmapDemo
 		public static void Attach(SystemWindow window, ColmapDemoApp app)
 		{
 			string photoDir = Environment.GetEnvironmentVariable("COLMAP_DEMO_PHOTOS");
-			if (string.IsNullOrEmpty(photoDir))
+			string video = Environment.GetEnvironmentVariable("COLMAP_DEMO_VIDEO");
+			if (string.IsNullOrEmpty(photoDir) && string.IsNullOrEmpty(video))
 			{
 				return;
 			}
 
-			app.AddPhotos(Directory.GetFiles(photoDir).OrderBy(p => p, StringComparer.Ordinal));
+			// The folder's videos and COLMAP_DEMO_VIDEO are read as one batch, awaited before Run: a second
+			// add while one is being read would only be refused ("still being read").
+			var videos = new List<string>();
+			if (!string.IsNullOrEmpty(photoDir))
+			{
+				var files = Directory.GetFiles(photoDir).OrderBy(p => p, StringComparer.Ordinal).ToList();
+				videos.AddRange(files.Where(ColmapDemoApp.IsVideoPath));
+				app.AddPhotos(files.Where(p => !ColmapDemoApp.IsVideoPath(p)));
+			}
+
+			if (!string.IsNullOrEmpty(video))
+			{
+				videos.Add(video);
+			}
 
 			string sparseShot = Environment.GetEnvironmentVariable("COLMAP_DEMO_SCREENSHOT_SPARSE");
 			if (!string.IsNullOrEmpty(sparseShot))
@@ -61,10 +77,37 @@ namespace ColmapDemo
 				}
 			};
 
-			if (Environment.GetEnvironmentVariable("COLMAP_DEMO_AUTORUN") == "1")
+			bool autoRun = Environment.GetEnvironmentVariable("COLMAP_DEMO_AUTORUN") == "1";
+			UiThread.RunOnIdle(async () =>
 			{
-				UiThread.RunOnIdle(app.StartRun);
-			}
+				// On the UI thread, once the window is up: the videos' frames are read before Run.
+				if (videos.Count > 0)
+				{
+					await app.AddVideosAsync(videos);
+				}
+
+				if (autoRun)
+				{
+					if (app.ErrorText.Length > 0)
+					{
+						Console.WriteLine("COLMAP_DEMO video not added: " + app.ErrorText);
+					}
+
+					app.StartRun();
+
+					// Too few photos (a video that could not be read): say so and end the unattended run
+					// rather than leave a window waiting for a run that never started.
+					if (!app.IsRunning)
+					{
+						Console.WriteLine($"COLMAP_DEMO run did not start ({app.PhotoPaths.Count} photos)");
+						if (!string.IsNullOrEmpty(finalShot))
+						{
+							await window.CaptureScreenshotAsync(finalShot);
+							window.CloseOnIdle();
+						}
+					}
+				}
+			});
 		}
 	}
 }

@@ -11,6 +11,7 @@ using MatterHackers.Agg.Platform;
 
 namespace ColmapDemo.Tests;
 
+[NotInParallel("AggUiThread")]
 public class CancelTests
 {
 	private sealed class HeadlessOs : IOsInformationProvider
