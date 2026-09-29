@@ -2984,3 +2984,34 @@ after seeding the caller's PRNG with 1234 and once with 4 threads after seeding 
 and drawing 1000 values; without the per-pair PRNG `0/cameras.bin` differed, and with it all
 sparse files are byte-identical and the caller's PRNG is kept. `ViewGraphCalibrationTests` and
 `GlobalPipelineTests` pass.
+
+## 140. AutomaticReconstructionController builds dense/<i> from sparse/<i>
+
+**What differs.** `RunSparseMapper` (colmap/controllers/automatic_reconstruction.cc) writes the
+mapper's models through `ReconstructionManager::Write`, which puts them in `sparse/<i>` sorted by
+descending 3D-point count, but leaves them in memory in mapper build order. `RunDenseMapper`
+then names `dense/<i>` after the in-memory index, so on a first run with two or more models
+`dense/<i>` can be built from a different model than `sparse/<i>`. A later run over the same
+workspace (COLMAP's own resume, which reads `sparse/<i>` back in sorted order) then pairs model
+i with another model's `dense/<i>`: it skips that model's dense work, or runs PatchMatch over the
+other model's undistorted images and depth maps and fuses and meshes the mix. The resume also
+sorts the `sparse/` directory names as strings, so with 11 or more models `sparse/10` becomes
+model 2. The port reorders the models in memory right after `Write`, the same way (descending
+point count, ties in index order as in entry 34), and reads a resume's `sparse/<i>` by the number
+i (`Controllers/AutomaticReconstruction.cs`). So `dense/<i>`, `sparse/<i>`,
+`ReconstructionManager.Get(i)` and `TexturedMeshes[].ModelIdx` (entry 135) all name the same
+model, the one with the most points first, on a first run and on every resume. With one model
+nothing changes.
+
+**Why.** A resumed workspace must not mix two models' files, and a host that retries the dense
+stages over an existing `sparse/` (MatterCAD's demo does, after a GPU failure) must get the same
+models at the same indices as the first run.
+
+**Evidence.** `AutomaticReconstructionTests.CSharpOnly_DenseModelsFollowSparseOrderOnFirstRunAndResume`
+(C#-only) hands the controller two models in build order [34 points, 103 points]; before the fix
+`sparse/` held [103, 34] while `dense/0` and `dense/1` held the undistorted models of [34, 103].
+With the fix both the first run and a resume build `dense/<i>` from `sparse/<i>`, and every
+dense product (depth and normal maps, fused.ply, fused.ply.vis, the mesh and its texture) is
+byte-identical between the two runs. `CSharpOnly_ResumeReadsSparseModelsInNumericOrder`
+(C#-only) reads 11 models back; before the fix they came in the order
+`0, 1, 10, 2, ..., 9`.

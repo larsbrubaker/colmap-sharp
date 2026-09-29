@@ -35,6 +35,9 @@
 // - COLMAP's controller is its own new thread; this one runs on the caller's. The sparse
 //   mapper therefore gets a fresh thread PRNG (restoring the caller's after), so an unseeded
 //   run does not continue whatever the calling pool thread drew before (entry 138).
+// - After writing sparse/, the models are reordered in memory the way ReconstructionManager.Write
+//   ordered them (most 3D points first), and a resume reads sparse/<i> in numeric order, so
+//   dense/<i> is always built from sparse/<i> (entry 140).
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Feature;
@@ -388,7 +391,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		if (Directory.Exists(sparsePath))
 		{
 			string[] dirList = Directory.GetDirectories(sparsePath);
-			Array.Sort(dirList, StringComparer.Ordinal);
+			Array.Sort(dirList, CompareModelDirs);
 			if (dirList.Length > 0)
 			{
 				// Skipping sparse reconstruction because it is already computed.
@@ -480,6 +483,47 @@ public sealed partial class AutomaticReconstructionController : BaseController
 
 		Directory.CreateDirectory(sparsePath);
 		reconstructionManager.Write(sparsePath);
+		OrderModelsAsWritten();
+	}
+
+	// ReconstructionManager.Write puts the model with the most 3D points in sparse/0, and a resume
+	// reads sparse/<i> back in that order. COLMAP's dense stage then walks the models in mapper
+	// build order, so on a first run with two or more models dense/<i> can be built from another
+	// model than sparse/<i>, and a later run over the workspace mixes their files. Reordering the
+	// models in memory the way Write does (descending point count; OrderByDescending is stable, so
+	// ties keep their index order, Write's tie-break) makes dense/<i>, sparse/<i> and
+	// TexturedMeshes[].ModelIdx agree on both runs (docs/CPP_DIVERGENCES.md entry 140).
+	private void OrderModelsAsWritten()
+	{
+		Reconstruction[] ordered = [.. Enumerable.Range(0, reconstructionManager.Size)
+			.Select(reconstructionManager.Get)
+			.OrderByDescending(reconstruction => reconstruction.NumPoints3D)];
+		for (int i = 0; i < ordered.Length; ++i)
+		{
+			reconstructionManager.Set(i, ordered[i]);
+		}
+	}
+
+	// The order of a resume's model directories: sparse/<i> by the number i, so "10" follows "9"
+	// (COLMAP sorts the names as strings, which puts sparse/10 at index 2 once there are 11
+	// models; entry 140). Names that are not numbers keep COLMAP's string order, after them.
+	private static int CompareModelDirs(string a, string b)
+	{
+		bool aIsIndex = int.TryParse(Path.GetFileName(a), System.Globalization.NumberStyles.None,
+			System.Globalization.CultureInfo.InvariantCulture, out int aIndex);
+		bool bIsIndex = int.TryParse(Path.GetFileName(b), System.Globalization.NumberStyles.None,
+			System.Globalization.CultureInfo.InvariantCulture, out int bIndex);
+		if (aIsIndex && bIsIndex && aIndex != bIndex)
+		{
+			return aIndex.CompareTo(bIndex);
+		}
+
+		if (aIsIndex != bIsIndex)
+		{
+			return aIsIndex ? -1 : 1;
+		}
+
+		return StringComparer.Ordinal.Compare(a, b);
 	}
 
 	// Maps a stage's own progress type onto Progress, synchronously on the reporting thread.
