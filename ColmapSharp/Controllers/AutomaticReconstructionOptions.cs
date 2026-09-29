@@ -107,6 +107,24 @@ public sealed class AutomaticReconstructionOptions
 		AdvancingFront = 2,
 	}
 
+	/// <summary>
+	/// What is being captured. C#-only (divergence 142; COLMAP has no such switch).
+	/// </summary>
+	public enum SubjectType
+	{
+		/// <summary>A general scene: COLMAP's pipeline, unchanged.</summary>
+		Scene,
+
+		/// <summary>
+		/// One object against a plain background (a turntable, an object spun in front of a wall).
+		/// Silhouette masks (the host's <see cref="Masks"/>, or SilhouetteSegmenter's) restrict
+		/// features and fusion; each model gets a visual hull that fills the dense cloud's gaps
+		/// before Poisson; the mesh is trimmed by the silhouettes instead of Poisson's density
+		/// trim; and when the dense stages give no mesh the hull itself is the result.
+		/// </summary>
+		Object,
+	}
+
 	/// <summary>The path to the workspace folder in which all results are stored.</summary>
 	public string WorkspacePath { get; set; } = "";
 
@@ -121,6 +139,12 @@ public sealed class AutomaticReconstructionOptions
 
 	/// <summary>The masks used as input (COLMAP's mask_path), or null for none.</summary>
 	public IImageSource? Masks { get; set; }
+
+	/// <summary>
+	/// What is being captured (C#-only; <see cref="SubjectType"/>). Scene, the default, is COLMAP's
+	/// behaviour.
+	/// </summary>
+	public SubjectType Subject { get; set; } = SubjectType.Scene;
 
 	/// <summary>The type of input data used to choose optimal mapper settings.</summary>
 	public DataType Data { get; set; } = DataType.Individual;

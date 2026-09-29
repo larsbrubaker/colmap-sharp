@@ -11,6 +11,7 @@
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Mathematics;
+using ColmapSharp.Mvs;
 using ColmapSharp.Mvs.Testing;
 using ColmapSharp.Mvs.Testing.Benchmark;
 using ColmapSharp.Sensor;

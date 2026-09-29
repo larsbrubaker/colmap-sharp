@@ -1,7 +1,8 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // PointKdTree: nearest-neighbor distance to a point cloud, for the reconstruction benchmark's
-// completeness when a run produced a fused cloud but no mesh (docs/QUALITY_PLAN.md, stage 0b).
+// completeness when a run produced a fused cloud but no mesh (docs/QUALITY_PLAN.md, stage 0b), and
+// for object mode's hull gap test (Silhouette/HullSurfaceFusion.cs).
 // Not a COLMAP port; written from the textbook algorithm (J. L. Bentley, "Multidimensional
 // binary search trees used for associative searching", CACM 18(9), 1975): median splits on the
 // widest axis, then a depth-first query that visits the near side first and prunes the far
@@ -10,7 +11,7 @@
 
 using ColmapSharp.LinearAlgebra;
 
-namespace ColmapSharp.Mvs.Testing.Benchmark;
+namespace ColmapSharp.Mvs;
 
 /// <summary>A static kd-tree over 3D points answering nearest-distance queries.</summary>
 public sealed class PointKdTree

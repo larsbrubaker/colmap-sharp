@@ -165,4 +165,5 @@ rather than by text hunks, in both the module file and this table.
 | 139 | ViewGraphCalibration re-estimates each relative pose from a fresh PRNG | [Estimators](divergences/Estimators.md) |
 | 140 | AutomaticReconstructionController builds dense/<i> from sparse/<i> | [Controllers](divergences/Controllers.md) |
 | 141 | AutomaticReconstructionOptions can keep bundle adjustment off a known camera | [Controllers](divergences/Controllers.md) |
+| 142 | AutomaticReconstructionOptions.Subject = Object adds masks, a visual hull and silhouette clean-up | [Controllers](divergences/Controllers.md) |
 | 143 | Video data can add KLT tracks as keypoints and matches | [Controllers](divergences/Controllers.md) |

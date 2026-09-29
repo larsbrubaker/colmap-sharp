@@ -198,7 +198,8 @@ public sealed partial class AutomaticReconstructionController : BaseController
 
 		optionManager.Mapper.RandomSeed = options.RandomSeed;
 
-		if (options.Masks is not null)
+		// Object mode always has masks: the host's or the segmenter's (divergence 142).
+		if (options.Masks is not null || IsObject)
 		{
 			optionManager.StereoFusion.MaskPath = MaskRoot;
 		}
@@ -237,7 +238,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		if (options.Extraction)
 		{
 			ImageReaderOptions reader = optionManager.ImageReader;
-			reader.Masks = options.Masks;
+			reader.Masks = ResolveMasks(FeatureExtraction.ExtractionStage);
 			reader.SingleCamera = options.SingleCamera;
 			reader.SingleCameraPerFolder = options.SingleCameraPerFolder;
 			reader.CameraModel = options.CameraModel;

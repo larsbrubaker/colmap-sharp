@@ -3,7 +3,7 @@
 // SyntheticBenchmark: runs AutomaticReconstructionController on one SyntheticObjectScene and
 // scores the result (docs/QUALITY_PLAN.md, stage 0b). Not a COLMAP port. The frames go in as an
 // in-memory image source named frame000.png, frame001.png, ..., with one SIMPLE_PINHOLE
-// camera; the workspace is a fresh temporary folder, deleted afterwards. The controller's
+// camera; the workspace is a fresh temporary folder, deleted afterwards (or the caller's, kept). The controller's
 // stages are timed with StageTimer, and the scored model's dense mesh (or its fused points when
 // meshing gave nothing) is read back from dense/<model>/ for BenchmarkEvaluator. The ColmapSharp.Benchmarks runner calls this once
 // per (scene, mapper seed), and the test suite's end-to-end check calls it too, so both measure
@@ -54,6 +54,12 @@ public sealed class SyntheticBenchmarkOptions
 	/// </summary>
 	public bool KnownIntrinsics { get; set; }
 
+	/// <summary>
+	/// Scene or Object (AutomaticReconstructionOptions.Subject). Object without true masks segments
+	/// the frames itself (SilhouetteSegmenter), as a host would.
+	/// </summary>
+	public AutomaticReconstructionOptions.SubjectType Subject { get; set; } = AutomaticReconstructionOptions.SubjectType.Scene;
+
 	/// <summary>Whether to hand the scene's true masks to the reconstruction (features and fusion).</summary>
 	public bool UseTrueMasks { get; set; }
 
@@ -68,6 +74,15 @@ public sealed class SyntheticBenchmarkOptions
 
 	/// <summary>Options of the surface scores.</summary>
 	public SurfaceMetricOptions Surface { get; set; } = new();
+
+	/// <summary>
+	/// The workspace folder to use and keep, or null (the default) for a fresh temporary folder
+	/// that is deleted afterwards. A kept workspace lets a test inspect or resume a run.
+	/// </summary>
+	public string? WorkspacePath { get; set; }
+
+	/// <summary>Also receives the controller's progress (synchronously, on the reporting thread).</summary>
+	public IProgress<ControllerProgress>? Progress { get; set; }
 }
 
 /// <summary>The scores and stage timings of one benchmark run.</summary>
@@ -76,6 +91,15 @@ public sealed record SyntheticBenchmarkResult(
 	IReadOnlyList<(string Stage, double Seconds)> StageSeconds,
 	double TotalSeconds)
 {
+	/// <summary>Whether the scored mesh is closed (every edge on two faces); false without a mesh.</summary>
+	public bool MeshClosed { get; init; }
+
+	/// <summary>
+	/// Whether the scored mesh is object mode's visual hull itself (its fallback when the dense
+	/// stages gave no mesh), rather than a mesh of the dense points.
+	/// </summary>
+	public bool MeshIsVisualHull { get; init; }
+
 	/// <summary>
 	/// The scored model's registered cameras (CamFromWorld) by frame index, so two runs can be
 	/// compared on the frames both placed (PoseMetrics.Compute on the common subset).
@@ -107,7 +131,7 @@ public static class SyntheticBenchmark
 			masks.Add(frameNames[k] + ".png", scene.Masks[k]);
 		}
 
-		string workspace = Path.Combine(Path.GetTempPath(), "colmap-sharp-benchmark-" + Guid.NewGuid().ToString("N"));
+		string workspace = options.WorkspacePath ?? Path.Combine(Path.GetTempPath(), "colmap-sharp-benchmark-" + Guid.NewGuid().ToString("N"));
 		Directory.CreateDirectory(workspace);
 		try
 		{
@@ -116,6 +140,7 @@ public static class SyntheticBenchmark
 				WorkspacePath = workspace,
 				Images = images,
 				Masks = options.UseTrueMasks ? masks : null,
+				Subject = options.Subject,
 				Data = options.Data,
 				VideoTracking = options.VideoTracking,
 				Quality = options.Quality,
@@ -146,7 +171,7 @@ public static class SyntheticBenchmark
 			var timer = new StageTimer();
 			var controller = new AutomaticReconstructionController(reconOptions, models)
 			{
-				Progress = timer,
+				Progress = options.Progress is null ? timer : new TeeProgress(timer, options.Progress),
 				CancellationToken = cancellationToken,
 			};
 			var clock = Stopwatch.StartNew();
@@ -157,7 +182,7 @@ public static class SyntheticBenchmark
 
 			var reconstructions = Enumerable.Range(0, models.Size).Select(models.Get).ToList();
 			int modelIdx = BenchmarkEvaluator.SelectModel(reconstructions);
-			(BenchmarkMesh? mesh, List<Vector3d>? points) = modelIdx < 0 ? (null, null) : ReadSurface(workspace, modelIdx, options.Mesher);
+			(BenchmarkMesh? mesh, List<Vector3d>? points, bool closed) = modelIdx < 0 ? (null, null, false) : ReadSurface(workspace, modelIdx, options.Mesher);
 			BenchmarkMetrics metrics = BenchmarkEvaluator.Evaluate(scene, frameNames, reconstructions, mesh, points, options.Surface);
 			var poses = new Dictionary<int, Rigid3d>();
 			if (modelIdx >= 0)
@@ -173,13 +198,20 @@ public static class SyntheticBenchmark
 				}
 			}
 
-			return new SyntheticBenchmarkResult(metrics, stages, total) { RegisteredPoses = poses };
+			return new SyntheticBenchmarkResult(metrics, stages, total) {
+				MeshClosed = closed,
+				MeshIsVisualHull = modelIdx >= 0 && IsVisualHullMesh(workspace, modelIdx, options.Mesher),
+				RegisteredPoses = poses,
+			};
 		}
 		finally
 		{
 			try
 			{
-				Directory.Delete(workspace, recursive: true);
+				if (options.WorkspacePath is null)
+				{
+					Directory.Delete(workspace, recursive: true);
+				}
 			}
 			catch (IOException)
 			{
@@ -196,8 +228,33 @@ public static class SyntheticBenchmark
 			.Select(v => v.ToString("R", CultureInfo.InvariantCulture)));
 	}
 
+	// Whether dense/<model>'s mesh has exactly the vertices and faces of its visual-hull.ply.
+	private static bool IsVisualHullMesh(string workspace, int modelIdx, AutomaticReconstructionOptions.MesherType mesher)
+	{
+		string densePath = Path.Combine(workspace, "dense", modelIdx.ToString(CultureInfo.InvariantCulture));
+		string meshPath = Path.Combine(densePath, mesher == AutomaticReconstructionOptions.MesherType.Delaunay ? "meshed-delaunay.ply" : "meshed-poisson.ply");
+		string hullPath = Path.Combine(densePath, AutomaticReconstructionController.VisualHullMeshName);
+		if (!File.Exists(meshPath) || !File.Exists(hullPath))
+		{
+			return false;
+		}
+
+		PlyMesh mesh = Ply.ReadPlyMesh(meshPath).Mesh, hull = Ply.ReadPlyMesh(hullPath).Mesh;
+		return mesh.Faces.SequenceEqual(hull.Faces)
+			&& mesh.Vertices.Select(v => (v.X, v.Y, v.Z)).SequenceEqual(hull.Vertices.Select(v => (v.X, v.Y, v.Z)));
+	}
+
+	private sealed class TeeProgress(IProgress<ControllerProgress> first, IProgress<ControllerProgress> second) : IProgress<ControllerProgress>
+	{
+		public void Report(ControllerProgress value)
+		{
+			first.Report(value);
+			second.Report(value);
+		}
+	}
+
 	// The model's mesh when meshing produced faces, else its fused points when there are any.
-	private static (BenchmarkMesh? Mesh, List<Vector3d>? Points) ReadSurface(string workspace, int modelIdx, AutomaticReconstructionOptions.MesherType mesher)
+	private static (BenchmarkMesh? Mesh, List<Vector3d>? Points, bool Closed) ReadSurface(string workspace, int modelIdx, AutomaticReconstructionOptions.MesherType mesher)
 	{
 		string densePath = Path.Combine(workspace, "dense", modelIdx.ToString(CultureInfo.InvariantCulture));
 		string meshPath = Path.Combine(densePath, mesher == AutomaticReconstructionOptions.MesherType.Delaunay ? "meshed-delaunay.ply" : "meshed-poisson.ply");
@@ -206,7 +263,7 @@ public static class SyntheticBenchmark
 			PlyTexturedMesh ply = Ply.ReadPlyMesh(meshPath);
 			if (ply.Mesh.Faces.Count > 0)
 			{
-				return (BenchmarkMesh.FromPly(ply.Mesh), null);
+				return (BenchmarkMesh.FromPly(ply.Mesh), null, Silhouette.HullSurfaceFusion.IsClosed(ply.Mesh));
 			}
 		}
 
@@ -216,10 +273,10 @@ public static class SyntheticBenchmark
 			List<PlyPoint> fused = Ply.ReadPly(fusedPath);
 			if (fused.Count > 0)
 			{
-				return (null, [.. fused.Select(p => new Vector3d(p.X, p.Y, p.Z))]);
+				return (null, [.. fused.Select(p => new Vector3d(p.X, p.Y, p.Z))], false);
 			}
 		}
 
-		return (null, null);
+		return (null, null, false);
 	}
 }

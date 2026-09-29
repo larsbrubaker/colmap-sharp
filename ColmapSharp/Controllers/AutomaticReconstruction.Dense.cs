@@ -66,6 +66,12 @@ public sealed partial class AutomaticReconstructionController
 
 		Directory.CreateDirectory(Path.Combine(options.WorkspacePath, "dense"));
 
+		// Object mode's hull needs cameras: with no model it has nothing to add (divergence 142).
+		if (IsObject && reconstructionManager.Size == 0)
+		{
+			Log.Warning("None of the photos could be placed, so no shape can be built. Take more photos that overlap, with the object in sharp focus.");
+		}
+
 		for (int i = 0; i < reconstructionManager.Size; ++i)
 		{
 			if (CheckIfStopped())
@@ -132,12 +138,15 @@ public sealed partial class AutomaticReconstructionController
 				yield break;
 			}
 
-			IBitmapSource bitmaps = options.Masks is null
-				? undistortedImages
-				: new WorkspaceBitmapSource(undistortedImages, options.Masks);
-
 			if (!haveDense)
 			{
+				// Only PatchMatch and fusion read the masks, so a model that only needs texturing
+				// never segments.
+				IImageSource? stageMasks = ResolveMasks(DenseStage);
+				IBitmapSource bitmaps = stageMasks is null
+					? undistortedImages
+					: new WorkspaceBitmapSource(undistortedImages, stageMasks);
+
 				// Patch match stereo (on the host's compute device or the CPU; COLMAP needs
 				// CUDA here), run by the caller.
 				yield return new PatchMatchController(
@@ -152,7 +161,10 @@ public sealed partial class AutomaticReconstructionController
 				}
 
 				yield return null;
-				if (!RunMeshing(densePath, fusedPath, meshingPath))
+
+				// Object mode (divergence 142): the visual hull fills the fused cloud's gaps
+				// before meshing, cleans the mesh up after it, and stands in when there is none.
+				if (!(IsObject ? RunObjectMeshing(i, densePath, fusedPath, meshingPath) : RunMeshing(densePath, fusedPath, meshingPath)))
 				{
 					yield break;
 				}
@@ -204,8 +216,9 @@ public sealed partial class AutomaticReconstructionController
 	}
 
 	// Meshing of model i: the part of RunDenseMapper's loop after fusion. Returns false where
-	// that loop returns (once stopped, and after the advancing-front warning).
-	private bool RunMeshing(string densePath, string fusedPath, string meshingPath)
+	// that loop returns (once stopped, and after the advancing-front warning). Poisson runs with
+	// poissonOptions when given (object mode), else with the controller's.
+	private bool RunMeshing(string densePath, string fusedPath, string meshingPath, PoissonMeshingOptions? poissonOptions = null)
 	{
 		if (CheckIfStopped())
 		{
@@ -231,7 +244,7 @@ public sealed partial class AutomaticReconstructionController
 			try
 			{
 				bool meshed = options.Mesher == AutomaticReconstructionOptions.MesherType.Poisson
-					? PoissonMeshing.Run(optionManager.PoissonMeshing, fusedPath, meshingPath, CancellationToken, meshingProgress)
+					? PoissonMeshing.Run(poissonOptions ?? optionManager.PoissonMeshing, fusedPath, meshingPath, CancellationToken, meshingProgress)
 					: RunDenseDelaunayMeshing(densePath, fusedPath, meshingPath, meshingProgress);
 				if (!meshed)
 				{

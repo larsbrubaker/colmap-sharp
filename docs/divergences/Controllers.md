@@ -499,6 +499,65 @@ needs today.
 `CSharpOnly_BaRefineOffIsRefusedUnderGlobalMapper`; the benchmark's known-intrinsics case in
 `benchmarks/baseline.json`.
 
+## 142. AutomaticReconstructionOptions.Subject = Object adds masks, a visual hull and silhouette clean-up
+
+**What differs.** COLMAP has no single-object mode. `AutomaticReconstructionOptions.Subject`
+defaults to `Scene`, which is COLMAP's pipeline unchanged. `Object`
+(`Controllers/AutomaticReconstruction.Object.cs`) changes these things:
+- masks are always used: the host's `Masks`, or `SilhouetteSegmenter`'s (TemporalWindow 2 for
+  video; only the `ImageNames` images when set), in feature extraction and fusion;
+- after fusion each model gets a visual hull (resolution 128, k = 1, box from
+  `VisualHullBounds`), and its surface samples are added where the fused cloud has no point
+  within 3 voxels (`HullSurfaceFusion.GapSamples`, written to `fused-hull.ply`), which Poisson
+  then meshes (Delaunay meshes `fused.ply` alone, since `fused.ply.vis` has no hull entries);
+- Poisson runs without its density trim (so its surface is watertight) and at depth 9 at most.
+  `HullSurfaceFusion.CleanUp` then first removes the connected pieces wholly outside the
+  silhouettes (every face outside the mask in more than k views and farther than 3 voxels from
+  the hull), then pulls the remaining vertices that lie outside the hull onto the hull surface.
+  No face is cut out of a kept piece, so a closed Poisson mesh stays closed. The order matters:
+  pulled first, a floater would be flattened onto the hull and then kept;
+- limits of the pull: a move that would flip a face (normal more than 90 degrees from the
+  original) is undone, so at concave creases of the hull some vertices stay outside it; faces
+  can collapse to zero area where vertices snap to one hull point, and are kept rather than cut;
+- when the dense stages give no mesh (including advancing-front meshing, which needs CGAL), the
+  hull mesh is written as the model's mesh. With no registered model there are no cameras and
+  no hull; the run fails as a scene run does;
+- the mesher writes `<mesh>.partial.ply`, and only the finished object mesh is renamed onto the
+  mesh path, so a stopped run leaves nothing a resume would take for a finished mesh (the rule
+  of divergence 135).
+
+**Why.** docs/QUALITY_PLAN.md stage 3b, after Hernández Esteban and Schmitt 2004: the hull
+bounds the object where stereo has nothing (dark, untextured sides), and the silhouettes say
+where the object is not, which Poisson's trim value can only guess per capture. Low hull weight
+is emulated by sampling density (one sample per hull vertex), since COLMAP's Poisson call has no
+per-point weight. Cutting single faces by the silhouettes was tried first and opened holes along
+the silhouette rims. The depth cap: the hull samples cover the whole surface, so every octree
+level refines everywhere, and at depth 11 the density estimation alone ran over seven minutes on
+the scene below.
+
+**Evidence.** `HullSurfaceFusionTests` pins the gap rule, the component removal, the clean-up
+order (a floater goes), the pull (closed stays closed) and the concave case (no flipped face);
+`ObjectModeEndToEndTests` pins the result below and the stop-and-resume rule. TexturedSphere,
+20 frames at 320x240, motion 0.27, mapper seed 1, Release:
+
+| Run | Frames placed | Focal ratio | F-score | Silhouette IoU | Closed |
+|---|---|---|---|---|---|
+| Scene, self-calibrated | 16/20 | 0.874 | 0.017 | 0.875 | no |
+| Scene, known intrinsics | 16/20 | 1.000 | 0.313 | 0.910 | no |
+| Scene, known intrinsics, true masks | 16/20 | 1.000 | 0.274 | 0.908 | no |
+| Object, segmented masks (before the segmenter fix) | 6/20 | 0.500 | 0.000 | 0.627 | yes |
+| Object, segmented masks, known intrinsics (before the fix) | 6/20 | 1.000 | 0.000 | 0.629 | yes |
+| Object, segmented masks, known intrinsics (after the fix) | 16/20 | 1.000 | 0.411 | 0.960 | yes |
+| Object, true masks | 16/20 | 0.874 | 0.023 | 0.979 | yes |
+| Object, true masks, known intrinsics | 16/20 | 1.000 | 0.429 | 0.953 | yes |
+
+With the same true masks and intrinsics Object mode beats Scene mode (F 0.429 against 0.274)
+and its mesh is closed. With its own masks it does nearly as well (F 0.411): before the
+segmenter fix on main, `SilhouetteSegmenter` lost about 40% of the sphere in frames 7-15 (IoU
+0.55-0.64), which cost 10 placed frames; after it, every mask is within IoU 0.984 of the truth.
+What still holds it back here is self-calibration, which collapses the focal on this small
+object (divergence 141).
+
 ## 143. Video data can add KLT tracks as keypoints and matches
 
 **What differs.** COLMAP has no video tracker. With `AutomaticReconstructionOptions.VideoTracking`
