@@ -14,7 +14,7 @@
 // Translation notes:
 // - The spanning tree numbers the active images in ascending id order (COLMAP: FlatHashSet
 //   order, which picks the tree's root, node 0) and adds the valid edges in ascending pair
-//   id order (docs/CPP_DIVERGENCES.md, entry 44).
+//   id order (divergence 44).
 // - COLMAP's cams_from_world[parent] default-constructs the root's entry (identity rotation,
 //   zero translation) the first time a child of the root is visited; the root's entry is
 //   seeded the same way here.

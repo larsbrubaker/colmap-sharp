@@ -10,7 +10,7 @@
 //
 // Tier A (exact) by construction: pixels are float (vl_sift_pix), filter parameters double,
 // and every mixed expression keeps C's promotion points. The oracle comparison and the
-// arm64 FMA-contraction caveat are in SiftOracleTests.cs and docs/CPP_DIVERGENCES.md entry 41.
+// arm64 FMA-contraction caveat are in SiftOracleTests.cs and divergence 41.
 //
 // Translation notes:
 // - VLFeat's pointers into the octave/temp buffers become (array, offset) pairs; the
@@ -21,7 +21,7 @@
 // - Cancellation (not in VLFeat): the process methods and Detect take a CancellationToken
 //   and check it between scale levels, so a cancelled extraction stops within one level's
 //   smoothing of the current octave. The checks never touch the numbers.
-// - Deliberate fix (docs/CPP_DIVERGENCES.md entry 43): ProcessFirstOctave resets the
+// - Deliberate fix (divergence 43): ProcessFirstOctave resets the
 //   gradient cache's octave (grad_o), which VLFeat resets only in vl_sift_new, so a filter
 //   reused for a new image never computes it from the previous image's gradient.
 
@@ -207,7 +207,7 @@ public sealed partial class VlSiftFilter
 		// Not in VLFeat, which resets grad_o only in vl_sift_new: a filter reused for a new
 		// image would otherwise keep the previous image's gradient when that image's last
 		// octave with keypoints is this one's first, making results depend on image order
-		// (docs/CPP_DIVERGENCES.md entry 43).
+		// (divergence 43).
 		gradO = oMin - 1;
 
 		int w = OctaveWidth = ShiftLeft(Width, -CurrentOctave);

@@ -8,7 +8,7 @@
 // ColmapSharp.Tests/Scene/ReconstructionTests.Database.cs (reconstruction_test.cc).
 //
 // Tier A (exact). Both walk the cache's / model's IdMaps in ascending id order
-// (docs/CPP_DIVERGENCES.md, entries 21 and 33); neither result depends on that order,
+// (divergences 21 and 33); neither result depends on that order,
 // except which offending image a failing check reports.
 
 using ColmapSharp.Sensor;

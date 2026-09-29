@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // AutomaticReconstructionTests (continued): C#-only test of
-// AutomaticReconstructionOptions.ComputeDevice (docs/CPP_DIVERGENCES.md entry 136), not a port.
+// AutomaticReconstructionOptions.ComputeDevice (divergence 136), not a port.
 // The dense stages of the textured scene (AutomaticReconstructionTests.CSharpOnly.cs) run three
 // times over one sparse model: on the CPU, on ReferenceComputeDevice (the CPU twin of the WGSL
 // kernels, so bit-identical to the CPU), and on a twin that cannot be waited on synchronously,

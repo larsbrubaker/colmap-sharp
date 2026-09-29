@@ -226,7 +226,7 @@ public static partial class Ply
 			if (hasTexcoord)
 			{
 				// COLMAP reads the count and the UVs unchecked; a truncated file throws here
-				// (docs/CPP_DIVERGENCES.md, entry 113).
+				// (divergence 113).
 				Check.That(file.ReadExactly(faceBuffer.AsSpan(0, 1)), $"Unexpected end of PLY file at face {i}");
 				Check.Eq(faceBuffer[0], (byte)6, "Expected 6 texture coordinates per triangular face");
 

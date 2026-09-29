@@ -21,8 +21,7 @@
 // - Solve writes into the caller's x (the Eigen::VectorXd* out-parameter), which must have
 //   A.Cols entries; C++ would resize it.
 // - SolverType.SupernodalCholmodLLT keeps COLMAP's name but selects the managed
-//   SparseCholeskyWithFallbackSolver (CHOLMOD is not ported, docs/CPP_DIVERGENCES.md
-//   entry 13).
+//   SparseCholeskyWithFallbackSolver (CHOLMOD is not ported, divergence 13).
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Util;

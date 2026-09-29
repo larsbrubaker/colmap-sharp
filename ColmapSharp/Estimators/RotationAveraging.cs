@@ -15,7 +15,7 @@
 //   hash map): the quaternion averages of InitializeRigRotationsFromImages sum their samples
 //   in that order, and CreateExpandedReconstruction numbers the singleton rigs (ascending rig
 //   id, then COLMAP's std::map sensor order) and the new frames (ascending frame id, then the
-//   frame's ordered data ids) in it (docs/CPP_DIVERGENCES.md, entry 44).
+//   frame's ordered data ids) in it (divergence 44).
 // - NodeHashMap<image_t, Rigid3d> is IReadOnlyDictionary<uint, Rigid3d>; FlatHashSet<image_t>
 //   is HashSet<uint> / IReadOnlySet<uint>.
 // - LOG(ERROR) messages go to Util/Log.cs; LOG(INFO) messages are dropped.

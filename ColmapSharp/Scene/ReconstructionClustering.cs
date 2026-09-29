@@ -14,7 +14,7 @@
 //   order only feeds the union-find and the median, neither of which depends on it. The one
 //   place it leaks is the id of clusters of equal size: COLMAP sorts the clusters by size
 //   with std::sort, so equal-size clusters are numbered in an unspecified (hash-map) order.
-//   Here they are numbered by ascending smallest frame id (docs/CPP_DIVERGENCES.md, entry
+//   Here they are numbered by ascending smallest frame id (divergence
 //   93).
 // - The result is a Dictionary; like COLMAP's NodeHashMap its enumeration order carries no
 //   meaning (here it is deterministic: union-find order, then the frames outside it).
@@ -183,7 +183,7 @@ public static class ReconstructionClustering
 		}
 
 		// Sort by number of frames (largest first); equal sizes by ascending smallest frame
-		// id, where COLMAP's order is its hash map's (docs/CPP_DIVERGENCES.md, entry 93).
+		// id, where COLMAP's order is its hash map's (divergence 93).
 		var sortedClusters = rootToNodes.Values
 			.OrderByDescending(clusterNodes => clusterNodes.Count)
 			.ThenBy(clusterNodes => clusterNodes.Min())

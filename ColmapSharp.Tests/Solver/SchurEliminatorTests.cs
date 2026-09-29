@@ -10,7 +10,7 @@
 //   VaryingFBlockSizeWithStaticStructure is ported as VaryingFBlockSizeWithoutStaticStructure:
 //   the same problem, through the dynamic eliminator.
 // Not ported: SchurEliminatorForOneFBlock.MatchesSchurEliminator (Ceres' fixed-size <2, 3, 6>
-// specialization for a single F block is not ported; see docs/CPP_DIVERGENCES.md entry 35).
+// specialization for a single F block is not ported; see divergence 35).
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Solver;

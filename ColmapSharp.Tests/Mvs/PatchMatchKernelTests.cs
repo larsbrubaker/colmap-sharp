@@ -296,7 +296,7 @@ public class PatchMatchKernelTests
 	public async Task PhotoConsistency_ComputesRadiiBeyondCudaTemplates()
 	{
 		// COLMAP's CUDA kernel is instantiated for radii 1-20 only; Check accepts up to 32 and
-		// the port computes them (docs/CPP_DIVERGENCES.md, entry 97). With the same camera
+		// the port computes them (divergence 97). With the same camera
 		// and image the windows (zero outside the image on both sides) match.
 		float[] frontal = [0, 0, -1];
 		foreach ((int radius, int step) in new[] { (25, 2), (PatchMatchOptions.MaxPatchMatchWindowRadius, 1) })

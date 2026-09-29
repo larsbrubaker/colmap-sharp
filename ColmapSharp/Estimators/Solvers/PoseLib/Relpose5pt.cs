@@ -16,7 +16,7 @@
 // substitution for each root.
 //
 // The null space comes from an unpivoted Householder QR instead of PoseLib's
-// fullPivHouseholderQr (docs/CPP_DIVERGENCES.md, entry 27): same space, different basis, same
+// fullPivHouseholderQr (divergence 27): same space, different basis, same
 // solution set. Tier B. Allocation-free apart from the output list (and the rare
 // three-row fallback solve of the back substitution).
 

@@ -21,7 +21,7 @@
 //   in ascending frame id (Util/IdMap.cs); COLMAP iterates a NodeHashMap, so a given seed
 //   hands its draws to different frames. The frame centers, points and cameras-in-rig are
 //   kept sorted by id too, which sets the element order inside the ordering groups. The
-//   final positions agree within the tests' tolerances (docs/CPP_DIVERGENCES.md entry 48).
+//   final positions agree within the tests' tolerances (divergence 48).
 // - The CUDA options (use_gpu, gpu_index, min_num_images_gpu_solver) are not ported: the
 //   solver runs on the CPU, as COLMAP does without CUDA.
 // - LOG(WARNING)/LOG(ERROR) go to Util/Log.cs; LOG(INFO)/VLOG output is dropped.

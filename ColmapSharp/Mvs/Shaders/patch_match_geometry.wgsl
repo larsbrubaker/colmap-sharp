@@ -12,7 +12,7 @@
 //   sampling of patch_match_textures.wgsl and is in patch_match_geom_cost.wgsl; RotateNormalMap
 //   is the rotate_normals kernel of patch_match_rotate.wgsl.
 // Ports: patch_match_cuda.cu's __device__ geometry helpers, as the CPU port models them
-//   (docs/CPP_DIVERGENCES.md, entries 86 and 96).
+//   (divergences 86 and 96).
 // Composed by ColmapSharp/Mvs/PatchMatchShaders.cs after patch_match_common.wgsl (it uses the
 // RNG and the float bit tests). A kernel that includes this file supplies, in its constants
 // header,

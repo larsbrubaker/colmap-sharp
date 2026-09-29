@@ -19,7 +19,7 @@
 // F with a positive q = 1/f^2 becomes E = K F K and is decomposed by Essential.cs.
 //
 // The null space comes from an unpivoted Householder QR instead of PoseLib's
-// fullPivHouseholderQr (docs/CPP_DIVERGENCES.md, entry 30): same space, different basis,
+// fullPivHouseholderQr (divergence 30): same space, different basis,
 // the same solution set in exact arithmetic, though spurious real roots of the ill-conditioned
 // degree-15 polynomial can appear or vanish with the basis. Tier B.
 

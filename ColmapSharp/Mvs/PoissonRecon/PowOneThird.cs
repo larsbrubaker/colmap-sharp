@@ -6,7 +6,7 @@
 // is also the platform libm (and wasm has its own), so the port computes the value itself:
 // the correctly rounded double of x^p for p = fl(1/3) = 1/3 - 2^-54/3, which is what Apple's
 // libm (the oracle's) returns whenever its result is correctly rounded. See
-// docs/CPP_DIVERGENCES.md, entry 75.
+// divergence 75.
 //
 // Method (written here): x^p = cbrt(x) * x^-d with d = 1/3 - p = 2^-54/3. A double guess y0
 // of cbrt(x) is refined by one Newton step whose residual y0^3 - x is formed exactly in

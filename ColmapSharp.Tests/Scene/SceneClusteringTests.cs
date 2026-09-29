@@ -5,7 +5,7 @@
 // TEST(Suite, Name) named Suite_Name. Tests ColmapSharp/Scene/SceneClustering.cs.
 //
 // Tier C: the partition comes from Mathematics/MultilevelPartitioner.cs instead of METIS
-// (docs/CPP_DIVERGENCES.md, entry 77), and every expected membership below is COLMAP's.
+// (divergence 77), and every expected membership below is COLMAP's.
 // CSharpOnly_FlatChildClustersOrderedBySizeThenSmallestId and
 // CSharpOnly_CreateSpreadsTiedOverlapAcrossFrames are extra C#-only checks.
 // UnorderedClustersEq compares the clusters as sets, ignoring the order of the clusters and
@@ -131,7 +131,7 @@ public class SceneClusteringTests
 			.IsEquivalentTo(UnorderedClustersEq([0, 1], [2, 3], [4, 5]));
 	}
 
-	// C#-only: pins the flat child order of docs/CPP_DIVERGENCES.md entry 94 (descending
+	// C#-only: pins the flat child order of divergence 94 (descending
 	// size, then ascending smallest image id), which COLMAP's comparator leaves undefined.
 	[Test]
 	public async Task CSharpOnly_FlatChildClustersOrderedBySizeThenSmallestId()
@@ -262,7 +262,7 @@ public class SceneClusteringTests
 		await Assert.That(childImageSets.Any(imageIds => imageIds.Contains(3) && imageIds.Contains(4) && imageIds.Contains(6))).IsTrue();
 	}
 
-	// C#-only (docs/CPP_DIVERGENCES.md, entry 120). In a synthetic dataset every image pair
+	// C#-only (divergence 120). In a synthetic dataset every image pair
 	// has the same number of matches, so every clustering tie falls to the order in which
 	// Create hands over the pairs. Taken in ascending pair id, the root split's overlap was
 	// images 1-3 and 31-33: one frame per side. For a panoramic rig (zero sensor

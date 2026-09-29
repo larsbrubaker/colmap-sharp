@@ -7,7 +7,7 @@
 // Translation of the fixtures:
 // - The input image files COLMAP writes with Bitmap::Write become an InMemoryImageSource of
 //   the same bitmaps under the same names (decoding is the host's job,
-//   docs/CPP_DIVERGENCES.md entry 82).
+//   divergence 82).
 // - The undistorted images go to an InMemoryBitmapStore (entry 98), so ExistsFile /
 //   GetRecursiveFileList on an image path ask the store; text files and directories are on
 //   disk, as in COLMAP.

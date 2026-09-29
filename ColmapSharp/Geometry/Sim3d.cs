@@ -13,7 +13,7 @@
 //   ToFile/FromFile text round trip (17 significant digits, lossless).
 // - Tier B: everything that rotates a vector with q * v (applying the transform, the
 //   translations of Inverse and of composition), for the FMA reason in
-//   docs/CPP_DIVERGENCES.md, entry 6.
+//   divergence 6.
 //
 // Translation notes: as for Rigid3d - a readonly struct mutated with `with`, whose
 // parameterless constructor (not default(Sim3d)) is the identity; COLMAP's free Inverse is

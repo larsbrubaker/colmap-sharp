@@ -10,7 +10,7 @@
 // end in their original orientation. PatchMatch.cs (Run and the getters) is the public entry
 // point. Tests: ColmapSharp.Tests/Mvs/PatchMatchRunTests.cs (C#-only).
 //
-// Tier C (docs/CPP_DIVERGENCES.md, entries 86, 95, 96). Deterministic: every parallel loop
+// Tier C (divergences 86, 95, 96). Deterministic: every parallel loop
 // writes disjoint outputs and random draws are keyed on the pixel, so the result is the
 // same for any thread count.
 //

@@ -19,7 +19,7 @@
 # closed-form pattern of image_color() below, which the C# test regenerates in memory.
 #
 # Fusion runs with num_threads = 1, the traversal order ColmapSharp always uses
-# (docs/CPP_DIVERGENCES.md, entry 87), so the points come out in the same order.
+# (divergence 87), so the points come out in the same order.
 #
 # Usage: oracle/.venv/bin/python oracle/fixture_stereo_fusion.py
 

@@ -23,7 +23,7 @@
 //   on the shared fused-pixel masks, so its output depends on scheduling. Here the
 //   traversal runs on one thread in row order, which is exactly COLMAP with num_threads = 1
 //   (and COLMAP's use_cache path, which always runs one thread). NumThreads only sets the
-//   workspace loading parallelism (docs/CPP_DIVERGENCES.md, entry 87).
+//   workspace loading parallelism (divergence 87).
 // - A point's visibility is COLMAP's FlatHashSet (std::unordered_set) iterated into a
 //   vector, in hash order; here it is in ascending image index (entry 88).
 // - Images and masks are decoded by the host through IBitmapSource; masks are read as grey

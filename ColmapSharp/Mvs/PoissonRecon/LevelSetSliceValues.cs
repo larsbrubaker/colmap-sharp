@@ -21,7 +21,7 @@
 // Translation notes: the key/vertex lists hold the vertex's index in the output stream rather
 // than a copy of the vertex (upstream pairs both); the vertex is the sink's entry at that
 // index. Upstream keeps one list per thread and merges them in thread order; the port runs
-// single-threaded, so there is one list (docs/CPP_DIVERGENCES.md, entry 123). The maps are only
+// single-threaded, so there is one list (divergence 123). The maps are only
 // looked up, never iterated, so their (unordered) iteration order reaches no output; the order
 // of the iso-edges inside one face-edge map entry is the recording order.
 

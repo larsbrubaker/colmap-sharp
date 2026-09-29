@@ -24,7 +24,7 @@
 // real solution becomes E = F diag(1, 1, 1/f) and is decomposed by Essential.cs.
 //
 // The null space comes from an unpivoted Householder QR instead of PoseLib's
-// fullPivHouseholderQr (docs/CPP_DIVERGENCES.md, entry 30). The order of the eigenvalues
+// fullPivHouseholderQr (divergence 30). The order of the eigenvalues
 // (Schur order) sets the order of the returned poses, which may differ from Eigen's; COLMAP
 // treats the output as a set. Tier B.
 

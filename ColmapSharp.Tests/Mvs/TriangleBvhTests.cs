@@ -2,7 +2,7 @@
 //
 // TriangleBvhTests: C#-only tests (not ports; COLMAP has no test for its CGAL occlusion
 // tree). They pin ColmapSharp/Mvs/TriangleBvh.cs, the CGAL AABB-tree replacement
-// (docs/CPP_DIVERGENCES.md, entry 90), and the texture mapping properties this port adds:
+// (divergence 90), and the texture mapping properties this port adds:
 // occlusion is applied, and results are identical for any thread count.
 
 using ColmapSharp.Mvs;

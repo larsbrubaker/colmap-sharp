@@ -208,7 +208,7 @@ public sealed class SolverOptions
 	/// Schur solvers then find an independent set). With several groups, a Schur solver
 	/// eliminates the lowest group, which must be an independent set. Unlike Ceres, Solve
 	/// leaves this object as it was (Ceres removes the blocks it drops as constant;
-	/// docs/CPP_DIVERGENCES.md entry 37).
+	/// divergence 37).
 	/// </summary>
 	public ParameterBlockOrdering? LinearSolverOrdering { get; set; }
 

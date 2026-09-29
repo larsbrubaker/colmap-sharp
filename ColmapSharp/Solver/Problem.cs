@@ -126,7 +126,7 @@ public sealed partial class Problem
 	/// <summary>
 	/// Problem::GetParameterBlocks: every parameter block, in insertion order. Ceres lists
 	/// them in the order of its std::map keyed by address, which has no C# counterpart;
-	/// insertion order is the reproducible choice (docs/CPP_DIVERGENCES.md, entry 53).
+	/// insertion order is the reproducible choice (divergence 53).
 	/// </summary>
 	public List<ArraySegment<double>> GetParameterBlocks() =>
 		Program.ParameterBlocks.Select(block => block.UserState).ToList();

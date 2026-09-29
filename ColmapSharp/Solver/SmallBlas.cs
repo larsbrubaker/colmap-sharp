@@ -12,7 +12,7 @@
 // operation (=, +=, -=), which is how Ceres' naive kernels round; Ceres switches to Eigen's
 // kernels when all sizes are compile-time constants (its template specializations such as
 // <2, 3, 6>), whose summation order is Eigen's and may differ in the last bits
-// (docs/CPP_DIVERGENCES.md entry 35).
+// (divergence 35).
 //
 // InvertUpperPsd is InvertPSDMatrix with assume_full_rank = true for dynamic sizes:
 // selfadjointView<Upper>().llt().solve(Identity), a Cholesky factorization of the upper

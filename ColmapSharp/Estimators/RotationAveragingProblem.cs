@@ -20,7 +20,7 @@
 //   the order of the jitter draws and which frame fixes the gauge. Here active frames and
 //   estimated cameras are laid out in ascending id order, pair constraints in ascending pair
 //   id order, and the gauge is fixed at the smallest-id (gravity-aligned, if any) frame
-//   (docs/CPP_DIVERGENCES.md, entry 44).
+//   (divergence 44).
 // - COLMAP looks up a pair's frame parameter with operator[], which silently inserts index 0
 //   for a frame outside the active set (and ComputeResiduals then throws from .at()). Callers
 //   invalidate such pairs first (PoseGraph.InvalidatePairsOutsideActiveImageIds); here the

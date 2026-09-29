@@ -4,7 +4,7 @@
 // SiftMatcherTests: the unguided CPU matcher cases of colmap/feature/sift_test.cc, 1:1 -
 // SiftCPUFeatureMatcher.Nominal, SiftCPUFeatureMatcher.TypeMismatch and
 // SiftCPUFeatureMatcherFaissVsBruteForce.Nominal (the index path against brute force; the
-// index is exact here, docs/CPP_DIVERGENCES.md entry 42). The guided cases are in
+// index is exact here, divergence 42). The guided cases are in
 // SiftMatcherGuidedTests.cs; the helpers of sift_test.cc are in SiftMatcherTestUtils.
 // Tests ColmapSharp/Feature/SiftMatcher.cs.
 //

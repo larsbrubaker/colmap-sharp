@@ -2,7 +2,7 @@
 //
 // ReconstructionIORobustnessTests: C#-only tests (not ports of a *_test.cc) for how
 // ColmapSharp/Scene/ReconstructionIO*.cs handles unusual or broken input: multibyte UTF-8
-// image names, names that are not UTF-8 (docs/CPP_DIVERGENCES.md, entry 25), truncated and
+// image names, names that are not UTF-8 (divergence 25), truncated and
 // lying binary files, unknown camera models and sensor types, images no frame holds, and the
 // libc++ `istream >>` number spellings CppLineTokens.cs reproduces (probed with a libc++
 // harness: "-1" read as an unsigned is its maximum, "0x1p3" is 8, a decimal that underflows

@@ -12,7 +12,7 @@
 // (J'J)^-1 = P R^-1 R^-T P' column by column. Here the Jacobian is dense and factored with
 // the column-pivoting Householder QR of LinearAlgebra/ColPivHouseholderQR.cs (Eigen's sparse
 // QR is MPL-2.0 and not ported). The result is the same matrix up to round-off
-// (docs/CPP_DIVERGENCES.md, entry 45). Covariance of a constant block is zero, as in Ceres.
+// (divergence 45). Covariance of a constant block is zero, as in Ceres.
 // Dense is fine for COLMAP's callers: a single pose (plus a camera) against its observations.
 
 using ColmapSharp.LinearAlgebra;

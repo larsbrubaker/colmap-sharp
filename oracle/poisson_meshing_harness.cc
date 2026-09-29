@@ -4,11 +4,11 @@
 // vendored by COLMAP 4.2.0), each compiled as its own translation unit with -DRELEASE as
 // COLMAP's CMakeLists.txt does. The thread pool is set as COLMAP sets it for num_threads = 1
 // (one thread, ThreadPool::NONE): the single-threaded order the port follows
-// (docs/CPP_DIVERGENCES.md, entries 106 and 123).
+// (divergences 106 and 123).
 //
 // Usage: harness <depth> <point_weight> <trim> <in.ply> <out.ply>. One case per process:
 // PoissonRecon.cpp's and SurfaceTrimmer.cpp's command-line flags are globals that keep their
-// "set" state across calls (docs/CPP_DIVERGENCES.md, entry 131). Built and run by
+// "set" state across calls (divergence 131). Built and run by
 // oracle/fixture_poisson_meshing.py, which stores the output PLYs in
 // ColmapSharp.Tests/TestData/oracle/poisson_meshing_exact.json. Not part of any build.
 

@@ -9,7 +9,7 @@
 //
 // Tier A (exact). The stream reads (`std::getline`, `line_stream >> value` in the classic
 // locale) go through Util/CppLineTokens.cs, so a token parses as libc++ parses it (strtof for
-// floats), except that a token is taken whole (docs/CPP_DIVERGENCES.md entry 25).
+// floats), except that a token is taken whole (divergence 25).
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Mathematics;

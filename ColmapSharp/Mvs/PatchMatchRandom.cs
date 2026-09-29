@@ -3,7 +3,7 @@
 // PatchMatchRandom: the random numbers of the CPU PatchMatch kernel, replacing COLMAP's
 // cuRAND state per pixel (gpu_mat_prng.cu's curand_init(id, 0, 0) and curand_uniform in
 // patch_match_cuda.cu). Written for colmap-sharp; not a COLMAP port
-// (docs/CPP_DIVERGENCES.md, entry 86).
+// (divergence 86).
 //
 // Counter-based: every draw is a pure function of (seed, pixel in the original, unrotated
 // reference image, phase, draw index), where the phase names the step that draws (the

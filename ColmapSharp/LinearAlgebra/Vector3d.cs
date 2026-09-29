@@ -19,7 +19,7 @@
 // its evidence (oracle/linear_algebra_rotations.py). The 3-vector norm here is plain
 // left to right, which the same oracle confirms through AngleAxisd's angle.
 // The macOS arm64 pycolmap wheel also contracts some a*b - c*d into an FMA (Cross, for
-// one); we do not, see docs/CPP_DIVERGENCES.md, entry 6.
+// one); we do not, see divergence 6.
 
 using System.Globalization;
 

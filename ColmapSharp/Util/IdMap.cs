@@ -5,7 +5,7 @@
 // points in. Written here, not ported: COLMAP's map is a hash map whose iteration order is
 // unspecified, and that order leaks into results (point ids assigned by Crop, the order of
 // registered frames, sums over points). CLAUDE.md requires deterministic iteration, so this
-// map iterates in ascending key order, always (docs/CPP_DIVERGENCES.md, entry 21).
+// map iterates in ascending key order, always (divergence 21).
 //
 // Lookups go through a Dictionary (O(1), as in COLMAP). Each entry also records its slot in
 // an ascending key list kept alongside:

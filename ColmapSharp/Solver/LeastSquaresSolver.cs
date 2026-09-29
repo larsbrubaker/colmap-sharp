@@ -15,7 +15,7 @@
 // put the eliminated blocks first (SchurOrdering.cs), chosen automatically or taken from
 // the user's SolverOptions.LinearSolverOrdering; Ceres also reorders for SuiteSparse's own
 // fill-reducing ordering, which the simplicial Cholesky here does itself
-// (docs/CPP_DIVERGENCES.md entry 22). A problem whose variable blocks have bounds must start
+// (divergence 22). A problem whose variable blocks have bounds must start
 // feasible and runs the projected line search (TrustRegionMinimizer.cs).
 
 namespace ColmapSharp.Solver;
@@ -134,7 +134,7 @@ public static class LeastSquaresSolver
 		// SetupLinearSolver. A user ordering loses the blocks the reduction removed (on a
 		// copy: Ceres edits the caller's ordering). If that empties the first elimination
 		// group, a Schur solver has nothing to eliminate and Ceres switches solvers
-		// (docs/CPP_DIVERGENCES.md entry 37).
+		// (divergence 37).
 		LinearSolverType type = options.LinearSolverType;
 		ParameterBlockOrdering? ordering = null;
 		if (options.LinearSolverOrdering is not null)
@@ -181,7 +181,7 @@ public static class LeastSquaresSolver
 		else if (type == LinearSolverType.SparseNormalCholesky && ordering is not null && ordering.NumElements != reduced.ParameterBlocks.Count)
 		{
 			// ReorderProgramForSparseCholesky's check; the fill-reducing ordering itself is
-			// the simplicial Cholesky's own (docs/CPP_DIVERGENCES.md entry 22).
+			// the simplicial Cholesky's own (divergence 22).
 			error = $"The program has {reduced.ParameterBlocks.Count} parameter blocks, but the parameter block ordering has {ordering.NumElements} parameter blocks.";
 			return null;
 		}

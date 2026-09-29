@@ -11,7 +11,7 @@
 // against unfused VLFeat) and CovariantSiftOracleTests.cs (pycolmap).
 //
 // Tier A against unfused VLFeat, like Sift.cs; against the macOS arm64 wheel, which fuses
-// multiply-adds, within the tolerance of docs/CPP_DIVERGENCES.md entry 41.
+// multiply-adds, within the tolerance of divergence 41.
 //
 // Translation notes:
 // - Sort: COLMAP orders the features by (octave, level) descending with std::sort, which

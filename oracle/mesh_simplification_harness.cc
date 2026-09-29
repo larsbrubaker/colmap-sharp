@@ -16,7 +16,7 @@
 //   (Eberly), as ColmapSharp does; Vector3d/3f/Matrix4d arithmetic is written out per
 //   coefficient in Eigen's evaluation order.
 // - Boundary edges are visited in (smaller, larger) vertex-index order instead of the
-//   boost::unordered_node_map order (docs/CPP_DIVERGENCES.md, entry 73).
+//   boost::unordered_node_map order (divergence 73).
 // - Built with -ffp-contract=off (CLAUDE.md, "No FMA").
 //
 // Input (stdin): "nv nf", then nv lines "x y z r g b" (x, y, z as decimal float values),

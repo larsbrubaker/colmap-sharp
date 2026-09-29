@@ -11,7 +11,7 @@
 // order as COLMAP's (the order in which matches were added).
 //
 // Translation notes:
-// - Hash-container order (docs/CPP_DIVERGENCES.md, entry 14): COLMAP keeps images and image
+// - Hash-container order (divergence 14): COLMAP keeps images and image
 //   pairs in NodeHashMap / FlatHashMap, whose iteration order depends on the build's hash
 //   backend (std or Boost). The only outputs that expose that order are ImagePairs() and
 //   NumMatchesBetweenAllImages(). Here both are Dictionaries that are never removed from,

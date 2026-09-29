@@ -11,7 +11,7 @@
 // - Ceres names the dense cases by back end (EIGEN) and the sparse ones by library and
 //   ordering. The one sparse back end here is the simplicial LLT with AMD, so the Eigen-sparse
 //   AMD and NATURAL cases both run it (the ordering is the Cholesky's own either way,
-//   docs/CPP_DIVERGENCES.md entry 35).
+//   divergence 35).
 // Not ported: the LAPACK, SuiteSparse, Accelerate and NESDIS (METIS) variants (those
 // libraries are not ported), and IterativeSchurComplementSolverTest's
 // NormalProblemSchurJacobiWithPowerSeriesExpansionInitialization and

@@ -18,7 +18,7 @@
 // Translation notes:
 // - Iteration order. COLMAP's stat maps are absl flat hash maps. Here they are Dictionarys
 //   that are only ever added to, so they iterate in insertion order: image stats in
-//   ascending image id (the reconstruction's IdMap order, docs/CPP_DIVERGENCES.md entry 21)
+//   ascending image id (the reconstruction's IdMap order, divergence 21)
 //   then AddImage order; ImagePairs in the correspondence graph's pair order, then AddImage
 //   order (entry 50). No count here depends on that order.
 // - C++ `image_stats_[id]` / `image_pair_stats_[id]` insert a default entry when the id is
@@ -156,8 +156,7 @@ public sealed partial class ObservationManager
 
 	/// <summary>
 	/// The statistics of every image pair with matches. Iterates in the correspondence
-	/// graph's pair order, then in the order AddImage added pairs (docs/CPP_DIVERGENCES.md,
-	/// entry 50).
+	/// graph's pair order, then in the order AddImage added pairs (divergence 50).
 	/// </summary>
 	public IReadOnlyDictionary<ulong, ImagePairStat> ImagePairs => _imagePairStats;
 
@@ -439,7 +438,7 @@ public sealed partial class ObservationManager
 	/// <summary>
 	/// COLMAP's operator&lt;&lt;. C++ streams the correspondence graph's shared_ptr, i.e. its
 	/// address; .NET has no stable address, so a non-null graph prints its own ToString
-	/// (docs/CPP_DIVERGENCES.md, entry 50).
+	/// (divergence 50).
 	/// </summary>
 	public override string ToString() =>
 		$"ObservationManager(reconstruction={_reconstruction}, correspondence_graph={(_correspondenceGraph is null ? "null" : _correspondenceGraph.ToString())})";

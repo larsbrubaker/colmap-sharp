@@ -24,7 +24,7 @@
 // - Source coordinates are accumulated per row by the homography's column steps and
 //   restarted per row from the accumulated row steps, in COLMAP's float order ("to reduce
 //   numerical errors").
-// - Float math with MathF and no fused multiply-add (docs/CPP_DIVERGENCES.md, entry 96);
+// - Float math with MathF and no fused multiply-add (divergence 96);
 //   source samples are exact float bilinear (entry 95).
 
 namespace ColmapSharp.Mvs;

@@ -9,7 +9,7 @@
 // Skipped lines: the `caspar` assertions of PropagatesExplicitMaxNumIterations and
 // DefaultMaxNumIterationsUsesBackendDefaults (ASSERT_TRUE(options.caspar) and its
 // solver_iter_max checks): ColmapSharp has no Caspar (GPU) backend options
-// (docs/CPP_DIVERGENCES.md, entry 66). The Ceres lines are ported unchanged.
+// (divergence 66). The Ceres lines are ported unchanged.
 
 using ColmapSharp.Controllers;
 using ColmapSharp.Estimators;

@@ -9,7 +9,7 @@
 // - Tier A (exact): ids, names, counts, camera parameters, 3D point positions (uniform draws),
 //   frame rotations (uniform draws + shortest-arc quaternion), and the index and position of
 //   every 2D point without a 3D point (uniform draws with min 0, and the shuffle permutation).
-// - Tier B: sensor-from-rig poses (1e-12; Gaussian draws, docs/CPP_DIVERGENCES.md entry 1);
+// - Tier B: sensor-from-rig poses (1e-12; Gaussian draws, divergence 1);
 //   frame translations (1e-14) and 2D projections (1e-9 px), which differ from the wheel in
 //   the last ulp where its quaternion rotation is contracted into FMAs (entry 31); 3D point
 //   errors (1e-9 absolute, means of tiny reprojection errors).
@@ -38,7 +38,7 @@ public class SyntheticOracleTests
 	private const double GaussianTolerance = 1e-12;
 
 	// A few ulps of the translation (|t| = 5, ulp 8.9e-16): the wheel's quaternion rotation
-	// is contracted into FMAs, ColmapSharp's is not (docs/CPP_DIVERGENCES.md entry 31).
+	// is contracted into FMAs, ColmapSharp's is not (divergence 31).
 	private const double ContractionTolerance = 1e-14;
 
 	// Projections to pixels (~1e3) inherit that last-ulp pose difference.

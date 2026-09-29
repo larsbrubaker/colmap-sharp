@@ -12,7 +12,7 @@
 // Tier A (exact): pure bookkeeping.
 //
 // Translation notes:
-// - Iteration order (docs/CPP_DIVERGENCES.md, entry 33): COLMAP keeps the objects in
+// - Iteration order (divergence 33): COLMAP keeps the objects in
 //   NodeHashMaps; here they are in Util/IdMap.cs and enumerate in ascending id order.
 //   The correspondence graph is built from the two-view geometries in the order the
 //   database returns them (COLMAP does the same), and CreateFromCache copies pairs in the

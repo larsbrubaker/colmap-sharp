@@ -16,7 +16,7 @@
 //
 // Iteration order: COLMAP iterates Reconstruction::Points3D()/Images() and a local
 // NodeHashMap of pairs, whose order is abseil's hash order. Here those are ascending id
-// order (IdMap, docs/CPP_DIVERGENCES.md entries 21 and 31). The draw sequence is the same;
+// order (IdMap, divergences 21 and 31). The draw sequence is the same;
 // only which point or pair receives which draws, and the order of each image's 2D points
 // before the shuffle, differ.
 //

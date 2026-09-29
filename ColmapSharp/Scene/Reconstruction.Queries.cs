@@ -9,7 +9,7 @@
 //
 // Tiers: IsValid, TearDown, Crop's bookkeeping, the lookups and the counts are Tier A.
 // Normalize/ComputeCentroid are Tier B through Geometry/Normalization.cs's centroid sum
-// (docs/CPP_DIVERGENCES.md, entry 15) and Transform is Tier B through Sim3d's rotation of
+// (divergence 15) and Transform is Tier B through Sim3d's rotation of
 // vectors (entry 6). UpdatePoint3DErrors follows the camera models' tier.
 
 using System.Globalization;

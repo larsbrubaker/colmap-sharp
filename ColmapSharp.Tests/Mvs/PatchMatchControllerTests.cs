@@ -3,7 +3,7 @@
 // PatchMatchControllerTests: C#-only tests (COLMAP has no patch_match_test.cc) for
 // ColmapSharp/Mvs/PatchMatchController.cs: reading patch-match.cfg into problems
 // ("__all__", "__auto__, N", explicit lists, comments), the "__auto__" ranking and its tie
-// order (docs/CPP_DIVERGENCES.md, entry 84), loading one problem's inputs (SetUpProblem,
+// order (divergence 84), loading one problem's inputs (SetUpProblem,
 // including the used-image order of entry 85), and Run: the files it writes, the skip of
 // finished problems, the photometric-then-geometric passes, a model in memory,
 // cancellation, and the warnings it logs. The workspace is a synthetic COLMAP reconstruction

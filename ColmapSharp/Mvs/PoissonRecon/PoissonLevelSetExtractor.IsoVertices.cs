@@ -27,7 +27,7 @@
 //   here it is BadRootCount on the extractor.
 // - Upstream sets the vertices in a ThreadPool::ParallelFor over the slice's leaves and numbers
 //   them by an atomic counter; the port runs the leaves in order, which is what a
-//   single-threaded run does (docs/CPP_DIVERGENCES.md, entry 123). No hash-map order reaches
+//   single-threaded run does (divergence 123). No hash-map order reaches
 //   the numbering: the vertex order is the leaf and edge loop order.
 
 namespace ColmapSharp.Mvs.PoissonRecon;

@@ -11,11 +11,11 @@
 //
 // Translation notes:
 // - image_path is not ported: point colors are read through a host callback
-//   (docs/CPP_DIVERGENCES.md entry 68), GlobalPipelineOptions.ReadImage.
+//   (divergence 68), GlobalPipelineOptions.ReadImage.
 // - As in COLMAP, the bundle_adjustment initializer sets the Ceres use_gpu, and
 //   BundleAdjustment() forwards ba_gpu_index to the Ceres gpu_index; the managed solver has no
 //   GPU path and ignores both. There are no Caspar (GPU) options, so BundleAdjustment() does
-//   not set caspar->gpu_index (docs/CPP_DIVERGENCES.md entry 66).
+//   not set caspar->gpu_index (divergence 66).
 // - The C++ accessors return by value; here each returns a fresh Clone().
 
 using ColmapSharp.Estimators;

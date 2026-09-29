@@ -7,7 +7,7 @@
 // Mirrors: ColmapSharp/Mvs/PatchMatchRandom.cs (the RNG, bit for bit) and
 //   PatchMatchKernel.CudaMin/CudaMax in ColmapSharp/Mvs/PatchMatchKernel.Geometry.cs.
 // Ports: nothing from COLMAP directly; PatchMatchRandom replaces patch_match_cuda.cu's cuRAND
-//   state (docs/CPP_DIVERGENCES.md, entry 86), and cuda_min/cuda_max keep CUDA's fminf/fmaxf
+//   state (divergence 86), and cuda_min/cuda_max keep CUDA's fminf/fmaxf
 //   (entry 96).
 // Composed by ColmapSharp/Mvs/PatchMatchShaders.cs. The C#-only
 // ColmapSharp.Tests/Mvs/PatchMatchShaderRngTransliterationTests.cs runs a line-by-line C# copy

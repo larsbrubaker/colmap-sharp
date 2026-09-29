@@ -9,7 +9,7 @@
 // COLMAP's first stage is CHOLMOD's supernodal LLT (GPL, not ported); here it is the
 // simplicial LLT of LinearAlgebra/SimplicialCholesky.cs with AMD ordering, which accepts
 // and rejects the same matrices (both stop at the first pivot <= 0) but groups the
-// floating-point work differently (docs/CPP_DIVERGENCES.md, entry 13). The fallback stage
+// floating-point work differently (divergence 13). The fallback stage
 // is Eigen::SimplicialLDLT in COLMAP and SimplicialCholesky's LDLT here. Tier B.
 //
 // Translation notes:

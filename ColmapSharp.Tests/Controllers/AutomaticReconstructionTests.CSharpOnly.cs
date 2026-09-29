@@ -19,7 +19,7 @@
 // scene, the port and pycolmap 4.2.0's poisson_meshing both give an empty mesh at trim 10,
 // while pycolmap keeps 26325 faces at trim 0. Delaunay meshing has no density trim.
 //
-// The same run pins the C#-only texturing step (docs/CPP_DIVERGENCES.md entry 135): the mesh
+// The same run pins the C#-only texturing step (divergence 135): the mesh
 // comes out textured, with one UV in [0, 1] per face corner, most faces assigned a view, a
 // non-empty atlas in memory and at the host's sink, and mesh.ply written next to it.
 //

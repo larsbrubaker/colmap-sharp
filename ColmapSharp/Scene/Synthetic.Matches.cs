@@ -8,7 +8,7 @@
 // outliers, and a two-view geometry with the exact E (and F) of the synthetic poses.
 //
 // Order: the chained pairs are collected in a NodeHashMap in COLMAP and written in its hash
-// order; here they go in ascending pair id order (docs/CPP_DIVERGENCES.md entry 31). Since
+// order; here they go in ascending pair id order (divergence 31). Since
 // every pair's matches are shuffled with the global PRNG, that changes which pair gets which
 // shuffle, not how many draws are made. Exhaustive and sparse pairs are ordered the same way
 // in both (registered-image order and std::set order).

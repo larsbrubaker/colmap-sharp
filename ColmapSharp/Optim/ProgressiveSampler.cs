@@ -20,7 +20,7 @@
 //   yields index total_num_samples on the first call). Keeping this is what Tier A means;
 //   the same happens with fewer samples once n has grown to total_num_samples. COLMAP's
 //   RANSAC then reads past the end of the data (undefined behavior); SampleX/SampleXY
-//   (Sampler.cs) throw a Check failure instead (docs/CPP_DIVERGENCES.md, entry 16).
+//   (Sampler.cs) throw a Check failure instead (divergence 16).
 
 using ColmapSharp.Mathematics;
 using ColmapSharp.Util;

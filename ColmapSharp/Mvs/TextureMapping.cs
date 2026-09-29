@@ -14,8 +14,8 @@
 // to disk here either; its callers encode the atlas, which this library leaves to the host.
 //
 // Tier C for the pipeline as a whole, B for its float arithmetic: projections are float
-// products whose last bits can differ from an Eigen/FMA build (docs/CPP_DIVERGENCES.md,
-// entry 63). Occlusion and tie orders are entries 90-92. Results are identical for any thread
+// products whose last bits can differ from an Eigen/FMA build (divergence 63).
+// Occlusion and tie orders are entries 90-92. Results are identical for any thread
 // count: every parallel loop writes only its own slots.
 
 using ColmapSharp.Sensor;

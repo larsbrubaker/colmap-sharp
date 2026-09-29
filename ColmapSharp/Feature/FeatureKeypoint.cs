@@ -13,7 +13,7 @@
 // (the scale/orientation constructor, FromShapeParameters, ComputeScale*,
 // ComputeOrientation, ComputeShear) go through MathF.Sin/Cos/Atan2/Sqrt where COLMAP calls
 // the platform's float libm; Sqrt is exact, the others may differ in the last ulp, so those
-// are Tier B (types_test.cc compares them with a tolerance; docs/CPP_DIVERGENCES.md entry 114).
+// are Tier B (types_test.cc compares them with a tolerance; divergence 114).
 //
 // Default value: COLMAP's default constructor is FeatureKeypoint(0, 0), i.e. the identity
 // shape a11 = a22 = 1. A C# struct's parameterless constructor runs for

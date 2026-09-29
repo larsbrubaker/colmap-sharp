@@ -10,7 +10,7 @@
 # (scripts/fetch-reference.sh) with -ffp-contract=off - the arithmetic ColmapSharp does -
 # runs it, and records what it prints. COLMAP itself builds PoissonRecon with -ffast-math;
 # that build is not reproducible bit for bit and is not the oracle here
-# (docs/CPP_DIVERGENCES.md, entry 74).
+# (divergence 74).
 #
 # Usage: oracle/.venv/bin/python oracle/fixture_poisson_bspline.py   (any python3 works)
 

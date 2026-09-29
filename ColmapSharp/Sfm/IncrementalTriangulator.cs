@@ -25,7 +25,7 @@
 //   output, Create's filtered copy per recursion depth, TriangulateTrack's inputs and
 //   Retriangulate's matches), because these run for every observation of every image.
 // - Iteration order. Retriangulate visits ObservationManager.ImagePairs in insertion order
-//   (docs/CPP_DIVERGENCES.md, entry 50); CompleteAllTracks/MergeAllTracks visit
+//   (divergence 50); CompleteAllTracks/MergeAllTracks visit
 //   Reconstruction.Point3DIds in ascending id order (entry 21); the modified-point set,
 //   merge trials and visited set are HashSets, whose order is deterministic for the same
 //   sequence of operations. COLMAP iterates absl hash sets and maps there (entry 51).

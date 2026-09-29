@@ -23,8 +23,8 @@
 // - UPDATE of a missing row is a no-op; reads of a missing row return defaults.
 // Every stored object is a private copy, so callers can keep mutating what they wrote or
 // read. A lock serializes all calls (COLMAP's SQLite connection is not thread-safe at all).
-// A write that violates a constraint leaves no partial rows, see docs/CPP_DIVERGENCES.md
-// entry 23. The two-view geometry half is InMemoryDatabase.Pairs.cs.
+// A write that violates a constraint leaves no partial rows, see divergence 23.
+// The two-view geometry half is InMemoryDatabase.Pairs.cs.
 //
 // Tests: ColmapSharp.Tests/Scene/DatabaseTests.cs (database_test.cc 1:1). Tier A (exact).
 

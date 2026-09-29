@@ -12,7 +12,7 @@
 // Tier A: every operation performs the C++ arithmetic in the C++ order, so results are
 // bit-identical to a -ffp-contract=off build of the C++ (oracle/poisson_bspline_harness.cc,
 // PoissonBSplineOracleTests). COLMAP itself builds PoissonRecon with -ffast-math
-// (docs/CPP_DIVERGENCES.md, entry 74), so the pipeline as a whole is Tier C.
+// (divergence 74), so the pipeline as a whole is Tier C.
 //
 // Translation notes:
 // - The C++ template parameter Degree becomes a runtime degree (Coefficients.Length - 1).

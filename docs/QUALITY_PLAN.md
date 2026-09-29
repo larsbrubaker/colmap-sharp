@@ -11,7 +11,7 @@ blocks (the top and side sweeps), and the split model shares no images with the 
 
 ## Where code goes
 
-- Better behavior of ported code changes in place, with a `docs/CPP_DIVERGENCES.md` entry that
+- Better behavior of ported code changes in place, with a divergence that
   carries the benchmark numbers.
 - New algorithms get their own folders: `Segmentation/`, `Feature/Tracking/`, `Sfm/Silhouette/`,
   `Mvs/Silhouette/`. Their headers say "Not a COLMAP port" and cite the paper, or the permissive

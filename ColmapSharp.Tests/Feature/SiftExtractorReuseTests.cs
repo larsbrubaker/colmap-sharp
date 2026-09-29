@@ -6,7 +6,7 @@
 // (grad_o) only in vl_sift_new, so when image A's last octave with keypoints is image B's
 // first octave, B's orientations and descriptors there come from A's gradient, and COLMAP's
 // output depends on the order in which a worker thread sees its images. The port resets the
-// cache per image (docs/CPP_DIVERGENCES.md entry 43).
+// cache per image (divergence 43).
 //
 // Fixture: oracle/fixture_sift_reuse.py writes sift_reuse.json - a low-contrast fine-noise A
 // whose keypoints all sit in octave -1, the seeded texture B, and pycolmap's features of B from
@@ -128,7 +128,7 @@ public class SiftExtractorReuseTests
 			mismatchedBytes += diff != 0 ? 1 : 0;
 		}
 
-		// SiftOracleTests' FMA-contraction tolerance (docs/CPP_DIVERGENCES.md entry 41).
+		// SiftOracleTests' FMA-contraction tolerance (divergence 41).
 		await Assert.That(got.Descriptors.Data.Data.Length).IsEqualTo(freshDescriptors.Length);
 		await Assert.That(maxKeypointDiff).IsLessThanOrEqualTo(2e-3);
 		await Assert.That(maxByteDiff).IsLessThanOrEqualTo(1);

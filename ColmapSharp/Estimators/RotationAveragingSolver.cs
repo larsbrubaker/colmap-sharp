@@ -15,7 +15,7 @@
 //   options, so the next solve uses the raised cap. The C# solver copies its options, so the
 //   cap is raised through LeastAbsoluteDeviationSolver.MaxNumIterations.
 // - SupernodalCholmodLLT selects the managed LLT-with-LDLT-fallback solver
-//   (docs/CPP_DIVERGENCES.md, entry 13), as does the IRLS phase.
+//   (divergence 13), as does the IRLS phase.
 // - LOG(ERROR) messages go to Util/Log.cs; VLOG messages are dropped, like LOG(INFO).
 
 using ColmapSharp.LinearAlgebra;

@@ -13,7 +13,7 @@
 // run on whatever pool threads the awaits land on, so this test catches an unseeded run that
 // depends on what those threads drew before only when the scheduling happens to expose it. The
 // library test AutomaticReconstructionTests.CSharpOnly_UnseededSparseModelIgnoresTheCallersPrng
-// pins that property (docs/CPP_DIVERGENCES.md entry 138).
+// pins that property (divergence 138).
 
 using ColmapSharp.Compute;
 using ColmapSharp.Mvs.Testing;

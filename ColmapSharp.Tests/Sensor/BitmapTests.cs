@@ -17,7 +17,7 @@
 //   same reason.
 //
 // Tier A everywhere except the Rescale cases, which (like COLMAP's) pin only dimensions
-// and that the two filters differ (docs/CPP_DIVERGENCES.md, entry 9).
+// and that the two filters differ (divergence 9).
 // C++ copy construction (const Bitmap&) is a reference here and copy assignment is Clone().
 
 using ColmapSharp.Sensor;
@@ -318,7 +318,7 @@ public partial class BitmapTests
 		}
 	}
 
-	// C#-only (docs/CPP_DIVERGENCES.md, entry 117): a sample point beyond int range, or NaN,
+	// C#-only (divergence 117): a sample point beyond int range, or NaN,
 	// is outside the image. .NET saturates (int)double, so floor(x) = int.MaxValue made
 	// x0 + 1 wrap negative, pass the bounds check and index far outside the pixel array.
 	[Test]

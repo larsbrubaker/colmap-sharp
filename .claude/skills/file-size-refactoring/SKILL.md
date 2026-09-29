@@ -1,6 +1,6 @@
 ---
 name: file-size-refactoring
-description: This skill provides guidance for fixing file size violations detected by FileComplianceTests. Use when a C# file exceeds its line limit (800 lines default, or explicit limit for legacy files). The skill explains strategies to reduce file size while maintaining code quality.
+description: This skill provides guidance for fixing file size violations detected by FileComplianceTests. Use when a source file or a Markdown doc exceeds its line limit (800 lines default, or explicit limit for legacy files). The skill explains strategies to reduce file size while maintaining code quality.
 ---
 
 # File Size Refactoring
@@ -9,13 +9,13 @@ This skill provides strategies for reducing file size when `FileComplianceTests`
 
 ## Why File Size Limits Exist
 
-The limit exists for one reason: **a smaller file is easier for a human to understand, navigate, and maintain.** When a file grows beyond ~800 meaningful lines, it almost always means it has accumulated too many responsibilities. Hitting the limit is a healthy signal that the file deserves structural attention.
+The limit exists for one reason: **a smaller file is easier for a human to understand, navigate, and maintain.** When a file grows beyond ~800 lines, it almost always means it has accumulated too many responsibilities. Hitting the limit is a healthy signal that the file deserves structural attention.
 
 The correct response is always to **decompose the file into smaller, cohesive pieces** -- never to compress the existing code to squeeze under the limit.
 
 ## What the Test Measures
 
-The test counts **non-empty lines** (excluding blank lines and whitespace-only lines). Comments, code, braces, usings -- all count. A file fails when it exceeds:
+The test counts **every line**, blank lines included, in source files (`.cs`, `.py`, `.sh`, the oracle's C/C++ harnesses, `.wgsl`) and Markdown docs (`.md`). The limit is a length trigger that prompts a refactor, not a measure of content. A file fails when it exceeds:
 - **800 lines** (default limit for all files)
 - **Explicit limit** for legacy files listed in `ExplicitFileLimits` in the test class
 
@@ -89,6 +89,10 @@ public class PrintJobService : IPrintJobManager { ... }
 public class PrinterStatusService : IPrinterStatus { ... }
 public class PrinterConfigService : IPrinterConfig { ... }
 ```
+
+### 6. Split a Doc by Topic
+
+A Markdown doc (a plan, a notice file, the divergence log) that passes the limit is split by topic into files that each read on their own, with an index file that says what lives where. `docs/CPP_DIVERGENCES.md` is the model: an index table (number, title, file) over `docs/divergences/<Module>.md`. Move text verbatim; links and citations into the doc must still resolve after the split.
 
 ## How to Evaluate an Extraction
 

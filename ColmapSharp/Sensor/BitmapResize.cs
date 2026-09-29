@@ -14,7 +14,7 @@
 // and still count toward the weight total; the filter is separable; the result is rounded
 // half away from zero to a byte. Accumulation is in double.
 //
-// Not Tier A (docs/CPP_DIVERGENCES.md, entry 9). Bilinear (the default, used by Thumbnail) is
+// Not Tier A (divergence 9). Bilinear (the default, used by Thumbnail) is
 // Tier B: OIIO accumulates in float, so a sum within float rounding of a half-integer can
 // round to the neighboring gray level; BitmapRescaleOracleTests pins it against pycolmap
 // within one gray level. Box matches OIIO on every probe without a tie, but when a source

@@ -20,7 +20,7 @@
 //   transposed matrix. Here one fused integer scan yields both directions (identical
 //   results, SiftMatchKernels.cs header), parallel over rows, deterministic.
 // - The default path searches FeatureDescriptorIndex, which is exact here (faiss is
-//   approximate for 512+ descriptors; docs/CPP_DIVERGENCES.md entry 42).
+//   approximate for 512+ descriptors; divergence 42).
 // The GPU matcher (SiftGPU) and SIFT LightGlue (ONNX) are excluded.
 
 using ColmapSharp.LinearAlgebra;

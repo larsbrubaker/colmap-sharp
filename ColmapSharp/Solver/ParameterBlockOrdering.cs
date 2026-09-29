@@ -11,7 +11,7 @@
 // Elements are identified like Problem's blocks, by an ArraySegment's (array, offset). Ceres
 // keeps each group in a std::set<double*>, so the blocks of one group come out in heap-address
 // order, which no two runs share. Here they come out in the order they were added to the group
-// (docs/CPP_DIVERGENCES.md entry 36).
+// (divergence 36).
 
 using ColmapSharp.Util;
 

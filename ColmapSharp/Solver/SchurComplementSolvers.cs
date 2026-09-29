@@ -11,7 +11,7 @@
 //   an E block) and factors the lower triangle with LinearAlgebra/SimplicialCholesky.cs
 //   (LLT, AMD on the scalar pattern). Ceres with EIGEN_SPARSE instead pre-orders the F blocks
 //   by AMD on the block pattern and factors with Eigen's SimplicialLLT in natural order
-//   (docs/CPP_DIVERGENCES.md entry 35).
+//   (divergence 35).
 // The pattern (chunks, S's cells, the Cholesky's symbolic analysis) is built on the first
 // solve and whenever the Jacobian's block structure changes.
 

@@ -10,7 +10,7 @@
 // the PRNG is thread-local and awaits may resume on another thread, so every test
 // synthesizes before its first await. CreateTestDir() is a fresh temp directory. One
 // deviation, forced by excluded image I/O: SynthesizeImages.Nominal's images go to a sink
-// instead of files (docs/CPP_DIVERGENCES.md entry 32), so the test reads the width and
+// instead of files (divergence 32), so the test reads the width and
 // height of the bitmaps the sink received rather than decoding PNG files.
 
 using ColmapSharp.Feature;

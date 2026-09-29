@@ -6,7 +6,7 @@
 // (float position, number of images that see it) that Delaunay meshing works on, plus the
 // two ways COLMAP triangulates them (CreateDelaunayTriangulation and
 // CreateSubSampledDelaunayTriangulation). The triangulation is Geometry/Delaunay's
-// DelaunayTriangulation3, which replaces CGAL (docs/CPP_DIVERGENCES.md entry 103).
+// DelaunayTriangulation3, which replaces CGAL (divergence 103).
 // Neighbors: DelaunayMeshingOptions.cs, DelaunayMeshingWeights.cs (edge weights and the ray
 // caster). Tests: ColmapSharp.Tests/Mvs/DelaunayMeshingTests.CSharpOnly.cs.
 //

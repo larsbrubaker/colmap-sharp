@@ -15,7 +15,7 @@
 // Translation notes:
 // - COLMAP's FlatHashSet members become HashSet exposed as IReadOnlySet. Where the Ceres
 //   backend iterates them, it sorts first so the problem layout does not depend on hash
-//   order (docs/CPP_DIVERGENCES.md entry 39).
+//   order (divergence 39).
 // - The backend options are held by shared_ptr in COLMAP with a deep-copying copy
 //   constructor; here they are classes and Clone() deep-copies them.
 // - check_if_stopped (std::function<bool()>) becomes Func<bool>?; BundleAdjuster.Solve also

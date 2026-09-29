@@ -9,7 +9,7 @@
 //
 // Tier A (exact) up to faiss's float summation: COLMAP finds the neighbors with faiss's
 // brute-force IndexFlatL2 (MIT, but native), replaced here by a managed brute-force search
-// (docs/CPP_DIVERGENCES.md entry 52). Like faiss, it ranks by float squared distance with
+// (divergence 52). Like faiss, it ranks by float squared distance with
 // ties broken by the smaller index, and computes the distance from coordinate differences;
 // faiss switches to ||x||^2 + ||y||^2 - 2 x.y (a BLAS matrix product) for 20 or more
 // positions, which can reorder near-equal neighbors. COLMAP parallelizes the search with
@@ -179,7 +179,7 @@ public sealed class SpatialPairGenerator : PairGenerator
 
 		// Eigen's colwise().mean() may sum a column in vectorized blocks, so its double mean
 		// can differ from this sequential sum in the last ulp before the float cast
-		// (docs/CPP_DIVERGENCES.md entry 52).
+		// (divergence 52).
 		double meanX = sumX / positions.Count;
 		double meanY = sumY / positions.Count;
 		double meanZ = sumZ / positions.Count;

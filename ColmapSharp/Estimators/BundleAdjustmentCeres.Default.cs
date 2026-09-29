@@ -16,7 +16,7 @@
 // Frame.RigFromWorldStorage.Params and Rig.SensorFromRigStorage(...).Params.
 //
 // Translation notes:
-// - Iteration order (docs/CPP_DIVERGENCES.md entry 39): COLMAP iterates the config's
+// - Iteration order (divergence 39): COLMAP iterates the config's
 //   FlatHashSets (abseil's hash order, which is seeded per process) when adding residuals
 //   and its FlatHashMap of per-point observation counts when choosing the three gauge
 //   points. Here the config's images and points are visited in ascending id order and the

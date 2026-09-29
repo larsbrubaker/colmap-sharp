@@ -15,12 +15,11 @@
 // Tier A for the cut weight (the minimum is unique). When several cuts share that weight, the
 // side reported can differ from boost's, and which side is labeled 1 is this code's choice
 // (the vertices merged into the last-added vertex of the best phase). graph_cut_test.cc only
-// pins the weight and the label range. See docs/CPP_DIVERGENCES.md, entry 4.
+// pins the weight and the label range. See divergence 4.
 //
 // ComputeNormalizedMinGraphCut builds the same CSR graph as COLMAP's MetisGraph wrapper but
 // partitions it with MultilevelPartitioner instead of METIS_PartGraphKway. Tier C: the parts
-// are balanced with a small cut, but need not be METIS's parts. See docs/CPP_DIVERGENCES.md,
-// entry 77.
+// are balanced with a small cut, but need not be METIS's parts. See divergence 77.
 
 using ColmapSharp.Util;
 

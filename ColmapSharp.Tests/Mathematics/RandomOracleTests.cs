@@ -8,7 +8,7 @@
 //
 // The fixture's "cases" come from a -ffp-contract=off build, the arithmetic ColmapSharp
 // does. Its "contracted_cases" (Apple clang's default fused multiply-adds) are not asserted:
-// see docs/CPP_DIVERGENCES.md, entry 1.
+// see divergence 1.
 //
 // Each case draws all its numbers synchronously before any await, because the PRNG is per
 // thread (see RandomTests).

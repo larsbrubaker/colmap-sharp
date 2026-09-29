@@ -15,7 +15,7 @@
 // Tier A when the edge weights (after the max-weight negation below) are distinct: the
 // minimum spanning tree is then unique, so the parents match COLMAP exactly. Among equal
 // weights boost's priority queue picks in heap order; here the earlier edge in the input
-// wins. See docs/CPP_DIVERGENCES.md, entry 3.
+// wins. See divergence 3.
 
 using ColmapSharp.Util;
 

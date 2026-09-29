@@ -10,7 +10,7 @@
 // queued entries (a point is re-queued only after it was popped), so the selection does
 // not depend on the heap implementation or on the order points are pushed. The result
 // lists the redundant ids in Reconstruction.Points3D order, i.e. ascending id
-// (docs/CPP_DIVERGENCES.md, entry 21); COLMAP's order is its hash map's, and its tests
+// (divergence 21); COLMAP's order is its hash map's, and its tests
 // compare order-insensitively.
 
 using ColmapSharp.Mathematics;

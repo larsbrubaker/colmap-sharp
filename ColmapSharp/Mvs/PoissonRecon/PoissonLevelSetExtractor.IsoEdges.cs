@@ -36,7 +36,7 @@
 // Translation notes:
 // - Upstream runs each step in a ThreadPool::ParallelFor over the leaves, with per-thread key
 //   lists merged in thread order at finalize; the port runs the leaves in order, one list, as
-//   a single-threaded run does (docs/CPP_DIVERGENCES.md, entry 123). The face and edge flags
+//   a single-threaded run does (divergence 123). The face and edge flags
 //   are set by one owner each, so the arrays do not depend on the order either way; only the
 //   order of the recorded lists would.
 // - CopyFinerXSliceIsoEdgeKeys pushes a pair of cross-edge vertices first to the slab and then,

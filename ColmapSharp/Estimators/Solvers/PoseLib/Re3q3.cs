@@ -17,7 +17,7 @@
 //   which read the C library's global std::rand(). Here the draw comes from a fresh
 //   mt19937 with a fixed seed on every call (Shoemake's uniform rotation, Graphics Gems III,
 //   for the rotation), so the result depends only on the input and is thread-safe. See
-//   docs/CPP_DIVERGENCES.md entry 26.
+//   divergence 26.
 // - Upstream behavior, kept: a system with a purely linear equation (for example x^2 = 1,
 //   y^2 = 4, z = x + y, which has four finite solutions) returns 0 solutions. An affine change
 //   of variables cannot give a linear equation quadratic terms, so every elimination matrix
@@ -343,7 +343,7 @@ public static class Re3q3
 	/// <remarks>
 	/// PoseLib draws R0 from Eigen's Quaternion::UnitRandom, i.e. from std::rand; here it
 	/// comes from a fresh mt19937 with a fixed seed on every call, so the result depends only
-	/// on the input (docs/CPP_DIVERGENCES.md entry 29).
+	/// on the input (divergence 29).
 	/// </remarks>
 	public static int SolveRotation(ReadOnlySpan<double> rcoeffs, Span<Vector4d> solutions, bool tryRandomVarChange = true)
 	{

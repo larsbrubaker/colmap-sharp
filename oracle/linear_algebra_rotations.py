@@ -110,7 +110,7 @@ def main():
 
 
 def explain_divergences(cases):
-    """Evidence for docs/CPP_DIVERGENCES.md entries 6 and 7: re-derive the two Tier B
+    """Evidence for divergences 6 and 7: re-derive the two Tier B
     fields in plain Python (no FMA unless asked) with ColmapSharp's formulas and show what
     the C++ must have done differently to produce the fixture's bits."""
     from math import fma, nextafter, sin, cos, sqrt, inf

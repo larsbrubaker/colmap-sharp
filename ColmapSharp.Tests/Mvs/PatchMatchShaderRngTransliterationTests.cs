@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // PatchMatchShaderRngTransliterationTests: C#-only (COLMAP's random numbers come from cuRAND;
-// PatchMatchRandom replaces them, docs/CPP_DIVERGENCES.md entry 86). A TRANSLITERATION CHECK,
+// PatchMatchRandom replaces them, divergence 86). A TRANSLITERATION CHECK,
 // NOT PRODUCTION CODE: WgslTransliteration below is a line-by-line C# copy of the integer
 // functions in ColmapSharp/Mvs/Shaders/patch_match_common.wgsl (u64 on two u32 words, the
 // 16-bit-limb multiply, the SplitMix64 mixer, the stream, and the round-to-nearest-even

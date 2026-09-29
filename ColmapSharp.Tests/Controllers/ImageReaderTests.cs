@@ -6,7 +6,7 @@
 // Tests ColmapSharp/Controllers/ImageReader.cs. Translation of the fixtures:
 // - Database::Open(kInMemorySqliteDatabasePath) becomes an InMemoryDatabase.
 // - The test directory of written image files becomes an InMemoryImageSource of the same
-//   bitmaps under the same names (decoding is the host's job, docs/CPP_DIVERGENCES.md entry
+//   bitmaps under the same names (decoding is the host's job, divergence
 //   82); "a file that is not a valid image" is a name mapped to null.
 // Tier A (exact).
 

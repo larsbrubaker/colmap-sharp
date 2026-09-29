@@ -11,7 +11,7 @@
 // (C#-only).
 //
 // Float math in COLMAP's order with MathF, and CUDA's NaN-ignoring float min/max as
-// PatchMatchKernel.CudaMin/CudaMax (docs/CPP_DIVERGENCES.md, entry 96). The NCC
+// PatchMatchKernel.CudaMin/CudaMax (divergence 96). The NCC
 // normalization factor mixes float and double exactly as the CUDA expression does (M_PI is
 // a double), and erff, which .NET lacks, is computed here in double from the series
 // erf(x) = 2/sqrt(pi) exp(-x²) sum_n 2^n x^(2n+1) / (1·3·...·(2n+1)) (Abramowitz and

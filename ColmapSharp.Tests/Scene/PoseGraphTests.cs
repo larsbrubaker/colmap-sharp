@@ -336,7 +336,7 @@ public class PoseGraphTests
 	}
 
 	// C#-only: equally large components come out by smallest frame id, and
-	// LargestConnectedFrameComponent picks the same one (docs/CPP_DIVERGENCES.md, entry 38).
+	// LargestConnectedFrameComponent picks the same one (divergence 38).
 	[Test]
 	public async Task CSharpOnly_EqualSizeComponentsOrderedBySmallestFrameId()
 	{

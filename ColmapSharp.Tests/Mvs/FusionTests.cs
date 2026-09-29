@@ -135,7 +135,7 @@ public class FusionTests
 	[Test]
 	public async Task CSharpOnly_UnreadableMaskThrows()
 	{
-		// C#-only (docs/CPP_DIVERGENCES.md, entry 89): a mask the source reports but cannot
+		// C#-only (divergence 89): a mask the source reports but cannot
 		// decode fails the run instead of silently fusing the image unmasked.
 		string workspacePath = OracleFixture.PathOf("stereo_fusion");
 		string maskPath = Path.Combine(workspacePath, "masks");

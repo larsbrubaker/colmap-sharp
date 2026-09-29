@@ -22,7 +22,7 @@
 #
 # Each case runs in its own process: PoissonRecon's command-line flags are globals whose "set"
 # state persists across calls in one process (a --density or --fullDepth from an earlier call
-# leaks into later ones; docs/CPP_DIVERGENCES.md, entry 131).
+# leaks into later ones; divergence 131).
 #
 # Floats are written in their shortest float32 round-trip form; the C# tests parse them as float.
 #
@@ -61,7 +61,7 @@ CASES = [
 
 # (name, depth, point_weight, trim) on the empty input, harness only. Not trimmed: upstream's
 # SurfaceTrimmer crashes on an empty mesh (it reads vertices[0] of an empty vector); the port
-# does not, which is docs/CPP_DIVERGENCES.md entry 132, pinned by a C#-only test instead.
+# does not, which is divergence 132, pinned by a C#-only test instead.
 EXACT_ONLY_CASES = [
     ("empty", 5, 1.0, 0.0),
 ]

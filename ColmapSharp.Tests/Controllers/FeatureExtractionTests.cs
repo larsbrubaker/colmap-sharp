@@ -4,7 +4,7 @@
 // FeatureExtractionTests: colmap/controllers/feature_extraction_test.cc ported 1:1, one
 // method per gtest case named Suite_Name. Tests ColmapSharp/Controllers/FeatureExtraction.cs.
 // Database files become InMemoryDatabases, and the written image files an
-// InMemoryImageSource (docs/CPP_DIVERGENCES.md entry 82); the camera mask file becomes
+// InMemoryImageSource (divergence 82); the camera mask file becomes
 // ImageReaderOptions.CameraMask. `use_gpu = false` has no counterpart (there is no GPU path).
 // The importer's feature files are written to a temporary directory (the importer reads a
 // directory, like COLMAP), with an ostream's default float formatting.
@@ -235,7 +235,7 @@ public class FeatureExtractionTests
 	private static string Format(float value) => ColmapSharp.Util.CppStreamFormat.FormatDouble(value);
 
 	// C#-only: the database contents (ids, keypoints, descriptors) do not depend on the thread
-	// count, since images are committed in reader order (docs/CPP_DIVERGENCES.md entry 83),
+	// count, since images are committed in reader order (divergence 83),
 	// and progress reports one step per image.
 	[Test]
 	public async Task CSharpOnly_ThreadCountIndependentAndReportsProgress()

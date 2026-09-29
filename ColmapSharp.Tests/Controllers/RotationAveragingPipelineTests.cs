@@ -189,7 +189,7 @@ public class RotationAveragingPipelineTests
 	}
 
 	// C#-only: gravity priors seed the rotation of the image their corr_data_id names, not the
-	// image whose id equals the prior's pose_prior_id (docs/CPP_DIVERGENCES.md entry 102). The
+	// image whose id equals the prior's pose_prior_id (divergence 102). The
 	// priors here have ids 101.. while the images have ids 1.., so a lookup by pose_prior_id
 	// finds no image.
 	[Test]
@@ -247,7 +247,7 @@ public class RotationAveragingPipelineTests
 		return database;
 	}
 
-	// C#-only (docs/CPP_DIVERGENCES.md entry 101): the first stop check runs before gravity
+	// C#-only (divergence 101): the first stop check runs before gravity
 	// seeding. The stop function records whether any frame was already posed when it was
 	// first asked; without the check before seeding it would first be asked after seeding.
 	[Test]
@@ -270,7 +270,7 @@ public class RotationAveragingPipelineTests
 		await Assert.That(numPosed).IsEqualTo(0);
 	}
 
-	// C#-only (docs/CPP_DIVERGENCES.md entry 101): a stop that arrives after gravity seeding
+	// C#-only (divergence 101): a stop that arrives after gravity seeding
 	// un-poses the seeded frames instead of leaving gravity rotations with NaN translations.
 	[Test]
 	public async Task CSharpOnly_StopAfterGravitySeedingUnposesSeededFrames()

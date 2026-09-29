@@ -13,7 +13,7 @@
 // Translation notes:
 // - COLMAP stores parents in a NodeHashMap (boost::unordered_node_map), whose iteration
 //   order is a function of boost's hash layout. Here Parents iterates in insertion order
-//   (a Dictionary that never removes). See docs/CPP_DIVERGENCES.md, entry 2.
+//   (a Dictionary that never removes). See divergence 2.
 // - The C++ Find recurses; this one walks the path twice (find the root, then repoint every
 //   node on the path at it), which leaves the map in the same state without recursion depth
 //   limits on long chains.

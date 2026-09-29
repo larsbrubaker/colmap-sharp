@@ -12,7 +12,7 @@
 // Translation notes:
 // - The 6 x 13 system A and the 3 x 10 rotation system AR are column-major stack spans.
 // - Re3q3.SolveRotation draws its random pre-rotation from a fixed-seed mt19937 rather than
-//   std::rand (docs/CPP_DIVERGENCES.md entry 29).
+//   std::rand (divergence 29).
 //
 // Tier B.
 

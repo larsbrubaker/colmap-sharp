@@ -7,7 +7,7 @@
 // (reconstruction_manager_test.cc 1:1).
 //
 // Write orders the models by point count with an index tie-break where COLMAP's std::sort
-// leaves ties unspecified (docs/CPP_DIVERGENCES.md, entry 34). shared_ptr<Reconstruction> is a plain reference; C++'s
+// leaves ties unspecified (divergence 34). shared_ptr<Reconstruction> is a plain reference; C++'s
 // non-const Get returns a reference to the shared_ptr so callers can swap the model, which
 // here is Set.
 
@@ -69,7 +69,7 @@ public sealed class ReconstructionManager
 		}
 
 		// std::sort by descending point count; the index tie-break makes equal counts
-		// deterministic (docs/CPP_DIVERGENCES.md, entry 34).
+		// deterministic (divergence 34).
 		Array.Sort(order, (a, b) =>
 		{
 			int bySize = _reconstructions[b].NumPoints3D.CompareTo(_reconstructions[a].NumPoints3D);

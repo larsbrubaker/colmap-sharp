@@ -7,19 +7,18 @@
 // (AutomaticReconstruction.cs) uses: the option objects it hands to each stage and the
 // ModifyFor{Individual,Video,Internet}Data / ModifyFor{Low,Medium,High,Extreme}Quality presets.
 // The rest of OptionManager (the command-line/ini registry) belongs to the CLI and is not
-// ported (docs/CPP_DIVERGENCES.md entry 67).
+// ported (divergence 67).
 //
 // Translation notes:
 // - image_path / mask_path become IImageSource hosts (Images / Masks), as in ImageReader.cs
-//   (docs/CPP_DIVERGENCES.md entry 82); workspace_path stays a folder on disk because the
+//   (divergence 82); workspace_path stays a folder on disk because the
 //   sparse models, depth maps, fused points and meshes are written there as COLMAP does.
 // - vocab_tree_path, use_gpu, gpu_index and ba_backend are not options here: vocabulary-tree
-//   matching, CUDA stages and the Caspar backend are out of scope (docs/CPP_DIVERGENCES.md
-//   entry 134).
+//   matching, CUDA stages and the Caspar backend are out of scope (divergence 134).
 // - Texture / TextureSink and the MeshTextureMapping option set are C#-only: they add COLMAP's
-//   separate mesh_texturer step to the dense stages (docs/CPP_DIVERGENCES.md entry 135).
-// - ComputeDevice is C#-only: the host's GPU for PatchMatch stereo (docs/CPP_DIVERGENCES.md
-//   entry 136), in place of use_gpu / gpu_index.
+//   separate mesh_texturer step to the dense stages (divergence 135).
+// - ComputeDevice is C#-only: the host's GPU for PatchMatch stereo (divergence 136),
+// in place of use_gpu / gpu_index.
 // - `int /= 1.5` in ModifyForMediumQuality converts to double and truncates back, as C++
 //   does; the casts below reproduce that.
 
@@ -148,7 +147,7 @@ public sealed class AutomaticReconstructionOptions
 
 	/// <summary>
 	/// Whether to perform dense mapping. True, like a COLMAP build with CUDA and MVS: the
-	/// PatchMatch algorithm runs on the CPU here (docs/CPP_DIVERGENCES.md entry 134).
+	/// PatchMatch algorithm runs on the CPU here (divergence 134).
 	/// </summary>
 	public bool Dense { get; set; } = true;
 
@@ -176,7 +175,7 @@ public sealed class AutomaticReconstructionOptions
 	/// Whether to texture each dense model's mesh with the photos' colors after meshing (only
 	/// when <see cref="Dense"/> is on). C#-only: COLMAP's automatic reconstruction stops at the
 	/// mesh and textures only through its separate mesh_texturer command
-	/// (docs/CPP_DIVERGENCES.md entry 135).
+	/// (divergence 135).
 	/// </summary>
 	public bool Texture { get; set; } = true;
 
@@ -192,7 +191,7 @@ public sealed class AutomaticReconstructionOptions
 
 	/// <summary>
 	/// The host's GPU compute device for PatchMatch stereo in the dense stages, or null to run
-	/// it on the CPU. C#-only (COLMAP's dense stereo is CUDA; docs/CPP_DIVERGENCES.md entry
+	/// it on the CPU. C#-only (COLMAP's dense stereo is CUDA; divergence
 	/// 136). A problem the device cannot hold runs on the CPU, with the reason logged as a
 	/// warning. Only when a device is set do the dense stage's PatchMatch progress messages gain
 	/// " (GPU)" or " (CPU)" after the image name, saying where each problem ran. The controller

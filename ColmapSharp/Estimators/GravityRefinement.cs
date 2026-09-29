@@ -16,7 +16,7 @@
 //   frame refined earlier changes the neighbor gravities a later frame sees.
 // - The error-prone frames, the per-frame neighbor pairs and the adjacency sets are sorted
 //   (COLMAP iterates absl hash sets). Because of the previous point, the frame order can
-//   change the result (docs/CPP_DIVERGENCES.md entry 47).
+//   change the result (divergence 47).
 // - COLMAP's outlier check after the solve compares each neighbor gravity with itself (the
 //   loop variable shadows the refined gravity), so the error is always 0 and every solved
 //   frame is accepted. Kept as is, since this is the behavior COLMAP's tests pin.

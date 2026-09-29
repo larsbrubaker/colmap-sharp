@@ -8,11 +8,11 @@
 // ColmapSharp.Tests/Scene/SceneClusteringTests.cs (scene_clustering_test.cc 1:1).
 //
 // Tier C (outcome): the partition itself comes from our multilevel partitioner, not METIS
-// (docs/CPP_DIVERGENCES.md, entry 77), so the memberships match COLMAP's tests but the
+// (divergence 77), so the memberships match COLMAP's tests but the
 // labels and the order of the child clusters can differ.
 //
 // Translation notes:
-// - Ties (docs/CPP_DIVERGENCES.md, entry 93). COLMAP sorts the overlap-candidate edges and
+// - Ties (divergence 93). COLMAP sorts the overlap-candidate edges and
 //   each image's related images by descending weight with std::sort, which leaves equal
 //   weights in an unspecified order. Here equal weights keep their edge order (a stable
 //   sort). That is also what libc++ produces for lists under 24 entries (sort3/4/5 and
@@ -168,7 +168,7 @@ public sealed class SceneClustering
 	/// <paramref name="databaseCache"/>'s correspondence graph, with the number of matches
 	/// between two images as the edge weight. Pairs are taken in the order of Boost's mixed
 	/// hash of their pair ids, modelling COLMAP's Boost hash map backend, not the graph's
-	/// ascending insertion order (docs/CPP_DIVERGENCES.md, entry 120).
+	/// ascending insertion order (divergence 120).
 	/// </summary>
 	public static SceneClustering Create(Options options, DatabaseCache databaseCache)
 	{

@@ -10,7 +10,7 @@
 // Mirrors: PatchMatchCpu.FilterPixels / FilterPixel in ColmapSharp/Mvs/PatchMatchCpu.Sweep.cs
 //   (PatchMatchCpu.Sweep.cs explains why filtering after the sweep equals filtering per row).
 // Ports: the filtering step of patch_match_cuda.cu's SweepFromTopToBottom, as the CPU port models
-//   it (docs/CPP_DIVERGENCES.md, entry 96).
+//   it (divergence 96).
 // Parts: dispatch, common, textures, geometry, likelihood, layout, geom_cost
 //   (ColmapSharp/Mvs/PatchMatchGpuKernels.cs).
 // Bindings: group 0 - 0 pm_byte_to_unit, 1 pm_poses, 2 pm_problem, 4 pm_source_images (textures

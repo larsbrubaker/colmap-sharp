@@ -5,7 +5,7 @@
 // SelectViews (colmap/mvs/texture_mapping.cc). Scores each (face, image) pair by the face's
 // projected area, keeps the best image per face, and smooths the labels over face
 // neighbors. The occlusion test runs on TriangleBvh.cs instead of CGAL's AABB tree
-// (docs/CPP_DIVERGENCES.md, entry 90); the smoothing breaks label ties by image index
+// (divergence 90); the smoothing breaks label ties by image index
 // (entry 91). Neighbors: TextureMapping.cs (entry point, adjacency).
 //
 // Memory: COLMAP keeps a dense double score per (face, image), 800 MB for a million faces
@@ -353,7 +353,7 @@ public static partial class TextureMapping
 	// provided the face scores positively in it and it beats the current label's count.
 	// COLMAP iterates a hash map of label counts, so which of two equally common labels wins
 	// depends on hash order; here labels are visited in ascending image index
-	// (docs/CPP_DIVERGENCES.md, entry 91).
+	// (divergence 91).
 	private static int SmoothedLabel(int[] viewPerFace, int[] adjacency, ulong[] positive, int words, int fi)
 	{
 		int current = viewPerFace[fi];

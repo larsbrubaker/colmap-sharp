@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // C#-only test of AutomaticReconstructionController's sparse stage
-// (ColmapSharp/Controllers/AutomaticReconstruction.cs, docs/CPP_DIVERGENCES.md entry 138):
+// (ColmapSharp/Controllers/AutomaticReconstruction.cs, divergence 138):
 // with the default random_seed (-1) the mapper's RANSAC draws from the thread's PRNG. COLMAP
 // runs the mapper on the controller's own new thread, so it always starts from the default
 // seed; the port runs it on the caller's thread, often a reused pool thread, so without a fresh

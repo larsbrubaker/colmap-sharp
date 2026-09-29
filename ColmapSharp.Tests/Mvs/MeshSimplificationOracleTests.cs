@@ -4,7 +4,7 @@
 // against COLMAP 4.2.0 (TestData/oracle/mesh_simplification.json, written by
 // oracle/fixture_mesh_simplification.py, which says where each case's numbers come from).
 // - wavy: a curved grid through pycolmap. Tier C: the same faces, positions within 1e-5
-//   (boundary systems can differ in the last bits, docs/CPP_DIVERGENCES.md, entry 72; they
+//   (boundary systems can differ in the last bits, divergence 72; they
 //   were byte-identical when generated).
 // - flat: flat grids with boundary_weight 0 through pycolmap, where every cost ties at 0 and
 //   the result is decided by the ported libc++ heap order (CollapseHeap.cs). Exact.

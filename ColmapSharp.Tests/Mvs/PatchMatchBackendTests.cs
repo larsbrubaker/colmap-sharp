@@ -2,7 +2,7 @@
 //
 // PatchMatchBackendTests: C#-only tests of PatchMatch's public GPU entry point
 // (ColmapSharp/Mvs/PatchMatch.cs: RunAsync with an IComputeDevice, Backend,
-// FallbackReason; docs/CPP_DIVERGENCES.md entry 136). COLMAP has no counterpart: its PatchMatch
+// FallbackReason; divergence 136). COLMAP has no counterpart: its PatchMatch
 // is CUDA-only and has no fallback. The device is ReferenceComputeDevice
 // (ColmapSharp/Mvs/Testing/), the CPU twin that runs the WGSL kernels through the production
 // CPU code, so a GPU run is bit-identical to the CPU run (Tier A for this pairing;

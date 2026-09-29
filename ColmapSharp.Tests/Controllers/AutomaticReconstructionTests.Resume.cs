@@ -2,14 +2,14 @@
 //
 // AutomaticReconstructionTests (continued): C#-only tests, not ports. They pin how a new
 // controller resumes over a workspace an earlier run left behind, the part of the dense
-// stages' skip rule that docs/CPP_DIVERGENCES.md entry 135 changes:
+// stages' skip rule that divergence 135 changes:
 // - With Texture on, a finished model keeps its fused.ply and mesh untouched (PatchMatch,
 //   fusion and meshing are skipped) but is textured again, since the texture lives in memory.
 // - With Texture off, a finished model is skipped entirely, as in COLMAP.
 // - A mesh file that is not a PLY mesh (the zero-byte file an interrupted Poisson run leaves,
 //   since PoissonMeshing.Run creates it before reconstructing) counts as missing, so the model
 //   is re-meshed from its fused.ply instead of aborting every resume.
-//   The re-mesh is byte-identical to the first run's mesh (docs/CPP_DIVERGENCES.md entry 137).
+//   The re-mesh is byte-identical to the first run's mesh (divergence 137).
 // - Cancelling during meshing leaves no partial mesh behind.
 // - Texturing progress ends at 100% even for an empty mesh.
 // One first run (the textured scene of AutomaticReconstructionTests.CSharpOnly.cs, Delaunay

@@ -105,7 +105,7 @@ public static class ReconstructionIOUtils
 
 	/// <summary>
 	/// The error for an image name that is not valid UTF-8. COLMAP keeps names as raw bytes;
-	/// a C# string cannot hold them faithfully (docs/CPP_DIVERGENCES.md, entry 25).
+	/// a C# string cannot hold them faithfully (divergence 25).
 	/// </summary>
 	internal static InvalidDataException NonUtf8ImageName(uint imageId) =>
 		new($"Image {imageId} has a name that is not valid UTF-8. Rename the image file and re-save the model with the name in UTF-8, then load it again.");

@@ -133,7 +133,7 @@ public class MatTests
 	}
 
 	// C#-only: a zero dimension fails COLMAP's THROW_CHECK_GT, and a truncated payload
-	// throws (docs/CPP_DIVERGENCES.md, entry 62).
+	// throws (divergence 62).
 	[Test]
 	public async Task Mat_ReadInvalid()
 	{

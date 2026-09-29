@@ -18,7 +18,7 @@
 # which the C# tests assert bit for bit. "contracted_cases" holds the default build's output
 # for every case where it differs: the numbers the pycolmap wheel most likely produces, since
 # its _core disassembles to tens of thousands of fmadd/fmsub instructions (it is built with
-# contraction on). See docs/CPP_DIVERGENCES.md, entry 1.
+# contraction on). See divergence 1.
 #
 # Usage: oracle/.venv/bin/python oracle/fixture_random.py   (numpy/pycolmap not needed)
 

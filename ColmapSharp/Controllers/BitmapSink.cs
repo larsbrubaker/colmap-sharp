@@ -7,7 +7,7 @@
 // requested JPEG quality. InMemoryBitmapStore keeps the bitmaps instead and serves them back
 // as the MVS code's IBitmapSource (Mvs/IBitmapSource.cs), so an undistorted workspace can go
 // straight into Mvs.Workspace with no image files at all. C#-only; see
-// docs/CPP_DIVERGENCES.md entry 98.
+// divergence 98.
 
 using System.Collections.Concurrent;
 

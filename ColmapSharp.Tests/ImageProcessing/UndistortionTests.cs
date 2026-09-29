@@ -7,7 +7,7 @@
 // Tier A for the camera and reconstruction cases (exact expected values, as in COLMAP);
 // RectifyStereoCameras_Nominal is Tier B with COLMAP's 1e-5 tolerance.
 // UndistortImage_WarpOptions compares a direct warp with a warp-then-Rescale, so it runs
-// through Bitmap.Rescale (Tier B, docs/CPP_DIVERGENCES.md entry 9); its bounds are COLMAP's.
+// through Bitmap.Rescale (Tier B, divergence 9); its bounds are COLMAP's.
 // CSharpOnly_UndistortReconstruction_KeepsCameraIds is C#-only and pins divergence entry 60;
 // CSharpOnly_RectifyAndUndistortStereoImages_FarSourceSamples is C#-only and pins entry 117.
 
@@ -447,7 +447,7 @@ public class UndistortionTests
 		}
 	}
 
-	// C#-only (docs/CPP_DIVERGENCES.md, entry 60): COLMAP overwrites each stored camera with a
+	// C#-only (divergence 60): COLMAP overwrites each stored camera with a
 	// default-constructed one, whose camera_id is invalid. Here the ids are kept, so code keyed
 	// by camera or sensor id (Crop re-adds every camera by its CameraId) still works after
 	// undistortion, as MatterCAD needs when it undistorts and then densifies the same model.
@@ -551,7 +551,7 @@ public class UndistortionTests
 		}
 	}
 
-	// C#-only (docs/CPP_DIVERGENCES.md, entry 117): with PRNG seed 25 the synthetic stereo pair
+	// C#-only (divergence 117): with PRNG seed 25 the synthetic stereo pair
 	// that UndistortersTests.StereoImageRectifier_Integration builds rectifies some target
 	// pixels to source points beyond int range. Bitmap.InterpolateBilinear used to index out
 	// of its array there, which made that test fail whenever an earlier test on the same

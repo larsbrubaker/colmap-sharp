@@ -15,7 +15,7 @@
 //
 // ExtractTopScaleFeatures: COLMAP uses std::partial_sort, which leaves ties (keypoints of
 // equal scale, e.g. two orientations of one SIFT keypoint) in an unspecified order. Here
-// ties keep their input order (index tie-break), see docs/CPP_DIVERGENCES.md entry 40.
+// ties keep their input order (index tie-break), see divergence 40.
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Mathematics;

@@ -23,7 +23,7 @@
 // - Get/Set bounds-check the flat index like std::vector::at (a row or column past its
 //   dimension that still lands inside the buffer is not caught, as in COLMAP).
 // - Reading a truncated file throws (EndOfStreamException) where COLMAP's stream silently
-//   stops filling the buffer (docs/CPP_DIVERGENCES.md, entry 62).
+//   stops filling the buffer (divergence 62).
 
 using System.Globalization;
 using System.Runtime.CompilerServices;

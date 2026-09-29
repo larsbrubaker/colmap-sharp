@@ -7,14 +7,14 @@
 // (Mvs/PatchMatchController.cs), fuses the depth maps (Mvs/Fusion.cs) into fused.ply and
 // fused.ply.vis, and meshes them (Mvs/PoissonMeshing.cs or Mvs/DelaunayMeshing.cs). With
 // Options.Texture on it then textures the mesh (AutomaticReconstruction.Texture.cs, C#-only,
-// docs/CPP_DIVERGENCES.md entry 135); a model whose fused.ply and mesh already exist is then
+// divergence 135); a model whose fused.ply and mesh already exist is then
 // still undistorted and textured once per controller, since the texture lives in memory. Also
 // under entry 135, a mesher that fails or is cancelled leaves no mesh file behind, and a mesh
 // file without a PLY mesh header counts as missing, so a resume re-meshes the model rather
 // than trusting (or failing on) a partial file. The rest of the controller is in
 // AutomaticReconstruction.cs.
 //
-// Translation notes (docs/CPP_DIVERGENCES.md entry 134):
+// Translation notes (divergence 134):
 // - COLMAP skips PatchMatch (and so everything after undistortion) without CUDA; the
 //   PatchMatch algorithm is ported to the CPU here, so it runs - on the host's compute device
 //   when Options.ComputeDevice is set (entry 136): always under RunAsync, and under Run only
@@ -26,7 +26,7 @@
 //   dense/<i>/images, so a model is undistorted again when its images are not in the store
 //   (e.g. in a new controller over an existing workspace), not only when dense/<i> is missing.
 // - Delaunay meshing reseeds the thread's PRNG first, so a resumed workspace re-meshes to the
-//   same bytes as the run that built it (docs/CPP_DIVERGENCES.md entry 137).
+//   same bytes as the run that built it (divergence 137).
 
 using ColmapSharp.Compute;
 using ColmapSharp.ImageProcessing;
@@ -276,7 +276,7 @@ public sealed partial class AutomaticReconstructionController
 		// Delaunay meshing shuffles its points with the thread's PRNG. COLMAP leaves that
 		// where the sparse mapper's RANSAC (or an earlier model's meshing) left it, so a
 		// resumed workspace meshes differently from the run that built it. Reseed so each
-		// model's mesh depends only on its inputs (docs/CPP_DIVERGENCES.md entry 137).
+		// model's mesh depends only on its inputs (divergence 137).
 		RandomUtils.SetPRNGSeed();
 		PlyMesh mesh = DelaunayMeshing.DenseDelaunayMeshing(
 			optionManager.DelaunayMeshing, reconstruction, plyPoints, visibility, progress, CancellationToken);

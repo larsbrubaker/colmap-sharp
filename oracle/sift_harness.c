@@ -5,7 +5,7 @@
 //
 // Why a harness in addition to pycolmap: Apple clang contracts a*b + c into fused multiply-adds
 // by default (-ffp-contract=on), and the macOS arm64 wheel's VLFeat is built that way, so its
-// keypoints differ from an unfused evaluation in the last bits (docs/CPP_DIVERGENCES.md entry 41). This
+// keypoints differ from an unfused evaluation in the last bits (divergence 41). This
 // harness is compiled with -ffp-contract=off (and without SSE2, like COLMAP's arm64 build) so it
 // is the exact, unfused VLFeat the C# port must match bit for bit.
 //

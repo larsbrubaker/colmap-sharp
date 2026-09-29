@@ -11,7 +11,7 @@
 // - Eigen's colPivHouseholderQr().rank() is LinearAlgebra/ColPivHouseholderQR.cs (same
 //   threshold rule); Eigen's maxCoeff(&index) returns the first maximum, as here.
 // - The three candidate points are taken in the problem's first-seen order of points
-//   (docs/CPP_DIVERGENCES.md entry 39), where COLMAP takes abseil hash order.
+//   (divergence 39), where COLMAP takes abseil hash order.
 
 using ColmapSharp.Estimators.CostFunctions;
 using ColmapSharp.Geometry;

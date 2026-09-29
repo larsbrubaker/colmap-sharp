@@ -11,7 +11,7 @@
 //
 // Translation note: COLMAP's controller reads OptionManager::bundle_adjustment; the option
 // manager (the CLI's option registry) is not ported, so the controller takes that
-// BundleAdjustmentOptions directly (docs/CPP_DIVERGENCES.md, entry 67). A default
+// BundleAdjustmentOptions directly (divergence 67). A default
 // OptionManager holds default BundleAdjustmentOptions, so `new BundleAdjustmentOptions()` is
 // the same configuration.
 

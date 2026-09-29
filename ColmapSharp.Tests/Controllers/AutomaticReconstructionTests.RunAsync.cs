@@ -2,7 +2,7 @@
 //
 // AutomaticReconstructionTests (continued): C#-only tests of
 // AutomaticReconstructionController.RunAsync, the entry that awaits PatchMatch on the host's
-// compute device (docs/CPP_DIVERGENCES.md entry 136), not a port. Over the textured scene of
+// compute device (divergence 136), not a port. Over the textured scene of
 // AutomaticReconstructionTests.CSharpOnly.cs they pin that RunAsync writes the same bytes as
 // Run with no device, uses a device that cannot be waited on synchronously (the browser's)
 // with the same outputs and no fallback warning, and stops part-way through the dense stage

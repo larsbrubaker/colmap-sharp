@@ -14,7 +14,7 @@
 // linear index order (column-major for matrices), so the same seed gives the same values
 // as COLMAP. RandomEigenQuaterniond goes through sqrt, sin and cos; .NET calls the platform
 // libm for sin and cos, which can round differently from the C++ build's (see
-// docs/CPP_DIVERGENCES.md, entry 7).
+// divergence 7).
 
 using ColmapSharp.LinearAlgebra;
 

@@ -10,8 +10,8 @@
 //
 // VectorToCSV streams each value with an ostream's default precision (6 significant
 // digits), so it goes through CppStreamFormat.FormatDouble. StringToDouble parses with
-// .NET's invariant double parser instead of std::istringstream (docs/CPP_DIVERGENCES.md,
-// entry 20): the two agree on plain decimal and exponent notation.
+// .NET's invariant double parser instead of std::istringstream (divergence 20):
+// the two agree on plain decimal and exponent notation.
 
 using System.Globalization;
 using System.Text;

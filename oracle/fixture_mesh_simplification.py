@@ -6,7 +6,7 @@
 #
 # - "wavy": a curved 30x30 grid under six option sets, through pycolmap's simplify_mesh. The
 #   costs are all distinct; the port matches within 1e-5 (Tier C: boundary systems can differ
-#   in the last bits, docs/CPP_DIVERGENCES.md, entry 72) and is byte-identical when generated.
+#   in the last bits, divergence 72) and is byte-identical when generated.
 # - "flat": flat grids with boundary_weight 0, through pycolmap. Every collapse costs exactly 0,
 #   so the result is decided by std::priority_queue's tie order (libc++'s heap, which
 #   ColmapSharp ports); these cases must match byte for byte.

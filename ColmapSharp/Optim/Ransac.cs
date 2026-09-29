@@ -29,7 +29,7 @@
 //   is not reproducible. This port always runs the loop once, on the calling thread, which
 //   is exactly COLMAP built without OpenMP ("the block runs once serially"). num_threads is
 //   still validated as COLMAP does (including the RandomSampler-only check), so options
-//   that COLMAP rejects are rejected here. docs/CPP_DIVERGENCES.md, entry 17.
+//   that COLMAP rejects are rejected here. divergence 17.
 // - The per-thread PRNG seeding (SetPRNGSeed(random_seed) when random_seed != -1 and the
 //   sampler is randomized) reseeds the calling thread's PRNG, as COLMAP's serial path does.
 

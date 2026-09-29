@@ -6,7 +6,7 @@
 //   PatchMatchSourceDepthMaps.Sample), in the same operation order.
 // Ports: patch_match_cuda.cu's tex2DLayered reads as the CPU port models them: unnormalized
 //   coordinates, texel centres at +0.5, border addressing (0 outside the layer), and exact
-//   float bilinear weights (docs/CPP_DIVERGENCES.md, entry 95).
+//   float bilinear weights (divergence 95).
 // Composed by ColmapSharp/Mvs/PatchMatchShaders.cs after patch_match_common.wgsl (it uses
 // is_finite_f32). A kernel that includes this file supplies, in its constants header,
 //   PM_SRC_MAX_WIDTH: i32, PM_SRC_MAX_HEIGHT: i32   (the layer size, as in C#)

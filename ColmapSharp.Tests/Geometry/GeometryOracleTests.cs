@@ -12,7 +12,7 @@
 //   Inverse's scale and rotation, ToMatrix, FromMatrix; EllipsoidToUTM's zone; the
 //   operator<< strings and Sim3d::ToFile's text.
 // - Tier B (ToleranceFields), each for an FMA contraction in the macOS arm64 wheel that
-//   ColmapSharp deliberately does not reproduce (docs/CPP_DIVERGENCES.md, entry 6):
+//   ColmapSharp deliberately does not reproduce (divergence 6):
 //   everything that rotates a vector with q * v (Rigid3d/Sim3d point transform, the
 //   translations of composition and Inverse, TgtOriginInSrc); AdjointInverse and the
 //   covariance helpers GetCovarianceForRigid3dInverse, GetCovarianceForComposedRigid3d and
@@ -20,7 +20,7 @@
 //   ellipsoid/ECEF/ENU/UTM conversions, whose multiply-adds the wheel fuses (for example
 //   N * (1 - e2) + alt in EllipsoidToECEF: fusing it takes that coordinate from
 //   13/80 mismatches to 3/80). UTMToEllipsoid is Tier B for an unexplained 1-ulp
-//   latitude difference on 2/80 points (docs/CPP_DIVERGENCES.md, entry 11).
+//   latitude difference on 2/80 points (divergence 11).
 // Tolerances: |expected - actual| <= relative * max(1, |expected|), and for coordinates in
 // meters in the GPS conversions (ECEF, ENU, UTM and altitude) additionally within 1e-8 m:
 // those come out of ~6.4e6 m ECEF values whose last-bit differences (9.3e-10 m) carry

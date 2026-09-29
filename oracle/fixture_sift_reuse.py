@@ -10,7 +10,7 @@
 # sit in octave -1, as on this low-contrast fine-noise A), B's orientations and descriptors in
 # that octave are computed from A's gradient. The fixture records that pycolmap's reused
 # output differs from its fresh output; the port resets the cache and must match FRESH
-# (docs/CPP_DIVERGENCES.md entry 43).
+# (divergence 43).
 #
 # Must run on macOS arm64 (the wheel the fixtures describe).
 # Usage: oracle/.venv/bin/python oracle/fixture_sift_reuse.py

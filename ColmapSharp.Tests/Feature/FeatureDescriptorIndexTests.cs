@@ -4,7 +4,7 @@
 // FeatureDescriptorIndexTests: colmap/feature/index_test.cc 1:1. The parameterized
 // ParameterizedFeatureDescriptorIndexTests.Nominal runs over the same four rows (SIFT and
 // ALIKED_N16ROT, 100 and 1000 descriptors); COLMAP's FAISS index type is the exact index here
-// (FeatureDescriptorIndex.IndexType.Default, docs/CPP_DIVERGENCES.md entry 42). Tests
+// (FeatureDescriptorIndex.IndexType.Default, divergence 42). Tests
 // ColmapSharp/Feature/FeatureDescriptorIndex.cs. EXPECT_NEAR on floats compares the floats
 // promoted to double.
 

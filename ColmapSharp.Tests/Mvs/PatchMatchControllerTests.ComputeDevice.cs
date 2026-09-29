@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // PatchMatchControllerTests (continued): C#-only tests of PatchMatchController.ComputeDevice
-// (ColmapSharp/Mvs/PatchMatchController.cs; docs/CPP_DIVERGENCES.md entry 136). COLMAP spreads
+// (ColmapSharp/Mvs/PatchMatchController.cs; divergence 136). COLMAP spreads
 // problems over CUDA devices by index; here the host hands the controller one compute device.
 // The device is ReferenceComputeDevice (ColmapSharp/Mvs/Testing/), the CPU twin of the WGSL
 // kernels, so every map the controller writes with it must be byte-identical to the maps it

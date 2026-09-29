@@ -10,7 +10,7 @@
 # ColmapSharp.Tests/Feature/VlCovDetTests.cs, which requires every value bit for bit.
 #
 # covariant_sift.json: pycolmap's covariant extractor (the macOS arm64 wheel, whose VLFeat
-# fuses multiply-adds, docs/CPP_DIVERGENCES.md entry 41) on the same images; keypoints as
+# fuses multiply-adds, divergence 41) on the same images; keypoints as
 # their six float32 shape values, descriptors as base64 uint8 rows. pycolmap does not bind
 # force_covariant_extractor, so the plain covariant case is only in the harness fixture. Read
 # by ColmapSharp.Tests/Feature/CovariantSiftOracleTests.cs.

@@ -15,7 +15,7 @@
 //
 // Translation notes:
 // - image_path becomes ReadImage, handed to every cluster's IncrementalPipeline
-//   (docs/CPP_DIVERGENCES.md entry 68).
+//   (divergence 68).
 // - COLMAP's ThreadPool of workers becomes Parallel.ForEach with the same worker count; each
 //   cluster writes only its own ReconstructionManager, so the merge sees the same inputs in
 //   any schedule. The cluster-pointer NodeHashMap is a Dictionary keyed by reference.
@@ -25,7 +25,7 @@
 //   schedule; here they do not.
 // - Cancellation: COLMAP's Run never checks CheckIfStopped. Here BaseController's
 //   CancellationToken and stop function reach every cluster's IncrementalPipeline, and a
-//   stopped run returns before merging (docs/CPP_DIVERGENCES.md entry 108).
+//   stopped run returns before merging (divergence 108).
 // - Exceptions: COLMAP's ThreadPool::Wait rethrows every task exception at once as a
 //   colmap::AggregateException (util/threading.cc, CheckFinishedTasks). Parallel.ForEach's
 //   System.AggregateException is the same contract, so it propagates as is; unlike
@@ -261,7 +261,7 @@ public sealed class HierarchicalPipeline : BaseController
 
 		// The cluster draws from a fresh PRNG, as on a new COLMAP worker thread, not from
 		// whatever the calling or reused pool thread drew before; the thread's own PRNG is
-		// restored afterwards (docs/CPP_DIVERGENCES.md entry 121).
+		// restored afterwards (divergence 121).
 		Mt19937? threadPrng = RandomUtils.Prng;
 		RandomUtils.Prng = null;
 		try

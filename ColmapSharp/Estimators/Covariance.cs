@@ -18,7 +18,7 @@
 // - LOG(WARNING) goes to Util/Log.cs and VLOG output is dropped; the functions return null
 //   where COLMAP warns and returns nullopt.
 // - GetOtherParams lists blocks in Problem.GetParameterBlocks order, which is insertion order
-//   here and address order in Ceres (docs/CPP_DIVERGENCES.md, entry 53).
+//   here and address order in Ceres (divergence 53).
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;

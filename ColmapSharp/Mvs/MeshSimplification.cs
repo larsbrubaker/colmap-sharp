@@ -11,7 +11,7 @@
 //
 // Tier C (outcome): the collapse order follows COLMAP's (the queue is libc++'s heap with
 // COLMAP's cost-only comparator, CollapseHeap.cs), but costs from non-singular 4x4 systems
-// and boundary quadric sums can differ in the last bits (docs/CPP_DIVERGENCES.md, entries 72
+// and boundary quadric sums can differ in the last bits (divergences 72
 // and 73), which can reorder near-equal collapses. Flat meshes without boundary weight match
 // pycolmap byte for byte; curved ones matched on every oracle case. The result does not
 // depend on the thread count.

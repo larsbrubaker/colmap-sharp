@@ -3,7 +3,7 @@
 // Re3q3Tests: C#-only tests (PoseLib has no re3q3 unit test and COLMAP none either) for
 // ColmapSharp/Estimators/Solvers/PoseLib/Re3q3.cs. They pin the random change-of-variables
 // branch, which the ported absolute_pose_test.cc cases never reach
-// (docs/CPP_DIVERGENCES.md entry 26). Tier B: solutions are checked against the system.
+// (divergence 26). Tier B: solutions are checked against the system.
 
 using ColmapSharp.Estimators.Solvers.PoseLib;
 

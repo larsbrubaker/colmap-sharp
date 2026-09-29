@@ -14,7 +14,7 @@
 // which COLMAP never selects, and use_explicit_schur_complement (off by default).
 // Vector reductions (dot products, norms) are sequential sums, so the iterates do not depend
 // on the thread count; Ceres' parallel reductions (and Eigen's vectorized norm) sum in a
-// different order (docs/CPP_DIVERGENCES.md entry 35).
+// different order (divergence 35).
 
 namespace ColmapSharp.Solver;
 

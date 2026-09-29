@@ -10,10 +10,10 @@
 //
 // Tier A (exact) with two deliberate differences:
 // - Points come from the reconstruction in ascending point3D id order (Util/IdMap.cs,
-//   docs/CPP_DIVERGENCES.md entry 21) where COLMAP iterates its hash map, so a point's
+//   divergence 21) where COLMAP iterates its hash map, so a point's
 //   index can differ from COLMAP's; images are in registration order in both.
 // - GetMaxOverlappingImages breaks ties in the shared-point count by ascending image
-//   index (docs/CPP_DIVERGENCES.md, entry 64).
+//   index (divergence 64).
 //
 // Additions for MatterCAD: ReadFromCOLMAP also takes a Reconstruction in memory (the path
 // overload reads one with Reconstruction.Read and delegates to it).

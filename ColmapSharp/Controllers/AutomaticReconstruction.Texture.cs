@@ -2,7 +2,7 @@
 // Ported from COLMAP (BSD-3-Clause, see THIRD_PARTY_NOTICES.md).
 //
 // AutomaticReconstructionController, texturing part: a C#-only last dense step
-// (docs/CPP_DIVERGENCES.md entry 135). COLMAP's automatic reconstruction stops at the mesh;
+// (divergence 135). COLMAP's automatic reconstruction stops at the mesh;
 // texturing is its separate mesh_texturer command (RunMeshTexturer in colmap/exe/mvs.cc). This
 // runs that command's body on each model's dense workspace right after meshing
 // (AutomaticReconstruction.Dense.cs): read the undistorted model (dense/<i>/sparse and

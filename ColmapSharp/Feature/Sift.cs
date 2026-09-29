@@ -20,7 +20,7 @@
 // Tier A (exact) against unfused VLFeat: the VLFeat layer matches VLFeat compiled without
 // FMA contraction bit for bit (VlSiftFilterTests). The macOS arm64 pycolmap wheel fuses
 // multiply-adds, so against it the same keypoints come out with last-bit drift
-// (SiftOracleTests, docs/CPP_DIVERGENCES.md entry 41). The descriptor normalization sums in
+// (SiftOracleTests, divergence 41). The descriptor normalization sums in
 // Eigen's NEON reduction order (FeatureUtils.cs).
 
 using ColmapSharp.Feature.VLFeat;

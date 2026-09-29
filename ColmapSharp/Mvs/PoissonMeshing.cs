@@ -16,7 +16,7 @@
 // the vendored C++ (the PoissonTreeOracleTests harnesses); the whole chain is Tier A against
 // upstream's own code built the same way (see below) and Tier C against the pycolmap wheel
 // (PoissonMeshingOracleTests), since the optimized wheel may round a few floats differently
-// (docs/CPP_DIVERGENCES.md, entry 125).
+// (divergence 125).
 //
 // Translation notes:
 // - COLMAP formats pointWeight and trim with std::to_string and PoissonRecon parses them back
@@ -29,7 +29,7 @@
 //   equals upstream's run with num_threads = 1. Upstream with more threads (COLMAP's default
 //   num_threads = -1 uses every hardware thread) sums some floats and numbers some nodes and
 //   vertices in thread order, so its output varies from run to run in the last bits
-//   (docs/CPP_DIVERGENCES.md, entries 106 and 123).
+//   (divergences 106 and 123).
 // - The file wrapper is Tier A against upstream's own RunPoissonRecon and RunSurfaceTrimmer
 //   built at -O1 (PoissonMeshingOracleTests.Exact.cs): the output PLY is byte-identical, except
 //   where PoissonSplat.LogF's rounding differs from Apple's logf (entry 116).

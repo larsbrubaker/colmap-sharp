@@ -6,7 +6,7 @@
 # -2/0/1 for the upsample, copy and downsample paths). Keypoints are written as their six
 # float32 shape values (exact as doubles), descriptors as base64 uint8 rows.
 # Read by ColmapSharp.Tests/Feature/SiftOracleTests.cs (Tier A; see that file and
-# docs/CPP_DIVERGENCES.md entry 41 for the arm64 FMA-contraction caveat).
+# divergence 41 for the arm64 FMA-contraction caveat).
 #
 # It also compiles oracle/sift_harness.c against cpp-reference's VLFeat with
 # -ffp-contract=off and writes sift_vlfeat.json: VLFeat's raw keypoints, orientations and

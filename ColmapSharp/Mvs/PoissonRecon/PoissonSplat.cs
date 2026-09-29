@@ -15,7 +15,7 @@
 // - The C++ splats in a ThreadPool::ParallelFor over samples; COLMAP runs it on all hardware
 //   threads, so the float accumulation order there is not deterministic. The port splats
 //   sequentially in sample order, which is what a single-threaded run does
-//   (docs/CPP_DIVERGENCES.md, entry 106).
+//   (divergence 106).
 // - The density form of _splatPointData calls its Splat lambda for the node and, with
 //   weight 1 - dx, for the node's parent, but the lambda ignores its node argument and splats
 //   into `temp` both times (and scales by temp's width). The port reproduces that.
@@ -23,7 +23,7 @@
 //   both the density lookups and the splats (oneKey); the port shares one NeighborKey too,
 //   since its cache state is observable through node creation order.
 // - log( float ) is the float overload in the C++; the port rounds the double logarithm to
-//   float (docs/CPP_DIVERGENCES.md, entry 116).
+//   float (divergence 116).
 
 namespace ColmapSharp.Mvs.PoissonRecon;
 

@@ -5,7 +5,7 @@
 // TEST(Suite, Name) named Suite_Name. Tests ColmapSharp/Mathematics/GraphCut.cs and
 // MinSTGraphCut.cs. Tier A: cut weights, flows and S-T labels are exact. The
 // ComputeNormalizedMinGraphCut* cases are Tier C (MultilevelPartitioner stands in for METIS,
-// docs/CPP_DIVERGENCES.md entry 77); like COLMAP's, they pin the label count and range, that
+// divergence 77); like COLMAP's, they pin the label count and range, that
 // both parts are used, and the component split of the disconnected graph.
 
 using ColmapSharp.Mathematics;

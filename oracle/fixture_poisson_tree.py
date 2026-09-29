@@ -47,7 +47,7 @@
 # It also adds to poisson_libm.json "powonethird/correct": the correctly rounded double of
 # x^fl(1/3) for each "powonethird/x", computed here with 60-digit decimal arithmetic. The
 # harness's "powonethird/y" is the platform libm's pow, which is not correctly rounded for every input
-# (docs/CPP_DIVERGENCES.md, entry 75).
+# (divergence 75).
 #
 # Usage: oracle/.venv/bin/python oracle/fixture_poisson_tree.py [fixture.json ...]   (any
 # python3 works; COLMAP_REFERENCE=<checkout> when cpp-reference/ is not next to this repo's

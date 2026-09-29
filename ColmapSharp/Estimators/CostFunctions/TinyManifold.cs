@@ -17,7 +17,7 @@
 //   single-block product is just the manifold itself.
 // - TinySphereManifold is C++'s SphereManifold<3>, the only size COLMAP implements.
 // - TinySphereManifold's tangent basis uses our own unit-orthogonal vector (Hughes & Moller),
-//   not Eigen's unitOrthogonal(); see docs/CPP_DIVERGENCES.md #19.
+//   not Eigen's unitOrthogonal(); see divergence 19.
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Optim;

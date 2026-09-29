@@ -7,7 +7,7 @@
 // Mirrors: PatchMatchCpu.InitRandomDepthAndNormalMaps in ColmapSharp/Mvs/PatchMatchCpu.cs (the
 //   same streams: PatchMatchRandom.InitDepthPhase and InitNormalPhase keyed on the pixel).
 // Ports: patch_match_cuda.cu's FillWithRandomNumbers and InitNormalMap, as the CPU port models
-//   them (docs/CPP_DIVERGENCES.md, entry 86).
+//   them (divergence 86).
 // Parts: dispatch, common, geometry, likelihood, layout (ColmapSharp/Mvs/PatchMatchGpuKernels.cs).
 // Bindings: group 0 - 1 pm_poses, 2 pm_problem, 6 pm_state (read_write: the depth and normal planes).
 

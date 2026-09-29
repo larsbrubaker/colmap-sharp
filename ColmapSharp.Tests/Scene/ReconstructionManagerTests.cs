@@ -4,7 +4,7 @@
 // ReconstructionManagerTests: colmap/scene/reconstruction_manager_test.cc ported 1:1, one
 // method per gtest case named Suite_Name. Tests ColmapSharp/Scene/ReconstructionManager.cs.
 // CSharpOnly_WriteOrdersByPointCountThenIndex pins Write/Read (reconstruction_manager_test.cc
-// has no case for them) and the index tie-break of docs/CPP_DIVERGENCES.md, entry 34.
+// has no case for them) and the index tie-break of divergence 34.
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Scene;

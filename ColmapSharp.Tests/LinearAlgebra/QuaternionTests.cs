@@ -185,7 +185,7 @@ public class QuaternionTests
 
 	/// <summary>
 	/// C#-only: exactly and nearly opposite vectors take the half-turn branch of
-	/// FromTwoVectors (1 + c &lt; 1e-8, docs/CPP_DIVERGENCES.md entry 28), which must still map
+	/// FromTwoVectors (1 + c &lt; 1e-8, divergence 28), which must still map
 	/// the first direction onto the second to rounding accuracy and return a unit quaternion.
 	/// Covers every choice of the least-aligned coordinate axis and both sides of the
 	/// threshold.

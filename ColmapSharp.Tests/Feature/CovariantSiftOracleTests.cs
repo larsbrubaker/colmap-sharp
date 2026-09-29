@@ -6,7 +6,7 @@
 // the sift_test.cc square and a seeded texture.
 //
 // Not bit-exact, for the reason SiftOracleTests gives: the macOS arm64 wheel's VLFeat fuses
-// multiply-adds (docs/CPP_DIVERGENCES.md entry 41). The bit-exact Tier A check is
+// multiply-adds (divergence 41). The bit-exact Tier A check is
 // VlCovDetTests, against the same VLFeat compiled unfused. Here every keypoint must pair with
 // a distinct pycolmap keypoint within the FMA drift, with descriptor bytes within 1 on at most
 // 0.1% of the bytes. Pairing, not index order, because the order legitimately differs: on the

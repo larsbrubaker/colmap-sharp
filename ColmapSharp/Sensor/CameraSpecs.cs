@@ -11,7 +11,7 @@
 //
 // Translation note: COLMAP's camera_specs_t is a NodeHashMap (hash-ordered). Here it is a
 // list in specs.cc source order, so CameraDatabase's query iterates deterministically
-// (docs/CPP_DIVERGENCES.md, entry 8).
+// (divergence 8).
 
 namespace ColmapSharp.Sensor;
 

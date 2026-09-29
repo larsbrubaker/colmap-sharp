@@ -5,7 +5,7 @@
 // transforms, cropping, lookups, statistics, validation and image directories, testing
 // ColmapSharp/Scene/Reconstruction.Queries.cs. Helpers and translation notes are in
 // ReconstructionTests.cs. The last cases are C#-only (labeled): they pin Clone's pointer
-// rewiring and the ascending-id iteration order that docs/CPP_DIVERGENCES.md entry 21
+// rewiring and the ascending-id iteration order that divergence 21
 // documents (the ported ConstructCopy/AssignCopy in ReconstructionTests.IO.cs cover copies
 // of a synthetic dataset).
 
@@ -368,7 +368,7 @@ public partial class ReconstructionTests
 	/// <summary>
 	/// C#-only: objects iterate in ascending id order whatever the insertion order, so Crop
 	/// hands out new point ids in ascending order of the old ones
-	/// (docs/CPP_DIVERGENCES.md, entry 21).
+	/// (divergence 21).
 	/// </summary>
 	[Test]
 	public async Task CSharpOnly_IterationIsInAscendingIdOrder()

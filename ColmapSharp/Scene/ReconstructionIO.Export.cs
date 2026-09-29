@@ -14,7 +14,7 @@
 // exporter return false after it has already written what came before, as in COLMAP, with
 // its LOG(WARNING) (trailing newline included where COLMAP's text has one) to Util/Log.cs. COLMAP walks Points3D() (and, for VRML,
 // Images()), which are hash maps; here they are walked in ascending id order
-// (docs/CPP_DIVERGENCES.md, entry 21, which already covers every Reconstruction walk).
+// (divergence 21, which already covers every Reconstruction walk).
 
 using System.Globalization;
 using System.Text;

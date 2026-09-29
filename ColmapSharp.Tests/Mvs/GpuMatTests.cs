@@ -5,7 +5,7 @@
 // replacements of GpuMat's operations in ColmapSharp/Mvs/Mat.Transforms.cs. COLMAP's
 // GpuMat is a CUDA buffer; here the same operations run on Mat<T>, so the cases run without
 // a GPU. GpuMatPRNG / FillWithRandomNumbers (cuRAND) becomes a fill from PatchMatchRandom
-// (docs/CPP_DIVERGENCES.md, entry 86): the values only need to differ, since each case
+// (divergence 86): the values only need to differ, since each case
 // compares an input with its transformed copy. The expected index formulas, including the
 // rotation test's rounded trigonometry, are COLMAP's. Tier A.
 

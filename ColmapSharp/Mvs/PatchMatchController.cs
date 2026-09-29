@@ -20,7 +20,7 @@
 // Translation notes:
 // - "__auto__" ranks by shared point count only in COLMAP (std::partial_sort, ties in
 //   libc++'s unspecified order); ties go to the lower image index here
-//   (docs/CPP_DIVERGENCES.md, entry 84).
+//   (divergence 84).
 // - SetUpProblem collects the used images in a FlatHashSet in COLMAP, whose iteration order
 //   becomes the order of the source images; here it is the reference image, then the
 //   problem's source images in their configured order (entry 85).
@@ -33,7 +33,7 @@
 //   ported, and progress is reported per problem through IProgress<ControllerProgress>.
 // - COLMAP runs one problem per GPU in parallel; here problems run one after another, each
 //   PatchMatch run itself parallel (NumThreads on the CPU, or on the one device), which
-//   gives the same outputs (docs/CPP_DIVERGENCES.md, entry 122).
+//   gives the same outputs (divergence 122).
 // - Run blocks; RunAsync awaits the compute device, for a host (the browser) whose device
 //   cannot be waited on synchronously. RunAsync also awaits YieldHook (C#-only, set by
 //   AutomaticReconstructionController.RunAsync) after each problem, so a single-threaded host
@@ -149,7 +149,7 @@ public sealed class PatchMatchController
 	/// <summary>
 	/// <see cref="Run"/>, awaiting the <see cref="ComputeDevice"/>'s work instead of blocking
 	/// on it: the entry point for a device that cannot be waited on synchronously. Problems
-	/// still run one at a time (docs/CPP_DIVERGENCES.md, entry 122); a problem on the CPU runs
+	/// still run one at a time (divergence 122); a problem on the CPU runs
 	/// synchronously on the calling thread inside this call, so a UI host should start it off
 	/// its UI thread.
 	/// </summary>

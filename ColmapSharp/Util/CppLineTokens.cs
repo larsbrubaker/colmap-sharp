@@ -17,7 +17,7 @@
 // - float: the same rules in single precision (libc++ reads a float with strtof, rounding
 //   the token once to float, not through double).
 // A token is taken whole, so "12abc" fails where libc++ would read 12 into an integer and
-// leave "abc" for the next extraction (docs/CPP_DIVERGENCES.md, entry 25). Correctly rounded
+// leave "abc" for the next extraction (divergence 25). Correctly rounded
 // parsing on both sides gives the same bits for the same token.
 
 using System.Globalization;

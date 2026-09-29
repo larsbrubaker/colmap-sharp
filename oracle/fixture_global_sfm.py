@@ -21,7 +21,7 @@
 # database the steps read (cameras, rigs, frames, images, keypoints, two-view geometries, pose
 # priors, and the raw matches where view graph calibration re-estimates relative poses from
 # them), so the C# test runs on exactly the same input without re-synthesizing it (synthetic
-# noise visits images in hash order, docs/CPP_DIVERGENCES.md entry 31). Every step is
+# noise visits images in hash order, divergence 31). Every step is
 # single-threaded with a fixed random seed. Doubles are written with repr() (exact); the
 # float32 keypoints with numpy's shortest float32 repr (exact in C# float.Parse).
 #

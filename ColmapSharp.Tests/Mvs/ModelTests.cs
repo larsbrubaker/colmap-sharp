@@ -5,7 +5,7 @@
 // ColmapSharp/Mvs/Model.cs. Tier A; EXPECT_FLOAT_EQ is gtest's 4-ulp comparison and
 // EXPECT_NEAR on floats compares them promoted to double, as gtest does. The C#-only cases
 // at the end pin the in-memory ReadFromCOLMAP overload and the tie order of
-// GetMaxOverlappingImages (docs/CPP_DIVERGENCES.md, entry 64).
+// GetMaxOverlappingImages (divergence 64).
 
 using ColmapSharp.Mvs;
 using ColmapSharp.Scene;
@@ -214,7 +214,7 @@ public class ModelTests
 
 	// C#-only: images with equal shared-point counts come out in ascending index order, and
 	// with fewer slots than tied candidates the cut-off keeps the lowest indices
-	// (docs/CPP_DIVERGENCES.md, entry 64).
+	// (divergence 64).
 	[Test]
 	public async Task Model_GetMaxOverlappingImagesTies()
 	{

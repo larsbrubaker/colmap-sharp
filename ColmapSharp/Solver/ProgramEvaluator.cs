@@ -10,7 +10,7 @@
 // cost array. Ceres instead sums cost and gradient per thread and then across threads, which
 // makes its last bits depend on the thread count and the scheduling. Here the cost is summed
 // over residual blocks in order and the gradient is J'r computed after the parallel pass, so
-// the result is the same for any thread count (docs/CPP_DIVERGENCES.md, entry 18). A gradient
+// the result is the same for any thread count (divergence 18). A gradient
 // asked for without a Jacobian (the bounded line search, Problem.Evaluate) goes through a
 // Jacobian and residual vector the evaluator owns, allocated on first use and reused.
 

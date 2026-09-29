@@ -8,7 +8,7 @@
 // 0.0 + a_0 b_0 + a_1 b_1 (+ a_2 b_2) summed in that order into a temporary and then stored
 // with the operation, so the results are bit-identical to the naive loops (pinned by
 // SmallBlasFixedTests). Ceres' own fixed-size path uses Eigen's kernels, whose order may
-// differ (docs/CPP_DIVERGENCES.md entry 35), so matching the naive loops is the contract.
+// differ (divergence 35), so matching the naive loops is the contract.
 //
 // The lengths are checked once per call; the loops then index without per-element bounds
 // checks.

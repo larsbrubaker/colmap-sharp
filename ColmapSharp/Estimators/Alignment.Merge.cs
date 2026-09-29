@@ -7,7 +7,7 @@
 // (alignment_test.cc: MergeReconstructions, MergeReconstructionsInconsistentImageNames,
 // AlignReconstructionToOrigRigScales).
 //
-// Deterministic order (docs/CPP_DIVERGENCES.md, entry 49): COLMAP copies the missing images
+// Deterministic order (divergence 49): COLMAP copies the missing images
 // in the iteration order of a FlatHashSet, which decides the order their frames are
 // registered in the target (RegFrameIds). The port copies them in the source's
 // RegImageIds order. The source points are merged in Points3D order (ascending id, entry

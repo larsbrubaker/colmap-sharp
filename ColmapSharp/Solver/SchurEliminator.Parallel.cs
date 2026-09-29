@@ -2,7 +2,7 @@
 // Written for ColmapSharp: the multithreaded chunk elimination of SchurEliminator.cs.
 // Ceres (schur_eliminator_impl.h, BSD-3-Clause, see THIRD_PARTY_NOTICES.md) runs the chunks
 // in parallel and locks each cell of S, so the order of additions into a cell depends on
-// scheduling (docs/CPP_DIVERGENCES.md entry 35, item 1). Here the result is bit-identical to
+// scheduling (divergence 35, item 1). Here the result is bit-identical to
 // the sequential loop (EliminateChunksSequentially) for any thread count, because every
 // value is still computed by the same operations in the same order:
 // - Phase A, in parallel over the chunks of a batch: each chunk computes its E'E (with the

@@ -8,14 +8,14 @@
 // port of patch_match_cuda.cu that Run delegates to. RunAsync with a host-provided compute
 // device runs PatchMatchGpu.cs (the WGSL kernels) instead when PatchMatchGpuPlan.cs says the
 // device can hold the problem, and falls back to PatchMatchCpu otherwise, recording which
-// backend ran and why (docs/CPP_DIVERGENCES.md, entry 136). Tests:
+// backend ran and why (divergence 136). Tests:
 // ColmapSharp.Tests/Mvs/PatchMatchTests.cs, PatchMatchRunTests.cs and PatchMatchBackendTests.cs
 // (C#-only; COLMAP has no patch_match_test.cc).
 //
 // Translation notes:
 // - Problem holds the image, depth map and normal map lists by reference, like COLMAP's
 //   pointers: the controller fills them per problem.
-// - Check drops COLMAP's gpu_index checks (docs/CPP_DIVERGENCES.md, entry 86): the GPU, when
+// - Check drops COLMAP's gpu_index checks (divergence 86): the GPU, when
 //   there is one, is the IComputeDevice the host passes to RunAsync, not an index.
 // - Run and RunAsync take a CancellationToken and an IProgress<double> (the fraction of sweeps
 //   done).

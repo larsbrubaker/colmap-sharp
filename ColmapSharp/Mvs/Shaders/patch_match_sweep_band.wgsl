@@ -16,7 +16,7 @@
 // Mirrors: PatchMatchCpu.SweepRows in ColmapSharp/Mvs/PatchMatchCpu.Sweep.cs, line by line (its
 //   ComputeFour scores hypotheses 1-4 bit-identically to four scalar Computes, which run here).
 // Ports: the row loop of patch_match_cuda.cu's SweepFromTopToBottom, as the CPU port models it
-//   (docs/CPP_DIVERGENCES.md, entries 86, 95 and 96).
+//   (divergences 86, 95 and 96).
 // Parts: dispatch, common, textures, geometry, likelihood, layout, ncc, geom_cost
 //   (ColmapSharp/Mvs/PatchMatchGpuKernels.cs); constants PM_NUM_SAMPLES: i32,
 //   PM_GEOM_CONSISTENCY: bool (the geometric term) and PM_SWEEP_COOPERATIVE: bool besides those

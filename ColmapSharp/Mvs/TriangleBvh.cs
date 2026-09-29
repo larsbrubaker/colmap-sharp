@@ -4,7 +4,7 @@
 // way" queries. It replaces the CGAL AABB_tree that COLMAP's texture mapping
 // (colmap/mvs/texture_mapping.cc, OcclusionTester) uses for occlusion tests; CGAL is GPL and
 // excluded (docs/LICENSE_AUDIT.md), and no CGAL code was read. TextureMapping.Views.cs is
-// the only user. Differences from CGAL's answers are docs/CPP_DIVERGENCES.md entry 90.
+// the only user. Differences from CGAL's answers are divergence 90.
 //
 // Written for colmap-sharp from the published algorithms:
 // - Binned surface area heuristic build: I. Wald, "On fast Construction of SAH-based

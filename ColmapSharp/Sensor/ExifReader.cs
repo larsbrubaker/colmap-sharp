@@ -24,7 +24,7 @@
 // Zero denominators: EXIF allows n/0 (cameras write 0/0 for "unknown"). OIIO most likely
 // stores the float quotient (inf or NaN); this reader leaves the attribute unset instead,
 // so the getters report "absent" rather than an inf/NaN focal length or GPS coordinate
-// (docs/CPP_DIVERGENCES.md, entry 10).
+// (divergence 10).
 
 using System.Buffers.Binary;
 using System.Text;

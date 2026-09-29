@@ -5,7 +5,7 @@
 // TestData/oracle/poisson_meshing.json) on a noisy, colored sphere, screened and unscreened,
 // with and without trimming. Tier C: every PoissonRecon stage is pinned bit-exact against the
 // vendored C++ built at -O1 (PoissonTreeOracleTests), but the wheel is optimized and may round
-// a few floats differently (docs/CPP_DIVERGENCES.md, entry 125): positions come out a few ulps
+// a few floats differently (divergence 125): positions come out a few ulps
 // apart, so MinimalAreaTriangulation splits some near-tie polygons along the other diagonal, and
 // a few vertices near the trim value land on the other side of it. The bar: the same PLY
 // property layout; untrimmed, the same vertex and triangle counts, positions within

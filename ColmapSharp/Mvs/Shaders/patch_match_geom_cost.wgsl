@@ -5,7 +5,7 @@
 // Mirrors: PatchMatchKernel.ComputeGeomConsistencyCost in
 //   ColmapSharp/Mvs/PatchMatchKernel.Geometry.cs, in the same operation order.
 // Ports: patch_match_cuda.cu's ComputeGeomConsistencyCost, as the CPU port models it
-//   (docs/CPP_DIVERGENCES.md, entry 96).
+//   (divergence 96).
 // Composed by ColmapSharp/Mvs/PatchMatchShaders.cs after common, textures (pm_sample_source_depth)
 // and geometry (the pose table, pm_div, pm_compute_point_at_depth). It declares no bindings.
 // Guards against non-finite values follow patch_match_geometry.wgsl's rules ("Guard:").

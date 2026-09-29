@@ -10,7 +10,7 @@
 // warping directly (scalar camera-model arithmetic and bilinear lookups). RectifyStereoCameras
 // is Tier B: it inverts a matrix and composes rotations through our Eigen replacements.
 // Images that go through Bitmap.Rescale (large downscales, spherical cameras with a
-// max_image_size) inherit its Tier B (docs/CPP_DIVERGENCES.md, entry 9).
+// max_image_size) inherit its Tier B (divergence 9).
 //
 // Translation notes:
 // - C++ output pointers become return values or out parameters.
@@ -19,7 +19,7 @@
 //   kInvalidCameraId because UndistortCamera builds a default-constructed Camera. Here
 //   UndistortReconstruction writes the undistorted model, size, parameters and prior flag
 //   into the stored Camera object (which the images' CameraPtr also reference) but keeps its
-//   CameraId (docs/CPP_DIVERGENCES.md, entry 60): code keyed by camera or sensor id would
+//   CameraId (divergence 60): code keyed by camera or sensor id would
 //   otherwise collide on the invalid id. UndistortCamera itself still returns a camera with
 //   the invalid id, as in COLMAP.
 // - std::min/std::max are written out as (b < a) ? b : a and (a < b) ? b : a where a NaN
@@ -543,7 +543,7 @@ public static class Undistortion
 	/// <summary>
 	/// C++ copy assignment of a Camera, except that the target keeps its CameraId (and so its
 	/// SensorId); COLMAP would copy the source's, which UndistortCamera leaves invalid
-	/// (docs/CPP_DIVERGENCES.md, entry 60).
+	/// (divergence 60).
 	/// </summary>
 	private static void AssignCamera(Camera target, Camera source)
 	{

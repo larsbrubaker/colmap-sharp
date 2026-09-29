@@ -337,7 +337,7 @@ public class FeatureMatchingUtilsTests
 
 	// C#-only: verifying outlier-laden, noisy matches with 1 and 4 threads writes identical
 	// two-view geometries (results are committed in pair order and each verification starts
-	// from the same PRNG state, docs/CPP_DIVERGENCES.md entry 71). Without the per-pair reseed
+	// from the same PRNG state, divergence 71). Without the per-pair reseed
 	// the 1-thread run continues one stream across pairs and the geometries differ.
 	[Test]
 	public async Task CSharpOnly_MatchIsThreadCountIndependent()

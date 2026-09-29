@@ -11,7 +11,7 @@
 //
 // COLMAP's float arithmetic in COLMAP's operation order (PatchMatch is Tier C); the exponential is MathF.Exp
 // rather than CUDA's expf, so the sums can differ from a GPU run in the last bits
-// (docs/CPP_DIVERGENCES.md, entry 96).
+// (divergence 96).
 //
 // Texture reads: COLMAP samples the image through a point-filtered CUDA texture with border
 // addressing and normalized-float reads, so a pixel outside the image is 0 and a pixel

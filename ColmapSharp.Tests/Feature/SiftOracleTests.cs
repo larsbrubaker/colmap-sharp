@@ -10,7 +10,7 @@
 // Tier A check is VlSiftFilterTests, against the same VLFeat compiled unfused, where every
 // value agrees. Here the same keypoints must come out (same count and order, so the same
 // detections and DoG-level truncation), with values within the drift fusing causes
-// (docs/CPP_DIVERGENCES.md entry 41).
+// (divergence 41).
 
 using System.Text.Json;
 

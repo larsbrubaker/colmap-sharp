@@ -12,7 +12,7 @@
 // in is libc++'s implementation detail, and it decides the rounding of the centroid sum.
 // Here each list is fully sorted instead (every nth_element postcondition holds for a
 // sorted list), so the bounding box is exact and the centroid can differ from COLMAP's by
-// rounding: Tier B (docs/CPP_DIVERGENCES.md, entry 15). CenterAndNormalizeImagePoints is
+// rounding: Tier B (divergence 15). CenterAndNormalizeImagePoints is
 // scalar code, Tier A (the test pins its matrix bit for bit).
 
 using ColmapSharp.LinearAlgebra;

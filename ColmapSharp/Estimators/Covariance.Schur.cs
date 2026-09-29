@@ -12,7 +12,7 @@
 // published algorithms; Eigen is MPL-2.0 and not ported). The matrices, the fill-reducing
 // AMD ordering's role, the rank test and the damping are COLMAP's; the operation order inside
 // the products and the factorization differs, so the results agree to round-off (Tier B,
-// docs/CPP_DIVERGENCES.md entry 54). As in COLMAP, S is sparse and L_inv is dense
+// divergence 54). As in COLMAP, S is sparse and L_inv is dense
 // (pose/other parameters squared).
 
 using ColmapSharp.LinearAlgebra;

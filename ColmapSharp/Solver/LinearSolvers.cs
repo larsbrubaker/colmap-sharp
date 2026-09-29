@@ -12,7 +12,7 @@
 // - DENSE_NORMAL_CHOLESKY: dense LLT of A'A + D^2 (LinearAlgebra/LLT.cs, Eigen's LLT).
 // - SPARSE_NORMAL_CHOLESKY: A'A + D^2 formed from BlockSparseMatrix's block structure and
 //   factored by LinearAlgebra/SimplicialCholesky.cs (LLT, AMD ordering), the stand-in for
-//   Ceres' SuiteSparse/Eigen sparse Cholesky (docs/CPP_DIVERGENCES.md entries 13 and 22).
+//   Ceres' SuiteSparse/Eigen sparse Cholesky (divergences 13 and 22).
 // The Schur solvers (DENSE_SCHUR, SPARSE_SCHUR: SchurComplementSolvers.cs; ITERATIVE_SCHUR:
 // IterativeSchurSolver.cs) are created here too; they need the Jacobian's first
 // num_eliminate_blocks column blocks to be the E blocks (SchurOrdering.cs).

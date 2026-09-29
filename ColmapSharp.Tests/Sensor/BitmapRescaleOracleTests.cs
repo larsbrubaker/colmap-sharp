@@ -4,7 +4,7 @@
 // dimensions). Compares Bitmap.Rescale (ColmapSharp/Sensor/BitmapResize.cs) with pycolmap
 // 4.2.0's OpenImageIO resize on the seeded images of oracle/fixture_bitmap_rescale.py.
 //
-// Tier B: every pixel within one gray level of pycolmap's (docs/CPP_DIVERGENCES.md, entry 9).
+// Tier B: every pixel within one gray level of pycolmap's (divergence 9).
 
 using ColmapSharp.Sensor;
 

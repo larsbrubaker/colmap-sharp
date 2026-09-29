@@ -408,7 +408,7 @@ public static class ViewGraphCalibration
 			// stream from pair to pair, so which pair sees which draws depends on scheduling.
 			// Here every pair starts from a fresh default-seeded PRNG, and the thread's own
 			// PRNG is restored, so Parallel.For's inline iterations on the calling thread
-			// don't consume the caller's stream (docs/CPP_DIVERGENCES.md entry 139).
+			// don't consume the caller's stream (divergence 139).
 			Mt19937? threadPrng = RandomUtils.Prng;
 			try
 			{

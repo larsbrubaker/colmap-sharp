@@ -2,7 +2,7 @@
 //
 // NormalizedMinGraphCutTests: C#-only tests, not a port of any COLMAP case.
 // GraphCut.ComputeNormalizedMinGraphCut runs on MultilevelPartitioner.cs, written here in
-// place of METIS (docs/CPP_DIVERGENCES.md entry 77), and graph_cut_test.cc's graphs have at
+// place of METIS (divergence 77), and graph_cut_test.cc's graphs have at
 // most eight vertices, which never reach coarsening. These pin the outcome (Tier C) on larger
 // graphs: planted clusters are recovered, parts stay balanced, a grid is cut near its
 // optimum, the result is deterministic, and the work grows near-linearly on the graph shapes

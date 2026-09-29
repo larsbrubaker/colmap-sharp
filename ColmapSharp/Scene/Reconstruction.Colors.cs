@@ -15,11 +15,11 @@
 //   decode image files (the host does), so the caller passes the decoded bitmap, or an image
 //   provider from image name to bitmap (null = the read failed: COLMAP logs a warning and
 //   skips the image). A grey bitmap is converted to RGB as Bitmap::Read(as_rgb=true) would
-//   (docs/CPP_DIVERGENCES.md, entry 68).
+//   (divergence 68).
 // - ExtractColorsForAllImages: COLMAP accumulates per-thread sums in thread-pool order, so its
 //   floating-point sums depend on scheduling. Here each image fills its own partial sums (in
 //   parallel, one slot per image) and they are reduced in ascending image-id order, so the
-//   result is the same for any thread count (docs/CPP_DIVERGENCES.md, entry 69).
+//   result is the same for any thread count (divergence 69).
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Sensor;

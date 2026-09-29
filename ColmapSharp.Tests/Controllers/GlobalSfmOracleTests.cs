@@ -80,7 +80,7 @@ public partial class GlobalSfmOracleTests
 	private const double CalibrationPoseToleranceDeg = 1e-5;
 
 	// Pairs whose re-estimated relative pose starts LO-RANSAC's local optimization from a
-	// different five-point solution than pycolmap does (docs/CPP_DIVERGENCES.md entry 124):
+	// different five-point solution than pycolmap does (divergence 124):
 	// same configuration and inlier count, but a pose 0.41 deg (rotation) and 0.25 deg
 	// (translation direction) away, where the ten-step local optimization stops.
 	private static readonly HashSet<string> UncalibratedPairsSeededDifferently = ["uncalibrated 2-3"];

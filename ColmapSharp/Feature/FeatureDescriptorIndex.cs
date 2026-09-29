@@ -11,7 +11,7 @@
 // k-nearest-neighbor search written from the definition, so it returns exactly what
 // COLMAP's IndexFlatL2 returns for fewer than 512 descriptors, but for 512 or more it
 // returns the true nearest neighbours where faiss's IVF index (nprobe = 8) is approximate.
-// See docs/CPP_DIVERGENCES.md entry 42.
+// See divergence 42.
 //
 // Tier A below 512 descriptors, and exact nearest neighbours in general:
 // - SIFT descriptors whose float values are integers in [0, 255] (what ToFloat produces)

@@ -13,7 +13,7 @@
 //
 // Translation notes (they apply to every controller):
 // - Images are read through an IImageSource (the image_path folder; Bitmap::Read decoding is
-//   the host's, docs/CPP_DIVERGENCES.md entry 82) and written through an IBitmapSink under
+//   the host's, divergence 82) and written through an IBitmapSink under
 //   the path COLMAP would write (Bitmap::Write encoding is the host's, entry 98). Text files
 //   (configs, scripts, projection matrices, bundle files) are written to the file system as
 //   in COLMAP, and so are the directories COLMAP creates.
@@ -23,7 +23,7 @@
 //   writes only its own result slot) and checks CheckIfStopped before each image's result
 //   is consumed, starting the next batch only when not stopped. Stopping thus finishes the
 //   batch in flight, where COLMAP finishes the tasks its threads had already picked up
-//   (docs/CPP_DIVERGENCES.md entry 99).
+//   (divergence 99).
 // - Stopping (CheckIfStopped: the stop function or the CancellationToken property) keeps
 //   COLMAP's semantics: Run returns normally, without OperationCanceledException.
 // - The LOG(INFO) "Undistorting image [i/n]" lines become each controller's Progress; the

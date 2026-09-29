@@ -10,7 +10,7 @@
 // - std::remainder is Math.IEEERemainder (both round the quotient to nearest, ties to even).
 // - Pair constraints (and so the jitter draws of the 1-DOF residual) are visited in
 //   ascending pair id order, frames and cameras in ascending id order
-//   (docs/CPP_DIVERGENCES.md, entry 44).
+//   (divergence 44).
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;

@@ -18,7 +18,7 @@
 // The integer paths are exact everywhere. The real paths are plain IEEE +,-,*,/ and sqrt,
 // which are exact too, with one caveat: NormalDistribution calls log, which is the platform
 // libm's in both C++ and .NET (on macOS both call the system libm, so they agree bit for
-// bit; elsewhere a last-ulp difference is possible, docs/CPP_DIVERGENCES.md entry 114).
+// bit; elsewhere a last-ulp difference is possible, divergence 114).
 //
 // Constants below are libc++'s template parameters evaluated for std::mt19937 on macOS,
 // where mt19937::result_type (uint_fast32_t) is a 32-bit unsigned int: the engine range

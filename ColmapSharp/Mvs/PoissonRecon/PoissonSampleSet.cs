@@ -18,7 +18,7 @@
 // accumulation order is the input order, so the sums match.
 //
 // Cancellation and progress: the token is checked, and progress reported, every 65536
-// points (docs/CPP_DIVERGENCES.md, entry 76, for the in-memory API).
+// points (divergence 76, for the in-memory API).
 
 namespace ColmapSharp.Mvs.PoissonRecon;
 

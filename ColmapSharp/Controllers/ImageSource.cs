@@ -7,7 +7,7 @@
 // Bitmaps, with the EXIF metadata filled through Sensor/ExifReader.cs so the camera and GPS
 // logic reads the same attributes OpenImageIO would have provided.
 // InMemoryImageSource is the simplest host: already-decoded bitmaps keyed by name. C#-only;
-// see docs/CPP_DIVERGENCES.md entry 82.
+// see divergence 82.
 
 using ColmapSharp.Sensor;
 

@@ -14,8 +14,8 @@
 // but Eigen 3.4 on aarch64 may evaluate these fixed-size float products with a fused pmadd,
 // and no oracle fixture pins them. GetInvP additionally comes from a 4x4 float inverse
 // written here from the textbook adjugate (Laplace expansion over 2x2 minors), which may
-// differ from Eigen's inverse in the last float bits. Both are docs/CPP_DIVERGENCES.md,
-// entry 63. Everything else (sizes, Rescale's K scaling, Downsize) is exact.
+// differ from Eigen's inverse in the last float bits. Both are divergence 63.
+// Everything else (sizes, Rescale's K scaling, Downsize) is exact.
 //
 // Translation notes:
 // - All matrices are row-major float arrays, as COLMAP's Eigen::Map<RowMajor> views are.

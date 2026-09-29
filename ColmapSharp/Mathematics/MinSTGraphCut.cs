@@ -28,7 +28,7 @@
 // source in the residual graph and the T tree the set that can reach the sink; both sets are
 // the same for every maximum flow. Boost colors free nodes (in neither tree) gray, which
 // COLMAP reports as connected to the source; so does this. With float capacities it is
-// Tier B: see docs/CPP_DIVERGENCES.md, entry 5.
+// Tier B: see divergence 5.
 //
 // Translation notes:
 // - The C++ template parameter node_t becomes int (node indices address arrays here).

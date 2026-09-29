@@ -14,7 +14,7 @@
 // - Same threading decision as Ransac.cs: the trial loop runs once on the calling thread,
 //   as in COLMAP built without OpenMP; the speculative-check-then-commit structure COLMAP
 //   uses for its parallel region is kept, and serially it is the plain algorithm
-//   (docs/CPP_DIVERGENCES.md, entry 17).
+//   (divergence 17).
 // - COLMAP std::swap()s its two residual vectors to keep the best local model's residuals
 //   without copying; the two arrays are swapped by reference here the same way.
 // - Estimate hides Ransac.Estimate (`new`) as the C++ member hides the base's: neither is
@@ -137,7 +137,7 @@ public class LoRansac<TEstimator, TLocalEstimator, TX, TY, TModel, TSupportMeasu
 
 			// Iterate through all estimated models. The first one that beats the best support
 			// seeds the local optimization, so the order a minimal solver returns its models in
-			// can change the result (docs/CPP_DIVERGENCES.md entry 124).
+			// can change the result (divergence 124).
 			foreach (TModel sampleModel in sampleModels)
 			{
 				threadEstimator.Residuals(x, y, sampleModel, residuals);

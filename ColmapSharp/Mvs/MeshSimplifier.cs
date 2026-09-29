@@ -186,7 +186,7 @@ internal sealed partial class MeshSimplifier
 	// with exactly one face adds a plane through the edge, perpendicular to the face, to both
 	// of its vertices. C++ finds the edges through a hash map and visits them in its
 	// iteration order; here they are visited by (first, second) vertex index, which decides
-	// the order of the floating-point sums (docs/CPP_DIVERGENCES.md, entry 73).
+	// the order of the floating-point sums (divergence 73).
 	private void AddBoundaryQuadrics()
 	{
 		Span<double> qBoundary = stackalloc double[16];

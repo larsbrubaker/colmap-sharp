@@ -17,12 +17,12 @@
 // - Cancellation: COLMAP's Run never checks CheckIfStopped. Here BaseController's
 //   CancellationToken (and SetCheckIfStoppedFunc) is checked before gravity seeding, gravity
 //   refinement and rotation averaging; a stop after seeding un-poses the seeded frames, so a
-//   stopped run never leaves half-posed frames (docs/CPP_DIVERGENCES.md entry 101).
+//   stopped run never leaves half-posed frames (divergence 101).
 // - Progress (C#-only): Progress, when set, receives a ControllerProgress as each stage
 //   finishes, the way the incremental pipeline reports its milestones.
 // - LOG(ERROR) goes to Util/Log.cs; LOG(INFO) and the timer are dropped.
 // - The gravity prior initialization looks the image up by the prior's corr_data_id (camera
-//   priors only), where COLMAP uses pose_prior_id (docs/CPP_DIVERGENCES.md entry 102).
+//   priors only), where COLMAP uses pose_prior_id (divergence 102).
 
 using ColmapSharp.Estimators;
 using ColmapSharp.Geometry;

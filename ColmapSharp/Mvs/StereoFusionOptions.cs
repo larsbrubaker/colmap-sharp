@@ -24,7 +24,7 @@ public sealed class StereoFusionOptions
 
 	/// <summary>
 	/// The number of threads to use when loading the workspace. The fusion traversal itself
-	/// always runs on one thread (docs/CPP_DIVERGENCES.md, entry 87).
+	/// always runs on one thread (divergence 87).
 	/// </summary>
 	public int NumThreads { get; set; } = -1;
 

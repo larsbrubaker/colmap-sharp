@@ -17,10 +17,10 @@
 //   (JobQueues of size 1) becomes batches: the reader fills a batch of num_threads images
 //   sequentially, Parallel.For resizes and extracts them (one extractor per worker, like one
 //   per extractor thread; SIFT extraction does not depend on what an extractor processed
-//   before, docs/CPP_DIVERGENCES.md entry 43), and the batch is written in reader order.
+//   before, divergence 43), and the batch is written in reader order.
 //   COLMAP's writer commits in extractor completion order, so with several threads its image
 //   ids depend on timing; here they always equal COLMAP's single-threaded ids
-//   (docs/CPP_DIVERGENCES.md entry 83).
+//   (divergence 83).
 // - The GPU path (SiftGPU, CUDA) is excluded (docs/LICENSE_AUDIT.md); FeatureExtractionOptions
 //   has no use_gpu, so every run takes COLMAP's CPU branch.
 // - The controller Thread becomes a synchronous method taking the Database (COLMAP opens it

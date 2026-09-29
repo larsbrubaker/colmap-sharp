@@ -33,8 +33,8 @@
 //   and Inverse (Vector4d's paired reduction), ToRotationMatrix, FromRotationMatrix
 //   (Matrix3d.Trace's grouping), AngularDistance, and AngleAxisd.FromQuaternion's angle.
 // - Tier B: q * v, which the macOS wheel computes with FMA-contracted cross products
-//   (docs/CPP_DIVERGENCES.md, entry 6), and FromAngleAxis, whose sin can differ from the
-//   wheel's by 1 ulp (docs/CPP_DIVERGENCES.md, entry 7).
+//   (divergence 6), and FromAngleAxis, whose sin can differ from the
+//   wheel's by 1 ulp (divergence 7).
 
 using System.Globalization;
 
@@ -229,7 +229,7 @@ public readonly struct Quaterniond : IEquatable<Quaterniond>
 	///   coordinate axis least aligned with u (|u_k| smallest), so |u x e| &gt;= sqrt(2/3). The
 	///   composition is exact, so the result stays accurate to rounding for every input.
 	///   Written here; results can differ from Eigen's in this branch
-	///   (docs/CPP_DIVERGENCES.md entry 28).
+	///   (divergence 28).
 	/// </summary>
 	public static Quaterniond FromTwoVectors(Vector3d a, Vector3d b)
 	{

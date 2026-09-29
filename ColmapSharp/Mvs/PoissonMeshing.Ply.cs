@@ -6,7 +6,7 @@
 // not contain normals") and carries its other properties through as auxiliary data; COLMAP's
 // fused.ply has exactly red, green and blue as uchar, and those become the mesh colors. The
 // values are read with COLMAP's own Ply.ReadPly. Other extra properties are not carried
-// (docs/CPP_DIVERGENCES.md, entry 130). Writing: PoissonRecon.cpp's WriteMesh (PLY::Write) and
+// (divergence 130). Writing: PoissonRecon.cpp's WriteMesh (PLY::Write) and
 // SurfaceTrimmer.cpp's PLY::WritePolygons write the same layout for COLMAP's arguments -
 // binary_little_endian, no comments, vertex x, y, z (float), then "value" (float) when the
 // density is output, then red, green, blue (uchar, the input's type); face

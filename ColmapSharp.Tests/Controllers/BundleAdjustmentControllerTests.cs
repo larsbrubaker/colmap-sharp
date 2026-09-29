@@ -8,7 +8,7 @@
 // bounds; ReconstructionEq when the run stops before optimizing.
 //
 // Translation notes: a default OptionManager is `new BundleAdjustmentOptions()` (the
-// controller takes OptionManager::bundle_adjustment, docs/CPP_DIVERGENCES.md entry 67);
+// controller takes OptionManager::bundle_adjustment, divergence 67);
 // std::make_shared<Reconstruction>(gt) is gt.Clone(). The PRNG is seeded with 0 before
 // every test (PrngTestIsolation, like gtest_main), and all work happens before the first
 // await (the PRNG is per thread).

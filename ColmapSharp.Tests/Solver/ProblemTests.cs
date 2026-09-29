@@ -351,7 +351,7 @@ public class ProblemTests
 	}
 
 	// C#-only: Ceres CHECK-fails on an empty ordering; the port fails the solve instead
-	// (docs/CPP_DIVERGENCES.md entry 37).
+	// (divergence 37).
 	[Test]
 	public async Task UserOrdering_Empty_Fails()
 	{

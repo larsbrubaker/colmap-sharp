@@ -28,7 +28,7 @@
 // Translation notes:
 // - Upstream runs SetLevelSet in a ThreadPool::ParallelFor over the slab's leaves, writing
 //   triangles and barycenter vertices as each thread gets to them; the port runs the leaves in
-//   order, which is what a single-threaded run does (docs/CPP_DIVERGENCES.md, entry 123). The
+//   order, which is what a single-threaded run does (divergence 123). The
 //   loop assembly uses vectors only (the key maps are looked up, never iterated), so no hash
 //   order reaches the output.
 // - The barycenter starts from upstream's default-constructed vertex times zero; its
@@ -36,7 +36,7 @@
 //   uninitialized float, and garbage (or NaN) times zero is not reliably zero. That is undefined
 //   behavior upstream (an optimized build gives every barycenter a NaN depth); the port starts
 //   the depth at zero, so the barycenter's depth is the mean of the loop's depths
-//   (docs/CPP_DIVERGENCES.md, entry 125).
+//   (divergence 125).
 // - A face whose iso-edges are neither set nor in the face-edge map is only warned about
 //   upstream ("Invalid face"); here it is counted in InvalidFaceCount. The other failures
 //   (MK_THROW) throw InvalidOperationException.
@@ -351,7 +351,7 @@ public sealed partial class PoissonLevelSetExtractor
 	private LevelSetVertex Barycenter(ReadOnlySpan<int> polygon)
 	{
 		// depth = 0f where upstream's is uninitialized (undefined behavior; see the header and
-		// docs/CPP_DIVERGENCES.md, entry 125).
+		// divergence 125).
 		float x = 0f, y = 0f, z = 0f, gx = 0f, gy = 0f, gz = 0f, depth = 0f;
 		float[] data = new float[zeroData.Length];
 		foreach (int index in polygon)

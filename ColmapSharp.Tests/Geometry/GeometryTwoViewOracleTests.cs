@@ -8,7 +8,7 @@
 // which COLMAP call each field comes from.
 //
 // Tier B throughout (SVD, eigen and slerp paths, and 3x3 products whose grouping and FMA
-// contraction differ from Eigen's in the macOS wheel, docs/CPP_DIVERGENCES.md entry 6).
+// contraction differ from Eigen's in the macOS wheel, divergence 6).
 // Each field is compared as |expected - actual| <= tolerance * max(1, |expected|); the
 // tolerance is stated per field below with the largest gap observed when it was set.
 // ComputeRot90FromGravity is exact. The homography scenes carry a little noise: noise-free,

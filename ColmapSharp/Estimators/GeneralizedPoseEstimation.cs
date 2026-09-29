@@ -14,7 +14,7 @@
 //   as in C++). The cameras are reference types, updated in place like std::vector<Camera>*.
 // - IsPanoramicRig compares every rig camera's origin to that of the first element of a
 //   FlatHashSet of the camera indices; the set's order is unspecified, so the smallest index
-//   is taken as the first here (docs/CPP_DIVERGENCES.md, entry 46).
+//   is taken as the first here (divergence 46).
 
 using System.Runtime.CompilerServices;
 

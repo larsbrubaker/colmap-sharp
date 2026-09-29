@@ -9,7 +9,7 @@
 #
 # NOISE_CASES additionally run synthesize_noise (after pruning tracks, where track_length is set). COLMAP visits
 # 3D points and images in hash order there and ColmapSharp in ascending id order
-# (docs/CPP_DIVERGENCES.md entry 31), so these record what can be compared order-insensitively:
+# (divergence 31), so these record what can be compared order-insensitively:
 # the track lengths after pruning, the frame poses after noise (frames are visited in the same
 # order), and per image / per 3D point the noise that was added (noisy minus clean value), whose
 # chunks of the Gaussian stream match as a multiset. SUMMARIZED_NOISE_CASES record per-image

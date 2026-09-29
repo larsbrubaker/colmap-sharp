@@ -13,7 +13,7 @@
 //   ToMatrix, FromMatrix, Adjoint, the equality operators, and ToString.
 // - Tier B: everything that rotates a vector with q * v (applying the transform, the
 //   translations of Inverse and of composition, TgtOriginInSrc), because the macOS wheel
-//   contracts q * v's cross products into FMAs (docs/CPP_DIVERGENCES.md, entry 6), and
+//   contracts q * v's cross products into FMAs (divergence 6), and
 //   AdjointInverse and GetCovarianceForRigid3dInverse, whose 3x3 and 6x6 products the
 //   wheel contracts the same way. Differences are a few ulps.
 //

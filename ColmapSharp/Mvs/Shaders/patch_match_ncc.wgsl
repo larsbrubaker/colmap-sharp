@@ -10,7 +10,7 @@
 //   ComputeFourLockstep is bit-identical to the scalar Compute, so the scalar path is the one
 //   ported.
 // Ports: patch_match_cuda.cu's PhotoConsistencyCostComputer, as the CPU port models it
-//   (docs/CPP_DIVERGENCES.md, entries 95-97).
+//   (divergences 95-97).
 // Composed by ColmapSharp/Mvs/PatchMatchShaders.cs after common, textures, geometry, likelihood and
 // layout. A kernel that includes it supplies PM_WINDOW_RADIUS: i32 and PM_WINDOW_STEP: i32 in its
 // constants header, and PM_WINDOW_SHARED: bool (the cooperative sweep_band's shared window, below),

@@ -14,7 +14,7 @@
 // Translation notes:
 // - Sort ties. COLMAP ranks with std::sort, whose order among equal keys is unspecified,
 //   over inputs in hash-map order. Every ranking here breaks ties by ascending image id
-//   (docs/CPP_DIVERGENCES.md, entry 59).
+//   (divergence 59).
 // - FindInitialImagePair runs its per-seed tasks sequentially in seed order, which is what
 //   COLMAP's thread pool reproduces when num_threads is 1 (entry 58).
 // - InitInfo's std::optional<Camera> members are nullable Camera references.

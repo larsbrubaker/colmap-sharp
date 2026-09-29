@@ -46,7 +46,7 @@ namespace ColmapSharp.Estimators.Solvers;
 /// <remarks>
 /// COLMAP takes the 2D null space from Eigen's FullPivHouseholderQR; this uses unpivoted
 /// Householder QR, which spans the same null space with a different basis. The solution set
-/// is the same; see docs/CPP_DIVERGENCES.md, entry 24, for the one degenerate edge where the
+/// is the same; see divergence 24, for the one degenerate edge where the
 /// basis shows.
 /// </remarks>
 public readonly struct FundamentalMatrixSevenPointEstimator

@@ -4,7 +4,7 @@
 // on inputs COLMAP's writers never produce: big-endian binary files for the point and mesh
 // readers, a 1M-point ASCII cloud read with bounded work (the buffered line reader), and ASCII
 // texture coordinates parsed with libc++'s `>> float` rules (CppLineTokens.TryReadFloat), and a
-// binary mesh truncated inside its texcoord lists (docs/CPP_DIVERGENCES.md, entry 113).
+// binary mesh truncated inside its texcoord lists (divergence 113).
 //
 // The 1M-point test guards against a pathological reader, not a slow machine. It used to
 // assert wall-clock time and failed under heavy load (12-19 s against 10 s), so it now counts

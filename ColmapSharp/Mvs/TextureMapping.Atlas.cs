@@ -187,7 +187,7 @@ public static partial class TextureMapping
 	/// Port of PackAtlas: shelf packing of the padded region boxes, tallest first, into the
 	/// smallest power-of-two square that fits, then the height shrunk to the used extent.
 	/// Equal heights keep region order (COLMAP's std::sort leaves that order unspecified;
-	/// docs/CPP_DIVERGENCES.md, entry 91).
+	/// divergence 91).
 	/// </summary>
 	internal static AtlasLayout PackAtlas(RegionProjection[] projections, int padding)
 	{

@@ -31,7 +31,7 @@
 //   e.g. "PatchMatch geometric", moves into Message), so a host grouping by Stage sees only
 //   the stages listed on Progress.
 // - option_manager_.Write(sparse/project.ini) has no counterpart (no ini registry), and the
-//   vocabulary-tree matcher is never chosen (docs/CPP_DIVERGENCES.md entry 134).
+//   vocabulary-tree matcher is never chosen (divergence 134).
 // - COLMAP's controller is its own new thread; this one runs on the caller's. The sparse
 //   mapper therefore gets a fresh thread PRNG (restoring the caller's after), so an unseeded
 //   run does not continue whatever the calling pool thread drew before (entry 138).
@@ -85,7 +85,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		{
 			case AutomaticReconstructionOptions.DataType.Video:
 				optionManager.ModifyForVideoData();
-				// Deliberate fix of an upstream ordering bug (docs/CPP_DIVERGENCES.md entry 134):
+				// Deliberate fix of an upstream ordering bug (divergence 134):
 				// COLMAP sets image_names above, then ModifyForVideoData's ResetOptions(false)
 				// rebuilds image_reader and mapper and restores only the project/database/image
 				// *paths*, so video data silently ignores the selection that individual and
@@ -172,7 +172,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 
 		// COLMAP turns on loop detection with its downloadable vocabulary tree; without
 		// vocabulary-tree support sequential matching runs without loop detection
-		// (docs/CPP_DIVERGENCES.md entry 134).
+		// (divergence 134).
 		optionManager.SequentialPairing.LoopDetection = false;
 
 		// Apply mapper-appropriate two-view geometry defaults.
@@ -407,7 +407,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		// COLMAP runs the mapper on the controller's own new thread, so an unseeded run
 		// (random_seed -1) draws from a PRNG that starts at the default seed. Here it runs on the
 		// caller's thread, often a reused pool thread, so it gets a fresh PRNG too, and the
-		// caller's own is restored afterwards (docs/CPP_DIVERGENCES.md entry 138).
+		// caller's own is restored afterwards (divergence 138).
 		Mt19937? callerPrng = RandomUtils.Prng;
 		RandomUtils.Prng = null;
 		try
@@ -492,7 +492,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 	// model than sparse/<i>, and a later run over the workspace mixes their files. Reordering the
 	// models in memory the way Write does (descending point count; OrderByDescending is stable, so
 	// ties keep their index order, Write's tie-break) makes dense/<i>, sparse/<i> and
-	// TexturedMeshes[].ModelIdx agree on both runs (docs/CPP_DIVERGENCES.md entry 140).
+	// TexturedMeshes[].ModelIdx agree on both runs (divergence 140).
 	private void OrderModelsAsWritten()
 	{
 		Reconstruction[] ordered = [.. Enumerable.Range(0, reconstructionManager.Size)

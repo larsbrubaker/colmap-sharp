@@ -5,7 +5,7 @@
 // ColmapSharp.Tests/TestData/oracle/poisson_bspline.json. Not part of any build.
 //
 // Why a harness and not pycolmap: pycolmap exposes only the whole poisson_meshing call, and
-// its PoissonRecon is compiled with -ffast-math (docs/CPP_DIVERGENCES.md, entry 74). These
+// its PoissonRecon is compiled with -ffast-math (divergence 74). These
 // templates are header-only, so compiling them here with -ffp-contract=off gives the exact
 // numbers of the arithmetic ColmapSharp performs.
 //

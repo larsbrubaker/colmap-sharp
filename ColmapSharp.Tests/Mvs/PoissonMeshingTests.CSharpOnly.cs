@@ -115,7 +115,7 @@ public partial class PoissonMeshingTests
 	[Test]
 	public async Task PoissonMeshing_EmptyInputTrimmed_WritesEmptyMesh()
 	{
-		// docs/CPP_DIVERGENCES.md, entry 132: upstream's SurfaceTrimmer crashes on the empty mesh
+		// divergence 132: upstream's SurfaceTrimmer crashes on the empty mesh
 		// PoissonRecon makes from no points; the port writes the file PoissonRecon wrote (the
 		// density value and the input's colors declared, no vertices or faces).
 		string testDir = MvsTestUtils.CreateTestDir();

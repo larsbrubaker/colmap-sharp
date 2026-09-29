@@ -15,7 +15,7 @@
 // Columns are independent: each reads and writes only its own pixels (the photo-consistency
 // window reads the read-only reference image), so Parallel.For over columns gives the same
 // result for any thread count. Random draws come from PatchMatchRandom keyed on the pixel of
-// the original reference image and the sweep (docs/CPP_DIVERGENCES.md, entry 86).
+// the original reference image and the sweep (divergence 86).
 // Hypotheses 1-4 of each Monte Carlo sample are scored together by
 // PatchMatchPhotoConsistency.ComputeFour (SIMD lanes, bit-identical to four scalar calls).
 //

@@ -6,7 +6,7 @@
 // clang++ and Eigen 3.4 in a scratch harness on the same input. PoseLib pre-rotates the
 // problem by a std::rand rotation, so its solutions vary with the seed at the 1e-10 level
 // (seeds 1..5 all gave these four poses); the port draws that rotation from a fixed seed
-// (docs/CPP_DIVERGENCES.md entry 29). Tier B: the solution set is compared
+// (divergence 29). Tier B: the solution set is compared
 // order-insensitively, since its order depends on the random pre-rotation.
 
 using ColmapSharp.Estimators.Solvers.PoseLib;

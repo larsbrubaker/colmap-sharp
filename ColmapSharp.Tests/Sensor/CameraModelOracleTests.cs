@@ -10,7 +10,7 @@
 // the optical axis and pixels at and next to the principal point for the small-radius
 // branches (FOV's radius^2 < 1e-4 Taylor branch among them).
 //
-// Tier A, with one documented exception (docs/CPP_DIVERGENCES.md, entry 12, "FMA contraction in the
+// Tier A, with one documented exception (divergence 12, "FMA contraction in the
 // camera models"):
 // - Which calls fail must match exactly, for every model and field.
 // - Bit-identical: CamFromImg of the pinhole models that unproject through the iterative

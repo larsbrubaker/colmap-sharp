@@ -6,7 +6,7 @@
 // element count P S, element e is source e / P at pixel e % P (the cost buffer's own index).
 // Mirrors: PatchMatchKernel.ComputeInitialCost in ColmapSharp/Mvs/PatchMatchKernel.Photometric.cs.
 // Ports: patch_match_cuda.cu's ComputeInitialCost, as the CPU port models it
-//   (docs/CPP_DIVERGENCES.md, entries 95-97).
+//   (divergences 95-97).
 // Parts: dispatch, common, textures, geometry, likelihood, layout, ncc (ColmapSharp/Mvs/PatchMatchGpuKernels.cs).
 // Bindings: group 0 - 0 pm_byte_to_unit, 1 pm_poses, 2 pm_problem, 3 pm_reference,
 //   4 pm_source_images, 5 pm_source_depths (textures declares it; a 4-byte dummy when photometric),

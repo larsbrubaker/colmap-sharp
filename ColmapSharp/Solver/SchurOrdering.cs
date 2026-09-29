@@ -17,7 +17,7 @@
 // layout (BlockSparseMatrix.cs) then puts the E cells first.
 //
 // Not ported: the fill-reducing pre-ordering of the F blocks for SPARSE_SCHUR, which the
-// sparse Cholesky's own AMD replaces (docs/CPP_DIVERGENCES.md entry 35).
+// sparse Cholesky's own AMD replaces (divergence 35).
 
 using ColmapSharp.Util;
 

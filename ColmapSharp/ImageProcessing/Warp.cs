@@ -13,8 +13,8 @@
 // Tier A (exact) when the image is warped directly: the per-pixel camera mapping and the
 // bilinear lookup (Bitmap.InterpolateBilinear) are scalar double arithmetic. When the target
 // is much smaller than the source, COLMAP warps at source resolution and then resizes with
-// Bitmap::Rescale, which is OIIO's resize in COLMAP and Tier B here (docs/CPP_DIVERGENCES.md,
-// entry 9), so that path inherits Rescale's tier.
+// Bitmap::Rescale, which is OIIO's resize in COLMAP and Tier B here (divergence 9),
+// so that path inherits Rescale's tier.
 //
 // Translation notes:
 // - The C++ output parameter `Bitmap* target_image` that the function reallocates becomes the

@@ -14,7 +14,7 @@
 // - Source images: linear filtering, read as normalized float (byte / 255). NVIDIA hardware
 //   interpolates with 9-bit fixed-point weights (8 fractional bits); the CPU port
 //   interpolates with exact float weights, the formula of COLMAP's own gfx9 emulation,
-//   SampleLayeredBilinear (docs/CPP_DIVERGENCES.md, entry 95).
+//   SampleLayeredBilinear (divergence 95).
 // - Source depth maps: point filtering, read as the stored float.
 // Both are read-only after construction, so any number of threads can sample them.
 // Performance: byte / 255 comes from a 256-entry table (the same float values), samples

@@ -237,7 +237,7 @@ public class HierarchicalPipelineTests
 		await Assert.That(GTestDouble.DoubleEq(afterRun2, recomputed2)).IsTrue();
 	}
 
-	// C#-only (docs/CPP_DIVERGENCES.md, entry 108): cancelling after the first cluster stops
+	// C#-only (divergence 108): cancelling after the first cluster stops
 	// the remaining clusters' incremental pipelines, and the run returns without merging.
 	[Test]
 	public async Task CSharpOnly_CancellationStopsBeforeMerging()
@@ -270,7 +270,7 @@ public class HierarchicalPipelineTests
 		await Assert.That(reconstructionManager.Size).IsEqualTo(0);
 	}
 
-	// C#-only (docs/CPP_DIVERGENCES.md, entry 121). Parallel.ForEach runs clusters on the
+	// C#-only (divergence 121). Parallel.ForEach runs clusters on the
 	// calling thread and on reused pool threads, whose PRNGs carry whatever earlier work drew,
 	// whereas COLMAP's workers are fresh threads. Before the fix a cluster continued that
 	// stream: HierarchicalPipeline_WithoutNoise passed alone but missed its 5e-4 bound in the

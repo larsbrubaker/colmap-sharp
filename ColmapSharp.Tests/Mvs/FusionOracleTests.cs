@@ -5,7 +5,7 @@
 // (oracle/fixture_stereo_fusion.py) and compares it with the fused.ply and fused.ply.vis
 // pycolmap 4.2.0's stereo_fusion wrote there with num_threads = 1. Tier C: the same point
 // count and order, colors exact, positions and normals within float rounding of the
-// projection products (docs/CPP_DIVERGENCES.md, entry 63), visibility the same image sets
+// projection products (divergence 63), visibility the same image sets
 // (the order within a set is entry 88). The options workspace adds noisy normals, a bounding
 // box, max_image_size, short traversals and masks (see the fixture script).
 //

@@ -7,10 +7,10 @@
 // SynthesizeImages differs in its output: COLMAP writes each image to image_path/name with
 // OpenImageIO, and image file I/O is the host's job here (PORTING_PLAN.md, bitmap_test.cc
 // skips), so each rendered Bitmap goes to a caller-supplied sink with its image name instead
-// (docs/CPP_DIVERGENCES.md entry 32).
+// (divergence 32).
 //
 // Order: images and 3D points are visited in ascending id order; COLMAP visits them in hash
-// order (docs/CPP_DIVERGENCES.md entry 31), which decides which one receives which draws.
+// order (divergence 31), which decides which one receives which draws.
 
 using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;

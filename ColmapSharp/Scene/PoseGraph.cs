@@ -16,7 +16,7 @@
 // - Edges live in a Dictionary, which enumerates in insertion order until an edge is deleted
 //   (COLMAP's NodeHashMap has its own order). The component functions do not depend on it:
 //   they walk frames in ascending id order and order equally large components by their
-//   smallest frame id (docs/CPP_DIVERGENCES.md, entry 38).
+//   smallest frame id (divergence 38).
 // - Load's LOG(INFO) edge count is dropped, like LOG(INFO) everywhere in the library.
 
 using ColmapSharp.Geometry;

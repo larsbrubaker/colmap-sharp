@@ -18,7 +18,7 @@
 //   the ptree stream translator does (RigConfig.Translators.cs), so "1.5" and 1.5 are both a
 //   double.
 // Strict JSON (no trailing commas, no comments) matches boost's parser, which rejects both.
-// The rotation and translation arrays must have exactly 4 and 3 entries (docs/CPP_DIVERGENCES.md #80).
+// The rotation and translation arrays must have exactly 4 and 3 entries (divergence 80).
 
 using System.Text.Json;
 

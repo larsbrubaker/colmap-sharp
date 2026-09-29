@@ -8,7 +8,7 @@
 // Mirrors: ColmapSharp/Mvs/PatchMatchLikelihood.cs (PatchMatchLikelihood and
 //   PatchMatchKernel.FindMinCost / TransformPDFToCDF) in the same operation order.
 // Ports: patch_match_cuda.cu's LikelihoodComputer, FindMinCost and TransformPDFToCDF, as the CPU
-//   port models them (docs/CPP_DIVERGENCES.md, entry 96).
+//   port models them (divergence 96).
 // Composed by ColmapSharp/Mvs/PatchMatchShaders.cs after patch_match_common.wgsl (cuda_min,
 // cuda_max, is_nan_f32) and patch_match_geometry.wgsl (pm_div, pm_mat33_dot_vec3_homogeneous).
 // It declares no bindings. A kernel that includes it supplies PM_NUM_SRC_IMAGES: i32 (as

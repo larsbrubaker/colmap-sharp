@@ -11,7 +11,7 @@
 // the CUDA kernel).
 //
 // Float math in COLMAP's operation order with MathF and no fused multiply-add
-// (docs/CPP_DIVERGENCES.md, entry 96): CUDA's rsqrt becomes 1 / MathF.Sqrt, and CUDA's
+// (divergence 96): CUDA's rsqrt becomes 1 / MathF.Sqrt, and CUDA's
 // float min/max (fminf/fmaxf, which ignore a NaN operand) become CudaMin/CudaMax. Random draws
 // come from PatchMatchRandom (entry 86).
 //

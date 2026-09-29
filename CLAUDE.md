@@ -31,8 +31,11 @@ pull in upstream COLMAP changes only when they help. Remaining port work is in
    changes one of their expected values, update it in the same change, stating the new
    behavior and the benchmark evidence; an unexplained change is still a bug.
 6. **Differences from COLMAP are recorded, not avoided.** Anything that behaves differently
-   from COLMAP gets a numbered entry in `docs/CPP_DIVERGENCES.md` (what differs, why, the
-   evidence), so a later upstream merge knows what was changed on purpose.
+   from COLMAP gets a numbered divergence entry (what differs, why, the evidence), so a later
+   upstream merge knows what was changed on purpose. Entries live by module in
+   `docs/divergences/<Module>.md`; `docs/CPP_DIVERGENCES.md` is the index (number, title,
+   file), says where a new entry goes and holds the next free number. Code comments cite an
+   entry as "divergence N".
 
 ## How closely must the base port match COLMAP?
 
@@ -75,7 +78,7 @@ function *and everything it calls* before porting it.
 - **Hash container iteration order.** COLMAP iterates `std::unordered_map`/`set` in places
   where order leaks into results. .NET `Dictionary` order differs. Where iteration order
   matters, find out what COLMAP actually relies on and make it deterministic here; document
-  it in `docs/CPP_DIVERGENCES.md` if the result can differ.
+  it in a divergence entry (indexed in `docs/CPP_DIVERGENCES.md`) if the result can differ.
 - **PRNG.** COLMAP uses `std::mt19937` behind `colmap/math/random.h`. Port mt19937 exactly.
   `std::uniform_int_distribution` / `uniform_real_distribution` / `normal_distribution` are
   implementation-defined; we match **libc++**, which the macOS pycolmap wheel links. So
@@ -87,7 +90,8 @@ function *and everything it calls* before porting it.
   test that pins the result bit-identical to the scalar path. Watch out: Apple clang defaults to
   `-ffp-contract=on`, so the macOS arm64 pycolmap wheel *may* fuse `a*b + c` where we don't.
   When a Tier A oracle diff lands exactly on a multiply-add, suspect contraction on the C++
-  side before chasing a port bug, and record the case in `docs/CPP_DIVERGENCES.md`.
+  side before chasing a port bug, and record the case in a divergence entry (indexed in
+  `docs/CPP_DIVERGENCES.md`).
 - **Numeric constants.** `std::numeric_limits<double>::epsilon()` is `2.220446049250313E-16`;
   C# `double.Epsilon` is the smallest subnormal and is **wrong**. `float` stays `float` —
   COLMAP stores descriptors, bitmaps, and depth maps in single precision.
@@ -113,11 +117,14 @@ function *and everything it calls* before porting it.
   comment when it differs enough to be hard to find (`/// Port of colmap::EstimateRigid3d`).
 - **Every file starts with a header**: what it is, the C++ file(s) it ports, and how it relates
   to its neighbors.
-- **800-line limit per file, the same rule as MatterCAD:** at most 800 non-empty lines in any
-  source file (`.cs`, scripts), enforced by `FileComplianceTests` in the test suite. There
-  are no exemptions. If a port would exceed the limit, split it by responsibility (partial
-  classes along C++ section boundaries are fine). Never trim comments or blank lines to fit;
-  see the `file-size-refactoring` skill.
+- **800-line limit per file:** at most 800 lines, blank lines included, in any source file
+  (`.cs`, scripts, oracle harnesses, WGSL) and any `.md` doc (plans, notices, divergences),
+  enforced by `FileComplianceTests` in the test suite. The limit is a length trigger that
+  prompts a refactor, not a measure of content. There are no exemptions. If a port would
+  exceed it, split it by responsibility (partial classes along C++ section boundaries are
+  fine); a doc that grows past it is split by topic, with an index file pointing at the
+  parts. Split rather than squeeze: never trim comments or blank lines to fit. See the
+  `file-size-refactoring` skill.
 - Value types (`Vector3d`, `Matrix3d`, `Rigid3d`, `Quaterniond`) are `readonly struct`s.
   Hot loops avoid allocation.
 - Comments explain *why*. Keep COLMAP's non-obvious comments, since they carry the reasoning.
@@ -162,9 +169,10 @@ Working conventions that every brief repeats:
 - Implementers commit on their own branch and never push or edit `PORTING_PLAN.md`; they list
   what their change makes stale, and the orchestrator prunes the plan when it merges.
 - Divergence entry numbers are stable and never reused. Hand each concurrent implementer its own
-  range, and take the next free number above the highest in `docs/CPP_DIVERGENCES.md`. When
-  merging that file, merge it entry by entry rather than by text hunks, then check that no
-  conflict marker is left (`FileComplianceTests` also rejects them).
+  range, and take the next free number from the index, `docs/CPP_DIVERGENCES.md`. When
+  merging divergences, merge entry by entry rather than by text hunks, in both the module
+  file under `docs/divergences/` and the index table, update the index's next free number,
+  then check that no conflict marker is left (`FileComplianceTests` also rejects them).
 - Keep headers, comments and divergence entries true to the final code in the same commit.
 - PoissonRecon stages are ported bit-exact against the vendored C++ through the clang harnesses
   in `oracle/poisson_*_harness.cc` (`oracle/fixture_poisson_tree.py` writes the fixtures);

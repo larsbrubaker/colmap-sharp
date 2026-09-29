@@ -8,7 +8,7 @@
 //
 // Tier A: same strings in, same answer out, except when the cleaned make matches more than
 // one make of the table; then COLMAP's answer depends on its hash map's iteration order and
-// ours on specs.cc source order (docs/CPP_DIVERGENCES.md, entry 8).
+// ours on specs.cc source order (divergence 8).
 
 namespace ColmapSharp.Sensor;
 

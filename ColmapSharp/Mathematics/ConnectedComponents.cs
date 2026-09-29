@@ -9,7 +9,7 @@
 // Tier A for the component *sets*. The order of the components, the order of the nodes
 // inside each, and which of two equally large components FindLargestConnectedComponent
 // returns follow COLMAP's hash-container iteration there; here they follow the order in
-// which the caller's node collection enumerates. See docs/CPP_DIVERGENCES.md, entry 2.
+// which the caller's node collection enumerates. See divergence 2.
 
 namespace ColmapSharp.Mathematics;
 

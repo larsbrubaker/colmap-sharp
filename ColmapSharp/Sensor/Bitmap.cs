@@ -16,8 +16,8 @@
 // feeds its EXIF block to ExifReader (ExifReader.cs), which fills the metadata the EXIF
 // getters read under OpenImageIO's attribute names.
 //
-// Tier A (exact) for everything here except Rescale (BitmapResize.cs, docs/CPP_DIVERGENCES.md
-// entry 9). Translation notes:
+// Tier A (exact) for everything here except Rescale (BitmapResize.cs, divergence 9).
+// Translation notes:
 // - C++ copy construction/assignment is Clone(); a default-constructed or cloned-empty
 //   Bitmap has no metadata store, like COLMAP's null meta_data_, and metadata access on it
 //   fails its THROW_CHECK_NOTNULL. C++ move semantics have no C# counterpart.
@@ -180,7 +180,7 @@ public sealed partial class Bitmap
 	public BitmapColor<byte>? InterpolateNearestNeighbor(double x, double y)
 	{
 		// (int)NaN is 0 in .NET, which would return pixel (0, 0); a NaN point is outside the
-		// image (docs/CPP_DIVERGENCES.md, entry 117). Infinities saturate and GetPixel rejects them.
+		// image (divergence 117). Infinities saturate and GetPixel rejects them.
 		if (double.IsNaN(x) || double.IsNaN(y))
 		{
 			return null;

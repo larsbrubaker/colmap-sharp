@@ -1,12 +1,15 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
-// FileComplianceTests: the 800-non-empty-line limit per source file (CLAUDE.md, "Layout and
-// style"), ported from MatterCAD's Tests/MatterCADTests/Standard/FileComplianceTests.cs so
-// both repos enforce the same rule the same way. C#-only; not a COLMAP test.
+// FileComplianceTests: the 800-line limit per file (CLAUDE.md, "Layout and style"), counting
+// every line, blank lines included: it is a length trigger that prompts a refactor, not a
+// measure of content. Ported from MatterCAD's Tests/MatterCADTests/Standard/FileComplianceTests.cs.
+// C#-only; not a COLMAP test.
 //
-// Differences from MatterCAD's copy: the root is found by walking up to ColmapSharp.sln
-// (not a fixed ../../.. from this file), scripts (.py, .sh) and the oracle's C/C++ harnesses
-// (.c, .cc, .cpp, .h) are measured as well as .cs, and the excluded trees are this repo's:
+// Differences from MatterCAD's copy: every line counts (MatterCAD counts non-empty lines), the
+// root is found by walking up to ColmapSharp.sln (not a fixed ../../.. from this file),
+// scripts (.py, .sh), the oracle's C/C++ harnesses (.c, .cc, .cpp, .h) and Markdown docs (.md:
+// plans, notices, the divergence log) are measured as well as .cs, and the excluded trees are
+// this repo's:
 // build output, the C++ reference checkout, the oracle's Python venv and the demo's agg-sharp
 // submodule (the demo's own projects under demo/ are measured like the library). It also fails
 // on git conflict markers left in any text file (a merge once let them slip into a doc), and
@@ -24,13 +27,13 @@ namespace ColmapSharp.Tests;
 
 /// <summary>
 /// Tests that all source files in the repository conform to file size limits.
-/// File size is measured as count of non-empty lines (excluding blank lines and whitespace-only lines).
-/// Limit: 800 non-empty lines, with no exemptions.
+/// File size is measured as the count of all lines, blank lines included.
+/// Limit: 800 lines, with no exemptions. Markdown docs are measured like source files.
 /// </summary>
 public class FileComplianceTests
 {
 	/// <summary>
-	/// Default maximum non-empty lines for any source file.
+	/// Default maximum lines for any measured file.
 	/// </summary>
 	private const int DefaultLineLimit = 800;
 
@@ -86,6 +89,9 @@ public class FileComplianceTests
 		".cpp",
 		".h",
 		".wgsl",
+		// Docs: plans, notices and the divergence log are read by people and agents alike, so
+		// they get the same limit; one that grows past it is split by topic with an index file.
+		".md",
 	};
 
 	/// <summary>
@@ -93,7 +99,6 @@ public class FileComplianceTests
 	/// </summary>
 	private static readonly HashSet<string> ConflictMarkerExtensions = new(IncludedExtensions, StringComparer.OrdinalIgnoreCase)
 	{
-		".md",
 		".json",
 		".txt",
 		".csproj",
@@ -120,13 +125,13 @@ public class FileComplianceTests
 
 		foreach (var filePath in files)
 		{
-			var lineCount = CountNonEmptyLines(filePath);
+			var lineCount = CountLines(filePath);
 			var relativePath = GetRelativePath(projectRoot, filePath);
 			var limit = GetFileLimit(relativePath);
 
 			if (lineCount > limit)
 			{
-				violations.Add($"  {relativePath}: {lineCount} non-empty lines (limit: {limit}) - this must be refactored into multiple smaller files. Use the file-size-refactoring skill.");
+				violations.Add($"  {relativePath}: {lineCount} lines (limit: {limit}) - {SplitAdvice(relativePath)}");
 			}
 		}
 
@@ -141,7 +146,7 @@ public class FileComplianceTests
 			}
 
 			message.AppendLine();
-			message.AppendLine("To fix: Refactor oversized files into smaller, cohesive modules (split by responsibility).");
+			message.AppendLine("To fix: split oversized code into smaller, cohesive files by responsibility, and oversized docs by topic with an index file. Never delete blank lines or comments to fit.");
 
 			Assert.Fail(message.ToString());
 		}
@@ -284,7 +289,7 @@ public class FileComplianceTests
 
 		foreach (var filePath in files)
 		{
-			var lineCount = CountNonEmptyLines(filePath);
+			var lineCount = CountLines(filePath);
 			var relativePath = GetRelativePath(projectRoot, filePath);
 			var limit = GetFileLimit(relativePath);
 
@@ -339,7 +344,9 @@ public class FileComplianceTests
 			WriteSourceFile(Path.Combine(root, "oracle", "Harness.cpp"));
 			WriteSourceFile(Path.Combine(root, "ColmapSharp", "Mvs", "Shaders", "Kernel.wgsl"));
 			WriteSourceFile(Path.Combine(root, "cpp-reference", "src", "Reference.cc"));
-			WriteSourceFile(Path.Combine(root, "docs", "NotMeasured.md"));
+			WriteSourceFile(Path.Combine(root, "docs", "Plan.md"));
+			WriteSourceFile(Path.Combine(root, "cpp-reference", "README.md"));
+			WriteSourceFile(Path.Combine(root, "demo", "agg-sharp", "README.md"));
 			WriteSourceFile(Path.Combine(root, "cpp-reference", "src", "Reference.cs"));
 			WriteSourceFile(Path.Combine(root, "oracle", ".venv", "lib", "Vendored.py"));
 			WriteSourceFile(Path.Combine(root, "obj", "Generated.cs"));
@@ -349,7 +356,7 @@ public class FileComplianceTests
 			var files = GetAllProjectFiles(root);
 
 			await Assert.That(files.Select(f => Path.GetFileName(f)).OrderBy(f => f, StringComparer.Ordinal).ToList())
-				.IsEquivalentTo(new List<string> { "Demo.cs", "Harness.c", "Harness.cc", "Harness.cpp", "Harness.h", "Kept.cs", "Kept.py", "Kernel.wgsl" });
+				.IsEquivalentTo(new List<string> { "Demo.cs", "Harness.c", "Harness.cc", "Harness.cpp", "Harness.h", "Kept.cs", "Kept.py", "Kernel.wgsl", "Plan.md" });
 		}
 		finally
 		{
@@ -378,6 +385,24 @@ public class FileComplianceTests
 		}
 	}
 
+	[Test]
+	public async Task LineCountIncludesBlankLines()
+	{
+		var root = CreateScratchRoot();
+		try
+		{
+			// The limit is a length trigger, so blank and whitespace-only lines count too.
+			var path = Path.Combine(root, "Doc.md");
+			File.WriteAllLines(path, ["# Title", "", "   ", "text"]);
+
+			await Assert.That(CountLines(path)).IsEqualTo(4);
+		}
+		finally
+		{
+			Directory.Delete(root, true);
+		}
+	}
+
 	private static string CreateScratchRoot()
 	{
 		var root = Path.Combine(Path.GetTempPath(), "ColmapSharpFileComplianceTests", Path.GetRandomFileName());
@@ -392,7 +417,7 @@ public class FileComplianceTests
 	}
 
 	/// <summary>
-	/// Count non-empty lines in a file (excluding blank lines and whitespace-only lines).
+	/// Count every line in a file, blank and whitespace-only lines included.
 	/// </summary>
 	/// <exception cref="IOException">
 	/// The file could not be read. Deliberately NOT swallowed: answering zero for anything that
@@ -400,12 +425,11 @@ public class FileComplianceTests
 	/// locked by an editor or a build while the scan ran - the one failure mode a size gate must
 	/// not have. A file that vanished mid-walk is a different thing and is handled below.
 	/// </exception>
-	private static int CountNonEmptyLines(string filePath)
+	private static int CountLines(string filePath)
 	{
 		try
 		{
-			var lines = File.ReadAllLines(filePath);
-			return lines.Count(line => !string.IsNullOrWhiteSpace(line));
+			return File.ReadAllLines(filePath).Length;
 		}
 		catch (Exception exception) when (exception is FileNotFoundException || exception is DirectoryNotFoundException)
 		{
@@ -421,6 +445,14 @@ public class FileComplianceTests
 				exception);
 		}
 	}
+
+	/// <summary>
+	/// What to do about an oversized file: a doc is split by topic, code by responsibility.
+	/// </summary>
+	private static string SplitAdvice(string relativePath) =>
+		Path.GetExtension(relativePath).Equals(".md", StringComparison.OrdinalIgnoreCase)
+			? "split this doc by topic into smaller files, with an index file that says what lives where (see docs/CPP_DIVERGENCES.md). Use the file-size-refactoring skill."
+			: "this must be refactored into multiple smaller files. Use the file-size-refactoring skill.";
 
 	/// <summary>
 	/// Get the line limit for a specific file path.

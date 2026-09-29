@@ -11,7 +11,7 @@
 //   initialized from float literals (sigma_color = 0.2f), so they hold the float's value
 //   (0.20000000298023224), not the decimal one.
 // - gpu_index is not ported: PatchMatch runs on the CPU here, so there is no device to
-//   pick (docs/CPP_DIVERGENCES.md, entry 86). NumThreads bounds the CPU parallelism.
+//   pick (divergence 86). NumThreads bounds the CPU parallelism.
 // - Print() is not ported (it is a LOG(INFO) listing; only warnings and errors go to
 //   Util/Log.cs).
 

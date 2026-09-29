@@ -4,7 +4,7 @@
 // MvsImageTests: colmap/mvs/image_test.cc ported 1:1 (Suite_Name), testing
 // ColmapSharp/Mvs/Image.cs. Named MvsImageTests so a --treenode-filter on the class does
 // not also select Scene/ImageTests.cs. EXPECT_FLOAT_EQ is gtest's 4-ulp comparison
-// (MvsTestUtils.FloatEq). Tier B (docs/CPP_DIVERGENCES.md, entry 63): the products may
+// (MvsTestUtils.FloatEq). Tier B (divergence 63): the products may
 // differ from an FMA-contracting C++ build in the last bits, within the 4-ulp checks.
 
 using ColmapSharp.Mvs;

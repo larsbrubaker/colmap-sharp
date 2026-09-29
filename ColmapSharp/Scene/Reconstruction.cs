@@ -27,7 +27,7 @@
 //   nothing here replaces those arrays (Transform and Normalize go through
 //   Frame.SetRigFromWorld, which writes into the same storage).
 // - Iteration order. COLMAP keeps its objects in hash maps; here they are in
-//   Util/IdMap.cs, which iterates in ascending id order (docs/CPP_DIVERGENCES.md, entry
+//   Util/IdMap.cs, which iterates in ascending id order (divergence
 //   21). RegFrameIds is COLMAP's vector, in registration order, exactly as in C++.
 // - C++ copy construction/assignment is Clone(). As in C++, the copied frames are not
 //   finalized (Frame's copy constructor resets the flag).

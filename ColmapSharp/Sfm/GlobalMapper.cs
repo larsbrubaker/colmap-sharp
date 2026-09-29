@@ -19,7 +19,7 @@
 //   the order their first observation entered the union-find (UnionFind.Parents iterates in
 //   insertion order). COLMAP walks hash maps, so the 3D point ids and the order of track
 //   elements can differ from COLMAP's; the set of tracks is the same
-//   (docs/CPP_DIVERGENCES.md entry 100).
+//   (divergence 100).
 // - LOG(ERROR) goes to Util/Log.cs; LOG(INFO) / VLOG and the stage timers are dropped.
 // - shared_ptr members are references; THROW_CHECK_NOTNULL is Check.NotNull.
 

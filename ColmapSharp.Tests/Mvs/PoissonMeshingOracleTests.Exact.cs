@@ -90,8 +90,7 @@ public partial class PoissonMeshingOracleTests
 		}
 	}
 
-	// depth6trim's output vertex whose density value is one ulp off (docs/CPP_DIVERGENCES.md,
-	// entry 116).
+	// depth6trim's output vertex whose density value is one ulp off (divergence 116).
 	private const int KnownLogFVertex = 898;
 
 	private static int HeaderLength(byte[] ply)

@@ -17,7 +17,7 @@
 // bCoordinate + (fCoordinate-bCoordinate)*averageRoot rounded to float, and the color is
 // evaluated at the float center ( s + w/2 , (bCoordinate+fCoordinate)/2 ). Upstream sets the
 // vertices in a ThreadPool::ParallelFor over the slab's leaves; the port runs the leaves in
-// order, as a single-threaded run does (docs/CPP_DIVERGENCES.md, entry 123).
+// order, as a single-threaded run does (divergence 123).
 
 namespace ColmapSharp.Mvs.PoissonRecon;
 

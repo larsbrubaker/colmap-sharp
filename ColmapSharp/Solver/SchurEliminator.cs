@@ -17,7 +17,7 @@
 // cell, so the order in which chunks add into a cell (and so the last bits of S) depends on
 // scheduling. Here the chunks run sequentially in order, which is exactly Ceres'
 // single-threaded order; the result does not depend on the thread count
-// (docs/CPP_DIVERGENCES.md entries 18 and 35). Only the dynamic-size eliminator is ported:
+// (divergences 18 and 35). Only the dynamic-size eliminator is ported:
 // Ceres' template specializations and SchurEliminatorForOneFBlock<2, 3, 6> compute the same
 // quantities with Eigen's fixed-size kernels; here SmallBlas dispatches the bundle adjustment
 // shapes to unrolled kernels that keep the naive loops' summation order (SmallBlasFixed.cs).

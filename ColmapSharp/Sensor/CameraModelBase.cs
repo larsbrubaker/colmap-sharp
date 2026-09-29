@@ -30,7 +30,7 @@
 //
 // Tier A: every operation keeps COLMAP's evaluation order, so projection and unprojection,
 // including the Newton iteration, are bit-identical to COLMAP for the same input, up to the
-// platform libm and FMA contraction in the C++ build (docs/CPP_DIVERGENCES.md, entry 12;
+// platform libm and FMA contraction in the C++ build (divergence 12;
 // CameraModelOracleTests pins which results are bit-identical to the pycolmap wheel).
 
 using ColmapSharp.LinearAlgebra;

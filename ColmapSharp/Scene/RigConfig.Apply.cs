@@ -13,7 +13,7 @@
 // - COLMAP hands the reconstruction its rigs and frames in NodeHashMap order (an
 //   std::unordered_map or boost::unordered_node_map, util/hash_containers.h), which sets the
 //   registration order of the frames and is implementation-defined per build and standard
-//   library. Here they go in ascending id order (docs/CPP_DIVERGENCES.md #81).
+//   library. Here they go in ascending id order (divergence 81).
 // - COLMAP's LOG(WARNING) goes to Util/Log.cs; its LOG(INFO) lines are dropped.
 
 using ColmapSharp.Geometry;

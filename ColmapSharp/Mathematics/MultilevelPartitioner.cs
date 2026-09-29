@@ -2,7 +2,7 @@
 //
 // MultilevelPartitioner: the k-way graph partitioner behind
 // GraphCut.ComputeNormalizedMinGraphCut (GraphCut.cs). COLMAP calls METIS_PartGraphKway
-// there; METIS is not ported (docs/CPP_DIVERGENCES.md, entry 77). This is written here from
+// there; METIS is not ported (divergence 77). This is written here from
 // the published multilevel scheme, not from METIS's code:
 //
 //   - B. Hendrickson and R. Leland, "A Multilevel Algorithm for Partitioning Graphs",

@@ -11,10 +11,10 @@
 // - image_path becomes ReadImage: the library does not decode image files, so the host
 //   hands over a decoded bitmap per image name (null when it has none, which COLMAP treats
 //   as a failed read: the points stay black). The default (null) behaves like COLMAP's
-//   default empty image_path (docs/CPP_DIVERGENCES.md, entry 68).
+//   default empty image_path (divergence 68).
 // - ba_use_gpu / ba_gpu_index are forwarded to the Ceres options like COLMAP does; the
 //   managed solver has no GPU path and ignores them.
-// - The Caspar (GPU) backend is not available (docs/CPP_DIVERGENCES.md, entry 66): Check
+// - The Caspar (GPU) backend is not available (divergence 66): Check
 //   rejects it exactly as a COLMAP build without CASPAR_ENABLED does, and the option builders
 //   have no Caspar options to fill.
 // - LoggingType / minimizer_progress_to_stdout have no counterpart (the solver does not log).

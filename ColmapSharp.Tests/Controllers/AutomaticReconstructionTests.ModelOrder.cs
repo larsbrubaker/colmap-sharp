@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // AutomaticReconstructionTests (continued): a C#-only test, not a port. It pins
-// docs/CPP_DIVERGENCES.md entry 140: ReconstructionManager.Write puts the model with the most
+// divergence 140: ReconstructionManager.Write puts the model with the most
 // 3D points in sparse/0, and the dense stage must index its models the same way, so dense/<i>
 // is built from sparse/<i> both on the first run (models in memory in mapper build order) and
 // on a resume (models read back from sparse/<i>). In COLMAP the first run walks the models in

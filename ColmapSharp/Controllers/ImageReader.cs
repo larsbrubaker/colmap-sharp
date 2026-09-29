@@ -13,7 +13,7 @@
 // Translation notes:
 // - The file system is replaced by IImageSource (ImageSource.cs): image_path, mask_path and
 //   camera_mask_path become Images, Masks and CameraMask, and decoding is the host's job
-//   (docs/CPP_DIVERGENCES.md entry 82). Bitmap::Read's final grey/RGB conversion is kept.
+//   (divergence 82). Bitmap::Read's final grey/RGB conversion is kept.
 // - Next's six out-pointers become one ImageReaderData, freshly made on each call, so no
 //   state from a previous image can leak into the next through a reused Image object.
 // - Names sort as COLMAP sorts them. Listed names (empty image_names) are std::sort-ed as

@@ -15,7 +15,7 @@
 //   GetModifiedPoints3D (IterativeLocalRefinement), it has grown as in C++, where it is a
 //   const reference to the same set.
 // - The variable points are collected in the order of point3DIds (a HashSet, deterministic
-//   for the same sequence of operations; docs/CPP_DIVERGENCES.md, entry 59).
+//   for the same sequence of operations; divergence 59).
 // - AdjustGlobalBundle applies its stricter convergence criteria for small reconstructions
 //   only to the pose-prior adjuster, exactly as COLMAP does (the default adjuster gets the
 //   caller's options unchanged).

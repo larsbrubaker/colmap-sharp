@@ -10,7 +10,7 @@
 // Jacobians are 2xN row-major spans, as COLMAP's double* outputs are; C++'s nullptr (skip
 // this Jacobian) is an empty span. Every expression keeps COLMAP's operator order, so the
 // kernels are bit-identical to the C++ for the same input up to libm and FMA contraction
-// (docs/CPP_DIVERGENCES.md, entry 12).
+// (divergence 12).
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Solver;

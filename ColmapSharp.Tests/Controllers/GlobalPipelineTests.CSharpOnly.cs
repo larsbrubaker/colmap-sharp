@@ -3,7 +3,7 @@
 // GlobalPipelineTests.CSharpOnly: C#-only cases for ColmapSharp/Controllers/GlobalPipeline.cs
 // (COLMAP has no progress reports and no CancellationToken): the stage progress,
 // cancellation through BaseController.CancellationToken, and the order of equally large
-// reconstructions (docs/CPP_DIVERGENCES.md entry 107).
+// reconstructions (divergence 107).
 
 using ColmapSharp.Controllers;
 using ColmapSharp.Mathematics;
@@ -74,7 +74,7 @@ public partial class GlobalPipelineTests
 		await Assert.That(reconstructionManager.Size).IsEqualTo(0);
 	}
 
-	// C#-only (docs/CPP_DIVERGENCES.md entry 107): two disconnected components of the same
+	// C#-only (divergence 107): two disconnected components of the same
 	// size give two reconstructions with the same registered frame count; the stable sort
 	// keeps them in component order, so the component with the smallest frame id comes first.
 	[Test]

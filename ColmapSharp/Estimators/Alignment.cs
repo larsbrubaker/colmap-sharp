@@ -23,7 +23,7 @@
 // - COLMAP's LOG(WARNING)/LOG(ERROR) lines go to Util/Log.cs; LOG(INFO)/VLOG lines are dropped.
 // - AlignReconstructionsViaPoints picks, per source point, the target point seen most often
 //   along its track; std::max_element over a hash map breaks ties by hash order, the port by
-//   first appearance along the track (docs/CPP_DIVERGENCES.md, entry 49).
+//   first appearance along the track (divergence 49).
 
 using System.Runtime.InteropServices;
 

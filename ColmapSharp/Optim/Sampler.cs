@@ -26,7 +26,7 @@
 // - Each sampled index is checked against the data length. In COLMAP an index past the end
 //   reads past the std::vector (undefined behavior); ProgressiveSampler produces one when
 //   its progressive growth reaches the last element (see ProgressiveSampler.cs). Here that
-//   fails loudly with a Check instead (docs/CPP_DIVERGENCES.md, entry 16).
+//   fails loudly with a Check instead (divergence 16).
 
 using ColmapSharp.Util;
 

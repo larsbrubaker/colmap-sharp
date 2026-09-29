@@ -10,8 +10,8 @@
 //
 // Tiers (pinned by GeometryOracleTests): EllipsoidToUTM's zone is Tier A, bit-identical
 // to pycolmap. UTMToEllipsoid is Tier B: its latitude can be 1 ulp off for a reason not
-// established (docs/CPP_DIVERGENCES.md, entry 11). The other conversions are Tier B: the macOS wheel
-// fuses some of their multiply-adds into FMAs (docs/CPP_DIVERGENCES.md, entry 6), which
+// established (divergence 11). The other conversions are Tier B: the macOS wheel
+// fuses some of their multiply-adds into FMAs (divergence 6), which
 // ColmapSharp does not, so coordinates can differ in the last bit of the ~6.4e6 m ECEF
 // values (up to 9.3e-10 m). sin, cos and friends are the platform libm's on both sides
 // (.NET's Math calls libm) and agree on the fixture. Plain scalar arithmetic otherwise

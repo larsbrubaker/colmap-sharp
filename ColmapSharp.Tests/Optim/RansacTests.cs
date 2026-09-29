@@ -209,7 +209,7 @@ public class RansacTests
 	}
 
 	/// <summary>
-	/// C#-only (not in ransac_test.cc): pins docs/CPP_DIVERGENCES.md entry 16. With as many
+	/// C#-only (not in ransac_test.cc): pins divergence 16. With as many
 	/// data pairs as the estimator needs, PROSAC's first sample includes index
 	/// total_num_samples; COLMAP reads past the end of the data there, this port fails a Check.
 	/// </summary>
@@ -229,7 +229,7 @@ public class RansacTests
 
 	/// <summary>
 	/// C#-only (not in ransac_test.cc): COLMAP rejects num_threads != 1 for any sampler but
-	/// RandomSampler; the serial port keeps that validation (docs/CPP_DIVERGENCES.md, entry 17).
+	/// RandomSampler; the serial port keeps that validation (divergence 17).
 	/// </summary>
 	[Test]
 	public async Task CSharpOnly_ParallelRequiresRandomSampler()

@@ -8,7 +8,7 @@
 // ColmapSharp.Tests/Scene/ReconstructionTests.Ply.cs.
 //
 // ConvertToPLY lists the points in ascending id order, where COLMAP lists them in its hash
-// map's order (docs/CPP_DIVERGENCES.md, entry 21).
+// map's order (divergence 21).
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Util;

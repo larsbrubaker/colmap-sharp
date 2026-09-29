@@ -18,7 +18,7 @@
 // against COLMAP's limits (2^32), and the lists grow as data is actually read instead of
 // reserving the declared count up front. Where the C++ reads past the end of a binary file
 // without checking (a face's texcoord count and UVs, which is undefined behavior there), this
-// port throws "Unexpected end of PLY file" instead (docs/CPP_DIVERGENCES.md, entry 113).
+// port throws "Unexpected end of PLY file" instead (divergence 113).
 
 using System.Buffers.Binary;
 

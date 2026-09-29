@@ -19,7 +19,7 @@
 //   order of the input pairs, so the database does not depend on the thread count.
 // - Each verification runs on a fresh PRNG when RANSAC is unseeded (random_seed -1), so
 //   every pair sees the stream a fresh COLMAP verifier thread would; COLMAP's verifier
-//   threads continue their streams across pairs (docs/CPP_DIVERGENCES.md entry 71). The
+//   threads continue their streams across pairs (divergence 71). The
 //   worker's own PRNG is restored afterwards: Parallel.For also runs iterations on the
 //   calling thread, whose generator COLMAP's separate worker threads never touch.
 // - COLMAP deletes a pair's stale matches / two-view geometry before queueing it; here the

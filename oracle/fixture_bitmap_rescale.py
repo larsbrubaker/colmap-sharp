@@ -2,9 +2,9 @@
 # fixture_bitmap_rescale.py: writes ColmapSharp.Tests/TestData/oracle/bitmap_rescale.json,
 # pycolmap's Bitmap.rescale (OpenImageIO resize) with the default BILINEAR filter on small
 # seeded images, grey and RGB, up and down. BOX is left out: it differs from OIIO where a
-# source pixel center falls exactly on the box edge (docs/CPP_DIVERGENCES.md, entry 9).
+# source pixel center falls exactly on the box edge (divergence 9).
 # Read by ColmapSharp.Tests/Sensor/BitmapRescaleOracleTests.cs, which checks ColmapSharp's managed resampler (ColmapSharp/Sensor/BitmapResize.cs) against it
-# within one gray level (Tier B; docs/CPP_DIVERGENCES.md, entry 9).
+# within one gray level (Tier B; divergence 9).
 #
 # Usage: oracle/.venv/bin/python oracle/fixture_bitmap_rescale.py
 
