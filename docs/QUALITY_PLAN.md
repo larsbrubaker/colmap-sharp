@@ -45,7 +45,9 @@ blocks (the top and side sweeps), and the split model shares no images with the 
      - silhouette IoU as the proxy for real captures;
      - runtime per stage.
      Results are written as JSON, with `benchmarks/baseline.json` checked in and a regression
-     tolerance.
+     tolerance. Report each metric over several mapper seeds (mean and worst): on the CLAHE
+     mouse frames both our mapper and pycolmap split into two models on roughly 1 in 10–20
+     seeds, so a single seed can mislead.
    - 0c: real captures (the mouse at f40/f80/f120, stored as a release asset with a checksummed
      manifest, not in git). A baseline matrix: Low / High / Extreme (affine + DSP + guided, all
      already ported), Individual vs Video, single camera, CLAHE. Results go in
