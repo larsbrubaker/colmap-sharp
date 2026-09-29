@@ -505,7 +505,8 @@ needs today.
 defaults to `Scene`, which is COLMAP's pipeline unchanged. `Object`
 (`Controllers/AutomaticReconstruction.Object.cs`) changes these things:
 - masks are always used: the host's `Masks`, or `SilhouetteSegmenter`'s (TemporalWindow 2 for
-  video; only the `ImageNames` images when set), in feature extraction and fusion;
+  time-ordered frames: `FramesAreTimeOrdered`, which when null means `Data = Video`; only the
+  `ImageNames` images when set), in feature extraction and fusion;
 - after fusion each model gets a visual hull (resolution 128, k = 1, box from
   `VisualHullBounds`), and its surface samples are added where the fused cloud has no point
   within 3 voxels (`HullSurfaceFusion.GapSamples`, written to `fused-hull.ply`), which Poisson
@@ -561,10 +562,12 @@ object (divergence 141).
 ## 143. Video data can add KLT tracks as keypoints and matches
 
 **What differs.** COLMAP has no video tracker. With `AutomaticReconstructionOptions.VideoTracking`
-on (off by default, so the default run is COLMAP's) and video data with SIFT, the matching stage
+on (off by default, so the default run is COLMAP's) and time-ordered frames with SIFT
+(`FramesAreTimeOrdered`, which when null means `Data = Video`; set true, it lets exhaustive
+matching of `Data = Individual` keep the tracks), the matching stage
 runs `SequenceTracker` over the frames in name order, picks keyframes by parallax
 (`Feature/Tracking/TrackMatcher.cs`), appends each keyframe's track keypoints with fixed-scale
-SIFT descriptors after its own SIFT features, runs the usual sequential matching, then adds
+SIFT descriptors after its own SIFT features, runs the usual matching for the data type, then adds
 each keyframe pair's track matches to the pair's descriptor matches and re-runs two-view
 verification on the union (`Controllers/VideoTrackMatching.cs`).
 
@@ -589,3 +592,39 @@ with many SIFT inliers (MaxSiftInliers 15-100) 0.56-0.61, all-zero track descrip
 (DescribeTracks off) 0.55, capping pair spans (MaxPairFrameGap 8) no change, cutting tracks
 into 7-frame pieces (MaxTrackLength) 0.49/0.51 with descriptors, 0.66 without. All stay off by
 default.
+
+## 144. Object mode can place frames that feature matching missed from their silhouettes
+
+**What differs.** COLMAP registers an image only through 2D-3D correspondences. With
+`AutomaticReconstructionOptions.SilhouettePlacement` on (off by default; it needs
+`Subject = Object` and `Sparse`, and the controller refuses it otherwise), the end of the sparse
+stage runs `Sfm/Silhouette/SilhouettePoseRegistration.Register` on each sparse model
+(`Controllers/AutomaticReconstruction.SilhouettePlacement.cs`): the selected photos with a mask,
+in name order, against a hull carved from the model's registered frames with Object mode's hull
+options and box. The placed frames are registered with a pose and no points, sparse/<i> is
+rewritten, and `sparse/<i>/silhouette-placement.txt` (the summary line) marks the model as done,
+so a resume does not place it again. It runs after the last mapper and bundle adjustment pass,
+since either would de-register frames without observations. Downstream, PatchMatch skips a
+placed frame (no source images), fusion skips its missing depth map, and the meshing hull and
+texturing use it.
+
+**Why.** docs/QUALITY_PLAN.md stages 4a/4b: a stretch of video where the object turns fast and
+shows little texture has no matches, yet every frame has a clean outline.
+
+**Evidence.** `SilhouettePlacementPipelineTests`: TexturedSphere, 16 frames at 240x180, motion
+0.27, frames 6-9 painted flat inside the mask, true masks, known intrinsics, mapper seed 1.
+Features register 9/16; placement adds 7 (all four flat frames and frames 0-2), and every dense
+stage and texturing finish with a closed mesh. Release, surface scored with the benchmark's Sim3:
+
+| Run | Registered | F (aligned on all registered frames) | F (aligned on the 9 feature frames) |
+|---|---|---|---|
+| Placement off | 9/16 | 0.384 | 0.384 |
+| Placement on | 16/16 | 0.042 | 0.364 |
+
+The mesh itself barely changes (0.364 against 0.384 on the same alignment), since placed frames
+add no dense points. But a sphere's outline does not pin the rotation: the flat frames are placed
+7-11 degrees off and the extrapolated frames 0-2 are 32-84 degrees off, which the consistency
+gate cannot see (a sphere seen from any direction carves the same disc). Those poses throw the
+benchmark's all-frame alignment off, and texturing would take colors from them. So it stays off
+by default until it is measured on an object whose outline changes as it turns (DarkObject, the
+real mouse capture).

@@ -31,7 +31,7 @@ Like every file in the repo, a module file stays within 800 lines; one that woul
 it is split by topic and the table updated. When merging branches, merge entries one by one
 rather than by text hunks, in both the module file and this table.
 
-**Next free number: 144.**
+**Next free number: 145.**
 
 ## Entries
 
@@ -167,3 +167,4 @@ rather than by text hunks, in both the module file and this table.
 | 141 | AutomaticReconstructionOptions can keep bundle adjustment off a known camera | [Controllers](divergences/Controllers.md) |
 | 142 | AutomaticReconstructionOptions.Subject = Object adds masks, a visual hull and silhouette clean-up | [Controllers](divergences/Controllers.md) |
 | 143 | Video data can add KLT tracks as keypoints and matches | [Controllers](divergences/Controllers.md) |
+| 144 | Object mode can place frames that feature matching missed from their silhouettes | [Controllers](divergences/Controllers.md) |

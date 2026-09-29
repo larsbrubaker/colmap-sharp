@@ -146,6 +146,35 @@ public sealed class AutomaticReconstructionOptions
 	/// </summary>
 	public SubjectType Subject { get; set; } = SubjectType.Scene;
 
+	/// <summary>
+	/// Place video frames that feature matching missed, using their outlines. Needs Subject = Object.
+	/// </summary>
+	/// <remarks>
+	/// C#-only (divergence 144; AutomaticReconstruction.SilhouettePlacement.cs). Off by default.
+	/// It runs at the end of the sparse stage, so it also needs <see cref="Sparse"/> on, and it
+	/// needs the photos to be video frames named in filming order (<see cref="FramesAreTimeOrdered"/>
+	/// true, or null with Data = Video); the controller refuses other settings. A placed photo has a pose
+	/// but no matched points, so PatchMatch finds no partner photos for it and computes no depth
+	/// for it: it adds to the object's outline shape (the visual hull) and to the texture, not
+	/// to the dense points.
+	/// </remarks>
+	public bool SilhouettePlacement { get; set; }
+
+	/// <summary>
+	/// Whether the photos, in name order, are frames of one video in the order they were filmed.
+	/// Null (the default) means yes exactly when <see cref="Data"/> is Video. Set it to use the
+	/// video-only helpers with another matcher: e.g. Data = Individual (every pair is matched)
+	/// with FramesAreTimeOrdered = true.
+	/// </summary>
+	/// <remarks>
+	/// C#-only (divergences 142, 143 and 144). It turns on Object mode's temporal mask repair
+	/// (neighbouring frames vote on each other's masks), <see cref="VideoTracking"/>, and it is
+	/// the order <see cref="SilhouettePlacement"/> interpolates in. <see cref="Data"/> still
+	/// picks the matcher and mapper settings: Video matches sequentially without loop detection,
+	/// which placed fewer frames of an orbiting capture than exhaustive matching.
+	/// </remarks>
+	public bool? FramesAreTimeOrdered { get; set; }
+
 	/// <summary>The type of input data used to choose optimal mapper settings.</summary>
 	public DataType Data { get; set; } = DataType.Individual;
 
@@ -252,10 +281,11 @@ public sealed class AutomaticReconstructionOptions
 	public IComputeDevice? ComputeDevice { get; set; }
 
 	/// <summary>
-	/// C#-only (divergence 143): for <see cref="DataType.Video"/>, also follow points through
-	/// the frames with a KLT tracker and add the tracks as keypoints and matches between
-	/// keyframes (Controllers/VideoTrackMatching.cs), next to the descriptor matches. Helps
-	/// frames that SIFT alone cannot place. Ignored for other data types.
+	/// C#-only (divergence 143): for time-ordered frames (<see cref="FramesAreTimeOrdered"/>, by
+	/// default <see cref="DataType.Video"/>), also follow points through the frames with a KLT
+	/// tracker and add the tracks as keypoints and matches between keyframes
+	/// (Controllers/VideoTrackMatching.cs), next to the descriptor matches. Helps frames that SIFT
+	/// alone cannot place. Ignored when the frames are not time-ordered.
 	/// </summary>
 	public bool VideoTracking { get; set; }
 

@@ -1,7 +1,8 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // AutomaticReconstructionController, video tracking: C#-only (divergence 143), not in COLMAP.
-// With AutomaticReconstructionOptions.VideoTracking on and video data, the matching stage adds
+// With AutomaticReconstructionOptions.VideoTracking on and time-ordered frames
+// (FramesAreTimeOrdered, which by default means video data), the matching stage adds
 // KLT tracks (Controllers/VideoTrackMatching.cs): keyframe track keypoints and descriptors
 // before the descriptor matcher runs, and the tracks' keyframe matches, re-verified, after it.
 // The rest of the controller is AutomaticReconstruction.cs.
@@ -13,9 +14,20 @@ namespace ColmapSharp.Controllers;
 /// <content>Video tracking around the matching stage.</content>
 public sealed partial class AutomaticReconstructionController
 {
-	private bool UsesVideoTracking =>
+	/// <summary>
+	/// Whether the photos are frames of one video in filming order:
+	/// AutomaticReconstructionOptions.FramesAreTimeOrdered, or when that is null, Data = Video.
+	/// </summary>
+	internal bool FramesAreTimeOrdered => AreFramesTimeOrdered(options);
+
+	// The rule behind FramesAreTimeOrdered, for the constructor's checks.
+	private static bool AreFramesTimeOrdered(AutomaticReconstructionOptions options) =>
+		options.FramesAreTimeOrdered ?? options.Data == AutomaticReconstructionOptions.DataType.Video;
+
+	/// <summary>Whether the matching stage adds KLT tracks (internal for FramesAreTimeOrderedTests).</summary>
+	internal bool UsesVideoTracking =>
 		options.VideoTracking
-		&& options.Data == AutomaticReconstructionOptions.DataType.Video
+		&& FramesAreTimeOrdered
 		&& options.Feature == AutomaticReconstructionOptions.FeatureType.Sift;
 
 	// Null when tracking is off. On a resumed run the tracks are found again (the tracker is

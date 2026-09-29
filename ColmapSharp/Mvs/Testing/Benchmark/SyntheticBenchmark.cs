@@ -63,6 +63,15 @@ public sealed class SyntheticBenchmarkOptions
 	/// <summary>Whether to hand the scene's true masks to the reconstruction (features and fusion).</summary>
 	public bool UseTrueMasks { get; set; }
 
+	/// <summary>Whether to texture the mesh too (AutomaticReconstructionOptions.Texture); off, since nothing scores the texture.</summary>
+	public bool Texture { get; set; }
+
+	/// <summary>AutomaticReconstructionOptions.FramesAreTimeOrdered (null: time-ordered iff Data is Video).</summary>
+	public bool? FramesAreTimeOrdered { get; set; }
+
+	/// <summary>Place the frames feature matching missed from their outlines (AutomaticReconstructionOptions.SilhouettePlacement; Object only).</summary>
+	public bool SilhouettePlacement { get; set; }
+
 	/// <summary>Whether to add KLT video tracks to the matches (AutomaticReconstructionOptions.VideoTracking; video data only).</summary>
 	public bool VideoTracking { get; set; }
 
@@ -141,6 +150,8 @@ public static class SyntheticBenchmark
 				Images = images,
 				Masks = options.UseTrueMasks ? masks : null,
 				Subject = options.Subject,
+				SilhouettePlacement = options.SilhouettePlacement,
+				FramesAreTimeOrdered = options.FramesAreTimeOrdered,
 				Data = options.Data,
 				VideoTracking = options.VideoTracking,
 				Quality = options.Quality,
@@ -155,7 +166,7 @@ public static class SyntheticBenchmark
 				BaRefineExtraParams = !options.KnownIntrinsics,
 				Dense = options.Dense,
 				Mesher = options.Mesher,
-				Texture = false,
+				Texture = options.Texture,
 				NumThreads = options.NumThreads,
 				RandomSeed = options.MapperSeed,
 			};

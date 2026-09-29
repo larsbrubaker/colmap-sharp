@@ -6,7 +6,9 @@
 // (FeatureExtraction.cs), matching (FeatureMatching.cs), sparse mapping (IncrementalPipeline,
 // HierarchicalPipeline or GlobalPipeline) and, per model, the dense stages in
 // AutomaticReconstruction.Dense.cs, the last of which (texturing, C#-only) is in
-// AutomaticReconstruction.Texture.cs. The options and presets are in
+// AutomaticReconstruction.Texture.cs. Object mode (C#-only) is in AutomaticReconstruction.Object.cs,
+// and its silhouette placement of unmatched frames, which ends the sparse stage, in
+// AutomaticReconstruction.SilhouettePlacement.cs. The options and presets are in
 // AutomaticReconstructionOptions.cs. Tests: ColmapSharp.Tests/Controllers/
 // AutomaticReconstructionTests.cs (automatic_reconstruction_test.cc).
 //
@@ -107,6 +109,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 
 		Check.That(CameraModels.ExistsCameraModelWithName(options.CameraModel));
 		ThrowIfCameraKeptFixedUnderGlobalMapper(options);
+		ThrowIfSilhouettePlacementCannotRun(options);
 
 		// Set feature type first so quality modifiers can query EffMaxImageSize().
 		switch (options.Feature)
@@ -351,6 +354,14 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		{
 			RunSparseMapper();
 			yield return null;
+
+			// C#-only (divergence 144): after the last mapper and bundle adjustment pass, since
+			// either would drop the placed frames again (they have no observations).
+			if (options.SilhouettePlacement && !CheckIfStopped())
+			{
+				RunSilhouettePlacement();
+				yield return null;
+			}
 		}
 
 		if (CheckIfStopped())
@@ -414,6 +425,7 @@ public sealed partial class AutomaticReconstructionController : BaseController
 					reconstructionManager.Read(dir);
 				}
 
+				sparseModelDirs = dirList;
 				return;
 			}
 		}
@@ -526,6 +538,8 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		Directory.CreateDirectory(sparsePath);
 		reconstructionManager.Write(sparsePath);
 		OrderModelsAsWritten();
+		sparseModelDirs = [.. Enumerable.Range(0, reconstructionManager.Size)
+			.Select(i => Path.Combine(sparsePath, i.ToString(System.Globalization.CultureInfo.InvariantCulture)))];
 	}
 
 	// ReconstructionManager.Write puts the model with the most 3D points in sparse/0, and a resume

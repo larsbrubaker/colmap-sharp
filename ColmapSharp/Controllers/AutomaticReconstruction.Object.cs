@@ -5,7 +5,8 @@
 // port; COLMAP has no single-object mode. With Scene (the default) none of this runs.
 //
 // - Masks: the host's AutomaticReconstructionOptions.Masks, or else SilhouetteSegmenter's
-//   (TemporalWindow 2 for video, whose neighbouring frames vote on each other's masks), from the
+//   (TemporalWindow 2 for time-ordered frames - FramesAreTimeOrdered, by default video data -
+//   whose neighbouring frames vote on each other's masks), from the
 //   selected images only (ImageNames, when set). They reach feature extraction
 //   (ImageReaderOptions.Masks) and fusion (StereoFusionOptions.MaskPath) through the same
 //   plumbing as host masks. Segmentation reports its progress under the stage that first needs
@@ -29,6 +30,9 @@
 // - With no registered model there are no cameras and so no hull: the reconstruction fails the
 //   way a scene's does (no model), and object mode adds nothing.
 // Texturing then runs on whichever mesh resulted (AutomaticReconstruction.Texture.cs).
+// With AutomaticReconstructionOptions.SilhouettePlacement, the frames feature matching missed are
+// placed from these masks at the end of the sparse stage (AutomaticReconstruction.SilhouettePlacement.cs,
+// divergence 144), so the hull here is carved from them too.
 
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Mvs;
@@ -82,6 +86,12 @@ public sealed partial class AutomaticReconstructionController
 
 	private bool IsObject => options.Subject == AutomaticReconstructionOptions.SubjectType.Object;
 
+	/// <summary>
+	/// The segmenter's TemporalWindow: 2 for time-ordered frames, whose neighbours vote on each
+	/// other's masks, else 0 (internal for FramesAreTimeOrderedTests).
+	/// </summary>
+	internal int MaskTemporalWindow => FramesAreTimeOrdered ? 2 : 0;
+
 	// The hull options object mode builds with. The clean-up reads the same smoothing and iso
 	// level, so "outside the hull" agrees with the surface vertices are pulled onto.
 	private static VisualHullOptions ObjectHullOptions() => new()
@@ -99,10 +109,7 @@ public sealed partial class AutomaticReconstructionController
 			return masks ??= options.Masks;
 		}
 
-		var segmentation = new SegmentationOptions
-		{
-			TemporalWindow = options.Data == AutomaticReconstructionOptions.DataType.Video ? 2 : 0,
-		};
+		var segmentation = new SegmentationOptions { TemporalWindow = MaskTemporalWindow };
 
 		// Only the selected images, when the host selected some: the others are never read.
 		IImageSource images = options.ImageNames.Count == 0 ? options.Images! : new SelectedImages(options.Images!, options.ImageNames);
