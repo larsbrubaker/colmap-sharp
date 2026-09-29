@@ -33,7 +33,7 @@ public partial class AutomaticReconstructionTests
 		var images = new InMemoryImageSource();
 		for (int i = 0; i < NumViews; ++i)
 		{
-			images.Add($"view{i}.png", RenderTexturedScene(i, NumViews, width: 200, height: 150));
+			images.Add($"view{i}.png", SyntheticObjectScene.RenderTexturedSphereOnWall(i, NumViews, width: 200, height: 150));
 		}
 
 		string densePath = Path.Combine(workspacePath, "dense", "0");

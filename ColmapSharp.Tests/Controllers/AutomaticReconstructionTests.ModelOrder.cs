@@ -20,6 +20,7 @@
 // models sparse/10 would become model 2).
 
 using ColmapSharp.Controllers;
+using ColmapSharp.Mvs.Testing;
 using ColmapSharp.Scene;
 using ColmapSharp.Sensor;
 
@@ -39,7 +40,7 @@ public partial class AutomaticReconstructionTests
 		var images = new InMemoryImageSource();
 		for (int i = 0; i < NumViews; ++i)
 		{
-			images.Add($"view{i}.png", RenderTexturedScene(i, NumViews, width: 200, height: 150));
+			images.Add($"view{i}.png", SyntheticObjectScene.RenderTexturedSphereOnWall(i, NumViews, width: 200, height: 150));
 		}
 
 		AutomaticReconstructionOptions Options(string workspacePath, bool extractAndMatch, bool dense) => new()

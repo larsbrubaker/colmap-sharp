@@ -10,7 +10,8 @@
 // (black is textureless, and the patches are not perspective-consistent surfaces), so its
 // filtered depth maps keep only a few percent of the pixels and fusion finds no point seen
 // consistently in MinNumPixels (5) images. Here a solid-noise-textured sphere in front of a
-// textured wall is ray-traced into a few small views, so every pixel is photo-consistent.
+// textured wall is ray-traced into a few small views, so every pixel is photo-consistent
+// (SyntheticObjectScene.RenderTexturedSphereOnWall, in the library's Mvs/Testing).
 //
 // Why Delaunay meshing: a cloud this small (about 2000 points) is too sparse for COLMAP's
 // Poisson defaults (depth 13, trim 10) - the surface trimmer removes every triangle. That is
@@ -30,6 +31,7 @@
 // undistorted images, not the host's masks.
 
 using ColmapSharp.Controllers;
+using ColmapSharp.Mvs.Testing;
 using ColmapSharp.Scene;
 using ColmapSharp.Sensor;
 using ColmapSharp.Util;
@@ -52,7 +54,7 @@ public partial class AutomaticReconstructionTests
 		var images = new InMemoryImageSource();
 		for (int i = 0; i < NumViews; ++i)
 		{
-			images.Add($"view{i}.png", RenderTexturedScene(i, NumViews, width: 200, height: 150));
+			images.Add($"view{i}.png", SyntheticObjectScene.RenderTexturedSphereOnWall(i, NumViews, width: 200, height: 150));
 		}
 
 		var textureSink = new InMemoryBitmapStore();
@@ -151,7 +153,7 @@ public partial class AutomaticReconstructionTests
 		var images = new InMemoryImageSource();
 		for (int i = 0; i < NumViews; ++i)
 		{
-			images.Add($"view{i}.png", RenderTexturedScene(i, NumViews, width: 200, height: 150));
+			images.Add($"view{i}.png", SyntheticObjectScene.RenderTexturedSphereOnWall(i, NumViews, width: 200, height: 150));
 		}
 
 		string[] selected = ["view1.png", "view2.png", "view3.png", "view4.png"];
@@ -236,108 +238,5 @@ public partial class AutomaticReconstructionTests
 				return [.. stages];
 			}
 		}
-	}
-
-	// Ray-traces view viewIdx of numViews: cameras 4 units from the origin on an arc about the
-	// y axis (12 degrees apart, alternating slightly up and down), looking at a unit sphere at
-	// the origin in front of the wall z = 3. Both surfaces carry the same solid noise texture,
-	// sampled at the 3D hit point so it is the same surface in every view; 3x3 supersampling
-	// keeps the fine octaves from aliasing.
-	private static Bitmap RenderTexturedScene(int viewIdx, int numViews, int width, int height)
-	{
-		double angle = (viewIdx - (numViews - 1) / 2.0) * 12.0 * Math.PI / 180.0;
-		double[] center = [4 * Math.Sin(angle), viewIdx % 2 == 0 ? 0.3 : -0.3, -4 * Math.Cos(angle)];
-		double[] forward = Normalized([-center[0], -center[1], -center[2]]);
-		double[] right = Normalized(Cross([0, 1, 0], forward));
-		double[] down = Cross(forward, right);
-		double focal = 1.2 * Math.Max(width, height);
-
-		var bitmap = new Bitmap(width, height, asRgb: true);
-		for (int y = 0; y < height; ++y)
-		{
-			for (int x = 0; x < width; ++x)
-			{
-				double sum = 0;
-				for (int sy = 0; sy < 3; ++sy)
-				{
-					for (int sx = 0; sx < 3; ++sx)
-					{
-						double u = (x + (sx + 0.5) / 3 - width / 2.0) / focal;
-						double v = (y + (sy + 0.5) / 3 - height / 2.0) / focal;
-						double[] dir = Normalized([
-							forward[0] + u * right[0] + v * down[0],
-							forward[1] + u * right[1] + v * down[1],
-							forward[2] + u * right[2] + v * down[2]]);
-						sum += Albedo(Trace(center, dir));
-					}
-				}
-
-				byte value = (byte)Math.Clamp(sum / 9 * 255, 0, 255);
-				bitmap.SetPixel(x, y, new BitmapColor<byte>(value, value, value));
-			}
-		}
-
-		return bitmap;
-	}
-
-	// The first hit of the ray with the unit sphere, else with the wall z = 3.
-	private static double[] Trace(double[] origin, double[] dir)
-	{
-		double b = Dot(origin, dir);
-		double c = Dot(origin, origin) - 1;
-		double discriminant = b * b - c;
-		double t = discriminant >= 0 ? -b - Math.Sqrt(discriminant) : (3 - origin[2]) / dir[2];
-		return [origin[0] + t * dir[0], origin[1] + t * dir[1], origin[2] + t * dir[2]];
-	}
-
-	// Four octaves of value noise in [0, 1], stretched for contrast.
-	private static double Albedo(double[] p)
-	{
-		double sum = 0;
-		double weight = 0.5;
-		double frequency = 4;
-		for (int octave = 0; octave < 4; ++octave)
-		{
-			sum += weight * ValueNoise(p[0] * frequency, p[1] * frequency, p[2] * frequency);
-			weight *= 0.5;
-			frequency *= 2;
-		}
-
-		return Math.Clamp((sum / 0.9375 - 0.5) * 2 + 0.5, 0, 1);
-	}
-
-	private static double ValueNoise(double x, double y, double z)
-	{
-		int xi = (int)Math.Floor(x), yi = (int)Math.Floor(y), zi = (int)Math.Floor(z);
-		double fx = Smooth(x - xi), fy = Smooth(y - yi), fz = Smooth(z - zi);
-		double Lerp(double a, double b, double t) => a + (b - a) * t;
-		double Corner(int dx, int dy, int dz) => Hash(xi + dx, yi + dy, zi + dz);
-		return Lerp(
-			Lerp(Lerp(Corner(0, 0, 0), Corner(1, 0, 0), fx), Lerp(Corner(0, 1, 0), Corner(1, 1, 0), fx), fy),
-			Lerp(Lerp(Corner(0, 0, 1), Corner(1, 0, 1), fx), Lerp(Corner(0, 1, 1), Corner(1, 1, 1), fx), fy),
-			fz);
-	}
-
-	private static double Smooth(double t) => t * t * (3 - 2 * t);
-
-	// A lattice value in [0, 1] from an integer hash (deterministic on every platform).
-	private static double Hash(int x, int y, int z)
-	{
-		uint h = unchecked((uint)x * 73856093u ^ (uint)y * 19349663u ^ (uint)z * 83492791u);
-		h ^= h >> 13;
-		h = unchecked(h * 0x5bd1e995u);
-		h ^= h >> 15;
-		return (h & 0xFFFFFF) / (double)0xFFFFFF;
-	}
-
-	private static double Dot(double[] a, double[] b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-
-	private static double[] Cross(double[] a, double[] b) =>
-		[a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-
-	private static double[] Normalized(double[] a)
-	{
-		double norm = Math.Sqrt(Dot(a, a));
-		return [a[0] / norm, a[1] / norm, a[2] / norm];
 	}
 }

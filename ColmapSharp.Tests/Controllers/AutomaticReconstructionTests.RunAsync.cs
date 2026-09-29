@@ -146,7 +146,7 @@ public partial class AutomaticReconstructionTests
 		var images = new InMemoryImageSource();
 		for (int i = 0; i < numViews; ++i)
 		{
-			images.Add($"view{i}.png", RenderTexturedScene(i, numViews, width: 200, height: 150));
+			images.Add($"view{i}.png", SyntheticObjectScene.RenderTexturedSphereOnWall(i, numViews, width: 200, height: 150));
 		}
 
 		return images;
