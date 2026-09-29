@@ -40,8 +40,11 @@ tests. Precedents: agg-sharp's `examples/AggSharpDemo` (three-project shape, Pag
 3. **Browser drop + video files.** agg-sharp: page-level drag-and-drop into `FileDropDispatcher`;
    `IVideoFrameReader` providers for the browser (`<video>` seek + canvas, or WebCodecs) and Mac
    (AVFoundation `AVAssetImageGenerator`) — Windows (Media Foundation) and the demo's video intake
-   are in. Windows: hardware decode (D3D11 device manager) is the remaining read-speed lever;
-   only 24 of 40 frames of a phone clip registered, so check denser sampling.
+   are in; the Mac reader and the browser drop are coming from agg-sharp. Windows: hardware decode
+   (D3D11 device manager) is the remaining read-speed lever. A phone clip of a black matte mouse
+   spinning on its cable placed 24 of 40 frames, the same frames pycolmap places: a capture limit
+   (only the textured underside matches), not a port bug. Denser sampling adds frames of the sides
+   already seen, not the unseen ones; the demo's capture tips cover what does help.
 4. **Webcam (browser).** agg-sharp: `getUserMedia` preview + still capture + timed capture.
    Demo: capture flow (take photos around an object, or record → frames).
 5. **Distribution.** Mac `.app` bundle zip on GitHub Releases (unsigned; document Gatekeeper),
@@ -52,7 +55,5 @@ tests. Precedents: agg-sharp's `examples/AggSharpDemo` (three-project shape, Pag
 
 - Browser CPU stages (SIFT, matching, bundle adjustment) run 20–50× slower than desktop; long
   single steps still hold the frame even with yields between units.
-- ImageSharp (agg-sharp's decoder) uses the Six Labors Split License — check before shipping
-  binaries.
 - Nesting agg-sharp inside colmap-sharp means a recursive MatterCAD clone pulls a second
   agg-sharp; MatterCAD should not recurse into `Submodules/colmap-sharp/demo/agg-sharp`.

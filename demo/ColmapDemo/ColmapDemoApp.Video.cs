@@ -3,7 +3,8 @@
 // ColmapDemoApp.Video: a dropped or picked video becomes photos. Its frames are read off the UI
 // thread (VideoFrameSampler.cs picks which and writes them as PNGs into a temp folder per video),
 // with "Reading video frames 12/40…" in the status line and Cancel stopping it; then the frames
-// join the photo list as one line ("40 frames from clip.mp4") and a run treats them like any photo.
+// join the photo list as one line ("40 frames from clip.mp4") and a run treats them like any photo,
+// except that a run of one video's frames alone gives them one shared camera (ColmapDemoApp.Placement.cs).
 // Where agg has no video reader (Mac and browser today) the panel says so in the reader's own
 // words. The frame folders are deleted by Clear and when the window closes (the one being read
 // too: its read never gets back to the UI thread once the window is gone).
@@ -25,6 +26,9 @@ namespace ColmapDemo
 	{
 		// Each added video and the temp folder its frames are in.
 		private readonly List<(string Video, string Folder)> videos = new List<(string Video, string Folder)>();
+
+		// Each added video's frames (paths in the photo list), for telling a one-video run apart.
+		private readonly List<IReadOnlyList<string>> videoFrameSets = new List<IReadOnlyList<string>>();
 
 		private CancellationTokenSource videoCancel;
 
@@ -166,6 +170,8 @@ namespace ColmapDemo
 
 				// The count first: a phone's file name is longer than the panel is wide.
 				row.Text = $"{frames.Count} {(frames.Count == 1 ? "frame" : "frames")} from {name}";
+				this.AddListEntry(row, frames);
+				this.videoFrameSets.Add(frames);
 				this.statusLine.Text = string.Empty;
 				this.UpdatePhotoCount();
 				return;
@@ -196,6 +202,7 @@ namespace ColmapDemo
 			}
 
 			this.videos.Clear();
+			this.videoFrameSets.Clear();
 		}
 
 		private void ShowError(string message)

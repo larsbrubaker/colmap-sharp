@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // ColmapDemoApp.Run: the Run / Cancel / Save mesh controls, the stage list's live progress and
-// the status line. A run is a ReconstructionSession (ReconstructionSession.cs) started off the
+// the status line (with the placement summary of ColmapDemoApp.Placement.cs under it). A run is a ReconstructionSession (ReconstructionSession.cs) started off the
 // UI thread on the Mac (RunOnUiThread false), or on the UI thread in the browser, where there
 // is no other; its events are marshalled here with UiThread.RunOnIdle either way. Each stage's
 // wall time (StageTimer.cs, stamped on the run's thread) goes to the console as
@@ -145,6 +145,7 @@ namespace ColmapDemo
 			this.lastResult = null;
 			this.activeStage = null;
 			this.errorLine.Visible = false;
+			this.ClearPlacement();
 			this.viewport.Clear();
 			foreach (string stage in Stages)
 			{
@@ -160,6 +161,7 @@ namespace ColmapDemo
 			{
 				ComputeDevice = this.computeDevice,
 				MaxImageSize = this.MaxImageSize,
+				SingleCamera = this.RunUsesSingleCamera,
 				YieldAsync = this.YieldAsync,
 			});
 			// Stamped here, on the run's thread as the report is made: the UI thread may get to it much
@@ -186,17 +188,17 @@ namespace ColmapDemo
 				{
 					SessionResult result = await session.RunAsync(photos, cancel.Token).ConfigureAwait(false);
 					TimeSpan endedAt = this.runClock.Elapsed;
-					UiThread.RunOnIdle(() => this.OnRunFinished(result, null, cancelled: false, endedAt));
+					UiThread.RunOnIdle(() => this.OnRunFinished(result, null, cancelled: false, endedAt, photos));
 				}
 				catch (OperationCanceledException)
 				{
 					TimeSpan endedAt = this.runClock.Elapsed;
-					UiThread.RunOnIdle(() => this.OnRunFinished(null, null, cancelled: true, endedAt));
+					UiThread.RunOnIdle(() => this.OnRunFinished(null, null, cancelled: true, endedAt, photos));
 				}
 				catch (Exception e)
 				{
 					TimeSpan endedAt = this.runClock.Elapsed;
-					UiThread.RunOnIdle(() => this.OnRunFinished(null, e, cancelled: false, endedAt));
+					UiThread.RunOnIdle(() => this.OnRunFinished(null, e, cancelled: false, endedAt, photos));
 				}
 			};
 
@@ -292,6 +294,7 @@ namespace ColmapDemo
 				AutoExpandBoundsToText = true,
 			};
 			panel.AddChild(this.statusLine);
+			this.AddPlacementLine(panel);
 
 			// Wrapped within the panel; FirstLine keeps it to a line or two.
 			this.errorLine = new WrappedTextWidget(string.Empty, pointSize: 9, textColor: ErrorColor)
@@ -367,7 +370,7 @@ namespace ColmapDemo
 			return line.Length > MaxLength ? line.Substring(0, MaxLength - 1) + "…" : line;
 		}
 
-		private void OnRunFinished(SessionResult result, Exception error, bool cancelled, TimeSpan endedAt)
+		private void OnRunFinished(SessionResult result, Exception error, bool cancelled, TimeSpan endedAt, IReadOnlyList<string> photos)
 		{
 			this.stageTimer.Finish(endedAt);
 			Console.WriteLine($"COLMAP_DEMO run: {endedAt.TotalSeconds:F1} s");
@@ -377,6 +380,11 @@ namespace ColmapDemo
 			if (this.activeStage != null)
 			{
 				this.SetStageRow(this.activeStage, result != null ? "done" : cancelled ? "cancelled" : "failed", result != null ? DoneStageColor : ErrorColor);
+			}
+
+			if (result != null)
+			{
+				this.ShowPlacement(result.Placement, photos);
 			}
 
 			if (result?.PreviewMesh != null)

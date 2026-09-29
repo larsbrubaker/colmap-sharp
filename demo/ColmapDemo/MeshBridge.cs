@@ -1,8 +1,8 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
 // MeshBridge: converts the library's results into what agg-sharp draws - a PlyMesh (with or
-// without its texture atlas) into a PolygonMesh.Mesh, and a sparse Reconstruction's points into
-// a list of colored points. The viewport (ModelViewport.cs) draws the results; the session
+// without its texture atlas) into a PolygonMesh.Mesh, and a sparse model's points into a list of
+// colored points. The viewport (ModelViewport.cs) draws the results; the session
 // (ReconstructionSession.cs) calls these on its worker thread so the UI thread only swaps in a
 // finished mesh. Tests: demo/ColmapDemo.Tests/MeshBridgeTests.cs.
 //
@@ -80,19 +80,25 @@ namespace ColmapDemo
 			return mesh;
 		}
 
-		/// <summary>The 3D points of every model in <paramref name="models"/>, with their colors.</summary>
-		public static List<ColoredPoint> SparsePoints(ReconstructionManager models)
+		/// <summary>
+		/// The 3D points of model <paramref name="modelIndex"/> of <paramref name="models"/>, with
+		/// their colors; none when the index is -1 (no model). Only one model: separate models have
+		/// unrelated coordinate frames, so drawing them together would overlay unrelated clouds.
+		/// </summary>
+		public static List<ColoredPoint> SparsePoints(ReconstructionManager models, int modelIndex)
 		{
 			var points = new List<ColoredPoint>();
-			for (int m = 0; m < models.Size; m++)
+			if (modelIndex < 0)
 			{
-				foreach (Point3D point in models.Get(m).Points3D.Values)
-				{
-					var xyz = point.Xyz;
-					points.Add(new ColoredPoint(
-						new Vector3(xyz.X, xyz.Y, xyz.Z),
-						new Color(point.Color.X, point.Color.Y, point.Color.Z)));
-				}
+				return points;
+			}
+
+			foreach (Point3D point in models.Get(modelIndex).Points3D.Values)
+			{
+				var xyz = point.Xyz;
+				points.Add(new ColoredPoint(
+					new Vector3(xyz.X, xyz.Y, xyz.Z),
+					new Color(point.Color.X, point.Color.Y, point.Color.Z)));
 			}
 
 			return points;

@@ -9,6 +9,8 @@
 // SaveMesh writes the result as OBJ (+ MTL + <name>.png) or PLY; SaveMeshZip puts the OBJ's
 // files in one zip, since a browser download is one file. Each run's temp workspace is
 // deleted when the run ends (COLMAP_DEMO_KEEP_WORKSPACE=1 keeps it).
+// The mapper can build several separate models; the one with the most placed photos is shown and
+// meshed, and PhotoPlacement.cs says which photos were placed.
 // When the GPU fails during the dense stage, the run goes on without it: GpuFailed is raised and
 // the dense stage is run again on the CPU in the same workspace, from the sparse model on disk.
 //
@@ -62,6 +64,13 @@ namespace ColmapDemo
 		/// </summary>
 		public int PoissonDepth { get; set; } = 11;
 
+		/// <summary>
+		/// Whether every photo shares one camera (COLMAP's single_camera): right for frames of one
+		/// video, which all come from the same lens at the same zoom, and it gives the mapper one
+		/// set of intrinsics to refine from all of them instead of one guess per frame.
+		/// </summary>
+		public bool SingleCamera { get; set; }
+
 		/// <summary>Where each run's temp workspace folder is made.</summary>
 		public string WorkspaceRoot { get; set; } = Path.Combine(Path.GetTempPath(), "ColmapDemo");
 
@@ -85,10 +94,10 @@ namespace ColmapDemo
 	/// <summary>What a finished run produced.</summary>
 	public sealed class SessionResult
 	{
-		/// <summary>The sparse points of every model.</summary>
+		/// <summary>The sparse points of the shown model (the one with the most placed photos).</summary>
 		public IReadOnlyList<ColoredPoint> SparsePoints { get; init; } = Array.Empty<ColoredPoint>();
 
-		/// <summary>The first model's mesh as the library wrote it, or null when meshing gave none.</summary>
+		/// <summary>The shown model's mesh as the library wrote it, or null when meshing gave none.</summary>
 		public PlyMesh Mesh { get; init; }
 
 		/// <summary>The mesh's per-corner UVs (6 per face) when textured, else null.</summary>
@@ -99,6 +108,9 @@ namespace ColmapDemo
 
 		/// <summary>The mesh converted for the viewport, or null.</summary>
 		public Mesh PreviewMesh { get; init; }
+
+		/// <summary>Which photos the mapper placed, and in how many separate groups.</summary>
+		public PhotoPlacement Placement { get; init; }
 
 		/// <summary>The workspace the run wrote into; deleted when the run ended unless KeepWorkspace.</summary>
 		public string WorkspacePath { get; init; }
@@ -139,6 +151,7 @@ namespace ColmapDemo
 			Func<ValueTask> yieldToHost = this.settings.YieldAsync ?? YieldToEventLoop;
 			var images = new InMemoryImageSource();
 			var names = new HashSet<string>(StringComparer.Ordinal);
+			var orderedNames = new List<string>(photoPaths.Count);
 
 			// A turn for the host before the first decode too, so "Starting..." gets painted.
 			await yieldToHost().ConfigureAwait(false);
@@ -156,23 +169,28 @@ namespace ColmapDemo
 				}
 
 				images.Add(name, bitmap);
+				orderedNames.Add(name);
 
 				// Decoding is the first long stretch of a run; on a shared UI thread the page would
 				// otherwise sit on "Starting..." until every photo is in.
 				await yieldToHost().ConfigureAwait(false);
 			}
 
-			return await this.RunAsync(images, cancel).ConfigureAwait(false);
+			return await this.RunAsync(images, orderedNames, cancel).ConfigureAwait(false);
 		}
 
 		/// <summary>Runs the pipeline on already-decoded photos.</summary>
-		public async Task<SessionResult> RunAsync(InMemoryImageSource images, CancellationToken cancel)
+		public Task<SessionResult> RunAsync(InMemoryImageSource images, CancellationToken cancel) =>
+			this.RunAsync(images, images.ListNames(), cancel);
+
+		// photoNames: the photos' names in input order, the order PhotoPlacement reports them in.
+		private async Task<SessionResult> RunAsync(InMemoryImageSource images, IReadOnlyList<string> photoNames, CancellationToken cancel)
 		{
 			string workspace = Path.Combine(this.settings.WorkspaceRoot, DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + "-" + Guid.NewGuid().ToString("N")[..8]);
 			Directory.CreateDirectory(workspace);
 			try
 			{
-				return await this.RunInWorkspaceAsync(images, workspace, cancel).ConfigureAwait(false);
+				return await this.RunInWorkspaceAsync(images, photoNames, workspace, cancel).ConfigureAwait(false);
 			}
 			finally
 			{
@@ -193,7 +211,7 @@ namespace ColmapDemo
 			}
 		}
 
-		private async Task<SessionResult> RunInWorkspaceAsync(InMemoryImageSource images, string workspace, CancellationToken cancel)
+		private async Task<SessionResult> RunInWorkspaceAsync(InMemoryImageSource images, IReadOnlyList<string> photoNames, string workspace, CancellationToken cancel)
 		{
 			FaultWatchingComputeDevice gpu = this.settings.ComputeDevice == null ? null : new FaultWatchingComputeDevice(this.settings.ComputeDevice);
 			IReadOnlyList<ColoredPoint> sparse = null;
@@ -217,14 +235,17 @@ namespace ColmapDemo
 
 			cancel.ThrowIfCancellationRequested();
 
+			// The dense stage ran on every model (dense/<i> is model i of this controller's manager,
+			// in the order the mapper built them); the largest is the one shown.
+			int shown = PhotoPlacement.LargestModelIndex(models);
 			if (sparse == null)
 			{
-				sparse = MeshBridge.SparsePoints(models);
+				sparse = MeshBridge.SparsePoints(models, shown);
 				this.SparseReady?.Invoke(sparse);
 			}
 
-			TexturedModelMesh textured = controller.TexturedMeshes.FirstOrDefault();
-			PlyMesh mesh = textured?.Mesh ?? ReadFirstMesh(workspace);
+			TexturedModelMesh textured = controller.TexturedMeshes.FirstOrDefault(m => m.ModelIdx == shown);
+			PlyMesh mesh = textured?.Mesh ?? ReadMesh(workspace, shown);
 			ImageBuffer atlas = null;
 			float[] uvs = null;
 			if (textured != null && !textured.Texture.TextureAtlas.IsEmpty)
@@ -241,6 +262,7 @@ namespace ColmapDemo
 				FaceUvs = hasMesh ? uvs : null,
 				Atlas = hasMesh ? atlas : null,
 				PreviewMesh = hasMesh ? MeshBridge.ToAggMesh(mesh, atlas, uvs) : null,
+				Placement = PhotoPlacement.FromModels(photoNames, models, shown),
 				WorkspacePath = workspace,
 			};
 		}
@@ -262,7 +284,11 @@ namespace ColmapDemo
 			{
 				WorkspacePath = workspace,
 				Images = images,
+				// Individual (exhaustive matching) for video frames too: on an orbit clip, sequential
+				// matching (DataType.Video) without loop detection placed fewer frames (16 vs 24 of 40
+				// on a phone clip), since the last frames never get matched back to the first.
 				Data = AutomaticReconstructionOptions.DataType.Individual,
+				SingleCamera = this.settings.SingleCamera,
 				Quality = this.settings.Quality,
 				Dense = true,
 				Mesher = AutomaticReconstructionOptions.MesherType.Poisson,
@@ -295,7 +321,7 @@ namespace ColmapDemo
 				// which is the only one touching the models).
 				if (getSparse() == null && p.Stage == AutomaticReconstructionController.DenseStage)
 				{
-					IReadOnlyList<ColoredPoint> points = MeshBridge.SparsePoints(models);
+					IReadOnlyList<ColoredPoint> points = MeshBridge.SparsePoints(models, PhotoPlacement.LargestModelIndex(models));
 
 					// For comparing captures: how much of the input the mapper actually used.
 					var registered = Enumerable.Range(0, models.Size).Select(m => models.Get(m).NumRegImages);
@@ -385,10 +411,15 @@ namespace ColmapDemo
 
 		private static async ValueTask YieldToEventLoop() => await Task.Yield();
 
-		// A run whose texturing was skipped still leaves the Poisson mesh on disk.
-		private static PlyMesh ReadFirstMesh(string workspace)
+		// A run whose texturing was skipped still leaves model modelIndex's Poisson mesh on disk.
+		private static PlyMesh ReadMesh(string workspace, int modelIndex)
 		{
-			string meshPath = Path.Combine(workspace, "dense", "0", "meshed-poisson.ply");
+			if (modelIndex < 0)
+			{
+				return null;
+			}
+
+			string meshPath = Path.Combine(workspace, "dense", modelIndex.ToString(System.Globalization.CultureInfo.InvariantCulture), "meshed-poisson.ply");
 			return File.Exists(meshPath) ? Ply.ReadPlyMesh(meshPath).Mesh : null;
 		}
 

@@ -65,7 +65,7 @@ namespace ColmapDemo
 			{
 				Console.WriteLine(result == null
 					? "COLMAP_DEMO run ended without a result"
-					: $"COLMAP_DEMO run done: {result.Mesh?.Faces.Count ?? 0} faces, textured={result.IsTextured}");
+					: $"COLMAP_DEMO run done: {result.Mesh?.Faces.Count ?? 0} faces, textured={result.IsTextured}; {result.Placement?.StatusText}");
 				if (!string.IsNullOrEmpty(finalShot))
 				{
 					UiThread.RunOnIdle(async () =>

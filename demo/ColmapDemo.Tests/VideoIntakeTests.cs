@@ -157,6 +157,12 @@ public class VideoIntakeTests
 			await Assert.That(app.IsReadingVideo).IsFalse();
 			await Assert.That(app.ErrorText).IsEqualTo(string.Empty);
 
+			// One video's frames share a camera; a photo added beside them ends that.
+			await Assert.That(app.RunUsesSingleCamera).IsTrue();
+			string photo = Path.Combine(root, "extra.jpg");
+			app.AddPhotos(new[] { photo });
+			await Assert.That(app.RunUsesSingleCamera).IsFalse();
+
 			string folder = Path.GetDirectoryName(app.PhotoPaths[0]);
 			app.FindDescendant("Clear Photos Button").InvokeClick();
 			await Assert.That(app.PhotoPaths.Count).IsEqualTo(0);

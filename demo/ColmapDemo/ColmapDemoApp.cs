@@ -2,10 +2,10 @@
 //
 // ColmapDemoApp: the whole demo as one widget, which each head (ColmapDemo.Mac,
 // ColmapDemo.Browser) only has to put in a window - the shape of agg-sharp's
-// examples/AggSharpDemo/AggSharpDemo/AggSharpDemoApp.cs. The left panel collects the photos
+// examples/AggSharpDemo/AggSharpDemo/AggSharpDemoApp.cs. The left panel gives capture tips, collects the photos
 // and lists the pipeline's stages; the right is the 3D viewport (ModelViewport.cs). Running,
 // progress, cancel and saving are in ColmapDemoApp.Run.cs; turning a video into photos is in
-// ColmapDemoApp.Video.cs.
+// ColmapDemoApp.Video.cs; marking which photos a run placed is in ColmapDemoApp.Placement.cs.
 
 using System;
 using System.Collections.Generic;
@@ -108,6 +108,8 @@ namespace ColmapDemo
 				});
 			}
 
+			AddCaptureTips(panel);
+
 			this.photoCount = new TextWidget(string.Empty, pointSize: 11, bold: true)
 			{
 				HAnchor = HAnchor.Left,
@@ -165,6 +167,20 @@ namespace ColmapDemo
 			AutomaticReconstructionController.TexturingStage,
 		};
 
+		/// <summary>
+		/// How to take photos that reconstruct well, shown in the panel before the photo list. What
+		/// the mapper needs is texture that stays put while the camera moves: a plain object spinning
+		/// on a cable in front of a plain wall places only the frames that see its textured side.
+		/// </summary>
+		public static IReadOnlyList<string> CaptureTips { get; } = new[]
+		{
+			"Set the object on a patterned surface (newspaper, a printed mat); don't hang it.",
+			"Move the camera around the object; don't spin the object.",
+			"Use even lighting.",
+			"Take 20–60 photos, each overlapping the last a lot.",
+			"Dark, plain or shiny objects need added texture: tape or stickers.",
+		};
+
 		/// <summary>The chosen photos' full paths, in the order they were added, without duplicates.
 		/// In the browser these are paths in the wasm file system the picker staged the bytes into.</summary>
 		public IReadOnlyList<string> PhotoPaths => this.photoPaths;
@@ -212,7 +228,7 @@ namespace ColmapDemo
 				}
 
 				this.photoPaths.Add(path);
-				this.AddListLine(Path.GetFileName(path));
+				this.AddListEntry(this.AddListLine(Path.GetFileName(path)), new[] { path });
 			}
 
 			this.skippedNote.Text = skipped == 1 ? "1 file skipped: not a photo or video" : $"{skipped} files skipped: not photos or videos";
@@ -221,6 +237,24 @@ namespace ColmapDemo
 
 			// Not awaited: it reports its own outcome in the panel and never throws.
 			_ = this.AddVideosAsync(videoPaths);
+		}
+
+		// Always visible: a first-time user needs them before the first capture, not after a poor run.
+		private static void AddCaptureTips(FlowLayoutWidget panel)
+		{
+			panel.AddChild(new TextWidget("Tips for good results", pointSize: 10, bold: true)
+			{
+				HAnchor = HAnchor.Left,
+				Margin = new BorderDouble(0, 2, 0, 12),
+			});
+			foreach (string tip in CaptureTips)
+			{
+				panel.AddChild(new WrappedTextWidget("• " + tip, pointSize: 9, textColor: HintColor)
+				{
+					HAnchor = HAnchor.Stretch,
+					Margin = new BorderDouble(4, 1, 0, 1),
+				});
+			}
 		}
 
 		private TextWidget AddListLine(string text)
@@ -281,6 +315,7 @@ namespace ColmapDemo
 
 			this.DeleteVideoFrames();
 			this.photoPaths.Clear();
+			this.listEntries.Clear();
 			this.photoList.CloseChildren();
 			this.skippedNote.Visible = false;
 			this.UpdatePhotoCount();
