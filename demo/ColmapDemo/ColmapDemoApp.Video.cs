@@ -51,9 +51,6 @@ namespace ColmapDemo
 		/// <summary>The note line's text when it is shown (skipped files, no video reader), otherwise empty.</summary>
 		public string NoteText => this.noteLine.Visible ? this.noteLine.Text : string.Empty;
 
-		/// <summary>How many frames each added video is cut into.</summary>
-		public int TargetFramesPerVideo { get; set; } = VideoFrameSampler.DefaultTargetFrames;
-
 		/// <summary>Where each video's frame folder is made.</summary>
 		public string VideoFramesRoot { get; set; } = Path.Combine(Path.GetTempPath(), "ColmapDemo");
 
@@ -108,6 +105,9 @@ namespace ColmapDemo
 			}
 
 			this.errorLine.Visible = false;
+
+			// A video is usually one object turned or walked round; the panel says it picked that.
+			this.ApplyVideoSettingsDefaults();
 			var cancel = new CancellationTokenSource();
 			this.videoCancel = cancel;
 			this.UpdatePhotoCount();

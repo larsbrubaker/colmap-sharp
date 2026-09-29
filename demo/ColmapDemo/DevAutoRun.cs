@@ -11,6 +11,7 @@
 //   COLMAP_DEMO_AUTORUN=1                 press Run once the window is up (and the videos are read)
 //   COLMAP_DEMO_SCREENSHOT_SPARSE=<png>   screenshot when the sparse points appear
 //   COLMAP_DEMO_SCREENSHOT=<png>          screenshot when the run ends, then close the window
+//   COLMAP_DEMO_SETTINGS_OPEN=1           open the Settings panel at startup (for a screenshot of it)
 //
 // agg's AGG_SMOKE_* counts frames from startup, which cannot wait for a run of unknown length, so
 // this captures on the app's own events through SystemWindow.CaptureScreenshotAsync instead.
@@ -28,6 +29,12 @@ namespace ColmapDemo
 		/// <summary>Wires the hook to <paramref name="app"/> in <paramref name="window"/>, if asked for.</summary>
 		public static void Attach(SystemWindow window, ColmapDemoApp app)
 		{
+			// Before the photo check: a screenshot of the panel needs no photos.
+			if (Environment.GetEnvironmentVariable("COLMAP_DEMO_SETTINGS_OPEN") == "1")
+			{
+				app.SettingsOpen = true;
+			}
+
 			string photoDir = Environment.GetEnvironmentVariable("COLMAP_DEMO_PHOTOS");
 			string video = Environment.GetEnvironmentVariable("COLMAP_DEMO_VIDEO");
 			if (string.IsNullOrEmpty(photoDir) && string.IsNullOrEmpty(video))

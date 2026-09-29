@@ -77,9 +77,6 @@ namespace ColmapDemo
 		/// <summary>Passed to the run as <see cref="SessionSettings.YieldAsync"/>; null for Task.Yield.</summary>
 		public Func<ValueTask> YieldAsync { get; set; }
 
-		/// <summary>The longer side photos are shrunk to before a run (<see cref="SessionSettings.MaxImageSize"/>).</summary>
-		public int MaxImageSize { get; set; } = new SessionSettings().MaxImageSize;
-
 		/// <summary>
 		/// Whether Save mesh offers one zip (mesh.obj, mesh.mtl, mesh.png) instead of loose files: the
 		/// browser's save is a single download.
@@ -157,13 +154,18 @@ namespace ColmapDemo
 			this.stageTimer.Reset();
 			this.runClock.Restart();
 
-			var session = new ReconstructionSession(new SessionSettings
+			// A number still being typed counts; then the panel locks and shows what this run uses, and
+			// the log starts with the same, so a tester's log or screenshot says what ran.
+			this.CommitSettingsEdits();
+			SessionSettings sessionSettings = this.settings.ToSessionSettings(this.RunUsesSingleCamera, this.computeDevice, this.YieldAsync);
+			this.UpdateSettingsLock(sessionSettings);
+			Console.WriteLine("COLMAP_DEMO settings: " + sessionSettings.Describe());
+			foreach ((string label, string value) in this.RunSummaryRows)
 			{
-				ComputeDevice = this.computeDevice,
-				MaxImageSize = this.MaxImageSize,
-				SingleCamera = this.RunUsesSingleCamera,
-				YieldAsync = this.YieldAsync,
-			});
+				Console.WriteLine($"COLMAP_DEMO   {label}: {value}");
+			}
+
+			var session = new ReconstructionSession(sessionSettings);
 			// Stamped here, on the run's thread as the report is made: the UI thread may get to it much
 			// later (in the browser, not before the run's next yield).
 			session.ProgressChanged += p =>
@@ -362,6 +364,24 @@ namespace ColmapDemo
 			this.computeNoteLine.Text = $"The GPU failed ({FirstLine(fault.Message)}); depth maps now run on the CPU.";
 		}
 
+		/// <summary>
+		/// The status line for a run that finished with <paramref name="result"/>; a run that was asked
+		/// for no surface (<paramref name="denseRequested"/> false, the quick camera check) says so
+		/// instead of reporting a missing mesh.
+		/// </summary>
+		public static string FinishedStatus(SessionResult result, bool denseRequested)
+		{
+			if (result.Mesh != null)
+			{
+				int faces = result.Mesh.Faces.Count;
+				return result.IsTextured ? $"Done: {faces:N0} triangles, textured" : $"Done: {faces:N0} triangles (vertex colors; no photo saw the surface)";
+			}
+
+			return denseRequested
+				? "Done, but no mesh came out. Try more photos with more overlap."
+				: $"Camera check done: {result.SparsePoints.Count:N0} points.";
+		}
+
 		/// <summary>The first line of <paramref name="message"/>, cut to fit a panel line or two.</summary>
 		public static string FirstLine(string message)
 		{
@@ -376,6 +396,7 @@ namespace ColmapDemo
 			Console.WriteLine($"COLMAP_DEMO run: {endedAt.TotalSeconds:F1} s");
 			this.runCancel?.Dispose();
 			this.runCancel = null;
+			this.UpdateSettingsLock();
 			this.lastResult = result;
 			if (this.activeStage != null)
 			{
@@ -390,12 +411,11 @@ namespace ColmapDemo
 			if (result?.PreviewMesh != null)
 			{
 				this.viewport.ShowMesh(result.PreviewMesh);
-				int faces = result.Mesh.Faces.Count;
-				this.statusLine.Text = result.IsTextured ? $"Done: {faces:N0} triangles, textured" : $"Done: {faces:N0} triangles (vertex colors; no photo saw the surface)";
+				this.statusLine.Text = FinishedStatus(result, this.settings.Dense);
 			}
 			else if (result != null)
 			{
-				this.statusLine.Text = "Done, but no mesh came out. Try more photos with more overlap.";
+				this.statusLine.Text = FinishedStatus(result, this.settings.Dense);
 			}
 			else if (cancelled)
 			{

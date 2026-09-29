@@ -6,7 +6,8 @@
 // and lists the pipeline's stages; the right is the 3D viewport (ModelViewport.cs). Running,
 // progress, cancel and saving are in ColmapDemoApp.Run.cs; turning a video into photos is in
 // ColmapDemoApp.Video.cs; taking dropped files (and freeing the browser's staged copies) is in
-// ColmapDemoApp.Drop.cs; marking which photos a run placed is in ColmapDemoApp.Placement.cs.
+// ColmapDemoApp.Drop.cs; marking which photos a run placed is in ColmapDemoApp.Placement.cs; the
+// Settings panel on the right, opened by the Settings button, is in ColmapDemoApp.Settings.cs.
 
 using System;
 using System.Collections.Generic;
@@ -80,7 +81,13 @@ namespace ColmapDemo
 			};
 			this.AddChild(panel);
 
-			panel.AddChild(new TextWidget("ColmapSharp", pointSize: 16, bold: true) { HAnchor = HAnchor.Left });
+			var titleRow = new FlowLayoutWidget(FlowDirection.LeftToRight) { HAnchor = HAnchor.Stretch };
+			titleRow.AddChild(new TextWidget("ColmapSharp", pointSize: 16, bold: true) { VAnchor = VAnchor.Center });
+			titleRow.AddChild(new HorizontalSpacer());
+			var settingsButton = new ThemedTextButton("Settings", theme) { Name = "Settings Button" };
+			settingsButton.Click += (sender, e) => this.SettingsOpen = !this.SettingsOpen;
+			titleRow.AddChild(settingsButton);
+			panel.AddChild(titleRow);
 			panel.AddChild(new TextWidget("Photos or a video to mesh", pointSize: 10, textColor: HintColor)
 			{
 				HAnchor = HAnchor.Left,
@@ -149,6 +156,11 @@ namespace ColmapDemo
 
 			this.viewport = new ModelViewport();
 			this.AddChild(this.viewport);
+
+			// On the right, over nothing the user needs while choosing settings; the viewport narrows.
+			this.settingsColumn = this.BuildSettingsColumn(theme);
+			this.AddChild(this.settingsColumn);
+			this.RefreshSettingsControls();
 
 			this.UpdatePhotoCount();
 		}
@@ -316,6 +328,12 @@ namespace ColmapDemo
 			this.photoCount.Text = count == 0 ? "No photos yet" : count == 1 ? "1 photo" : $"{count} photos";
 			this.clearButton.Enabled = count > 0 && !this.IsRunning && !this.IsReadingVideo;
 			this.UpdateRunButtons();
+
+			// Whether the photos are one video's frames decides which video options apply.
+			if (this.settingsColumn != null)
+			{
+				this.RefreshSettingsControls();
+			}
 		}
 	}
 }

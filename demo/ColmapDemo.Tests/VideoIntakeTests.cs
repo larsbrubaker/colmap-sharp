@@ -126,6 +126,38 @@ public class VideoIntakeTests
 	}
 
 	[Test]
+	public async Task AddingAVideoPicksOneObjectAndTimeOrderedFrames()
+	{
+		AggContext.OsInformation ??= new HeadlessOs();
+		IVideoFrameReader savedReader = AggContext.VideoFrames;
+		string root = Directory.CreateTempSubdirectory("ColmapDemoVideoTests").FullName;
+		try
+		{
+			AggContext.VideoFrames = new FakeReader();
+			var app = new ColmapDemoApp(fileDropSupported: false) { VideoFramesRoot = root, TargetFramesPerVideo = 4 };
+			await Assert.That(app.Settings.Subject).IsEqualTo(ColmapSharp.Controllers.AutomaticReconstructionOptions.SubjectType.Scene);
+
+			await RunOnUiPump(() => app.AddVideosAsync(new[] { Path.Combine(root, "clip.mp4") }));
+
+			await Assert.That(app.Settings.Subject).IsEqualTo(ColmapSharp.Controllers.AutomaticReconstructionOptions.SubjectType.Object);
+			await Assert.That(app.Settings.SubjectPickedForVideo).IsTrue();
+
+			// The frames are time-ordered (temporal outline repair, tracking) but still matched
+			// exhaustively, which placed more frames of an orbit than sequential matching.
+			var options = new ColmapSharp.Controllers.AutomaticReconstructionOptions();
+			app.Settings.ToSessionSettings(app.RunUsesSingleCamera).ApplyTo(options);
+			await Assert.That(options.FramesAreTimeOrdered == true).IsTrue();
+			await Assert.That(options.Data).IsEqualTo(ColmapSharp.Controllers.AutomaticReconstructionOptions.DataType.Individual);
+			await Assert.That(options.SingleCamera).IsTrue();
+		}
+		finally
+		{
+			AggContext.VideoFrames = savedReader;
+			Directory.Delete(root, recursive: true);
+		}
+	}
+
+	[Test]
 	public async Task AddingAVideoListsItsFramesAsPhotosAndClearDeletesThem()
 	{
 		AggContext.OsInformation ??= new HeadlessOs();
