@@ -64,9 +64,9 @@ blocks (the top and side sweeps), and the split model shares no images with the 
    - 1b: drop keypoints on specular highlights; CLAHE only inside the mask. Accept: the inlier
      ratio rises and the registered count doesn't fall.
 2. **Video tracking.**
-   - 2a: pyramidal KLT in `Feature/Tracking/` (Lucas–Kanade, Shi–Tomasi, Bouguet; OpenCV
-     `lkpyramid.cpp` Apache-2.0 as reading), with a forward–backward check and replenishment
-     inside the mask.
+   - 2a is in (`Feature/Tracking`; gain/offset compensation; sphere reprojection 0.50 px). Open:
+     on the mouse's top/side views (f120 038–058) masked tracks mostly end after 1–2 frames and
+     mask erosion is not the main cause; count why tracks end before 2b builds on them.
    - 2b: keyframes chosen by parallax; tracked points get SIFT descriptors; matches go into the
      database, then verification and mapping.
    - 2c: sequential and loop matching over keyframes, shared bounded intrinsics, and full-rate
