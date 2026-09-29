@@ -1,6 +1,8 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
-// AutomaticReconstructionTests (continued): C#-only, not a port. Pins that the host's Poisson
+// AutomaticReconstructionTests (continued): C#-only, not a port. Also pins that the host's
+// BaRefineFocalLength / BaRefineExtraParams (divergence 141) reach the mapper under every
+// preset, defaulting to COLMAP's refinement. Pins that the host's Poisson
 // options (AutomaticReconstructionOptions.PoissonMeshing, which COLMAP's controller does not
 // have) reach the meshing step under every quality preset, and that NumThreads still comes from
 // the controller's own NumThreads as in COLMAP. The step passes EffectivePoissonMeshing straight
@@ -47,6 +49,36 @@ public partial class AutomaticReconstructionTests
 		await Assert.That(effective.PointWeight).IsEqualTo(2.0);
 		await Assert.That(effective.Color).IsFalse();
 		await Assert.That(effective.NumThreads).IsEqualTo(3);
+		Directory.Delete(testDir, recursive: true);
+	}
+
+	[Test]
+	[Arguments(AutomaticReconstructionOptions.QualityLevel.Low, AutomaticReconstructionOptions.DataType.Individual)]
+	[Arguments(AutomaticReconstructionOptions.QualityLevel.Extreme, AutomaticReconstructionOptions.DataType.Video)]
+	public async Task CSharpOnly_BaRefineOptionsReachTheMapper(
+		AutomaticReconstructionOptions.QualityLevel quality,
+		AutomaticReconstructionOptions.DataType data)
+	{
+		string testDir = CreateTestDir();
+		var byDefault = new AutomaticReconstructionController(
+			new AutomaticReconstructionOptions { WorkspacePath = testDir, Images = new InMemoryImageSource(), Quality = quality, Data = data },
+			new ReconstructionManager());
+		var known = new AutomaticReconstructionController(
+			new AutomaticReconstructionOptions
+			{
+				WorkspacePath = testDir,
+				Images = new InMemoryImageSource(),
+				Quality = quality,
+				Data = data,
+				BaRefineFocalLength = false,
+				BaRefineExtraParams = false,
+			},
+			new ReconstructionManager());
+
+		await Assert.That(byDefault.EffectiveMapper.BaRefineFocalLength).IsTrue();
+		await Assert.That(byDefault.EffectiveMapper.BaRefineExtraParams).IsTrue();
+		await Assert.That(known.EffectiveMapper.BaRefineFocalLength).IsFalse();
+		await Assert.That(known.EffectiveMapper.BaRefineExtraParams).IsFalse();
 		Directory.Delete(testDir, recursive: true);
 	}
 

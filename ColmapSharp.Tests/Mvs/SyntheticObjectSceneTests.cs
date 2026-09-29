@@ -274,6 +274,30 @@ public class SyntheticObjectSceneTests
 		await Assert.That(reversals).IsGreaterThanOrEqualTo(2);
 	}
 
+	// motionDuration only rescales frame times: the default (1.0) gives exactly the poses and
+	// pixels of an explicit 1.0, and a shorter duration keeps each frame's camera in the lab (the
+	// jitter) while the object turns less.
+	[Test]
+	public async Task CSharpOnly_MotionDurationOnlyRescalesFrameTimes()
+	{
+		SyntheticObjectScene byDefault = SyntheticObjectScene.Generate(SyntheticObjectKind.TexturedSphere, 5, 32, 24, seed: 3);
+		SyntheticObjectScene explicitFull = SyntheticObjectScene.Generate(SyntheticObjectKind.TexturedSphere, 5, 32, 24, seed: 3, motionDuration: 1.0);
+		SyntheticObjectScene slow = SyntheticObjectScene.Generate(SyntheticObjectKind.TexturedSphere, 5, 32, 24, seed: 3, motionDuration: 0.3);
+		for (int k = 0; k < 5; ++k)
+		{
+			await Assert.That(explicitFull.CamFromWorld[k]).IsEqualTo(byDefault.CamFromWorld[k]);
+			await Assert.That(Hash(explicitFull.Frames[k])).IsEqualTo(Hash(byDefault.Frames[k]));
+			await Assert.That(SyntheticObjectScene.FrameTime(k, 5)).IsEqualTo(k / 4.0);
+
+			Rigid3d slowCamFromLab = slow.CamFromWorld[k] * SyntheticObjectScene.LabFromObject(SyntheticObjectScene.FrameTime(k, 5, 0.3)).Inverse();
+			await Assert.That((slowCamFromLab.Translation - CamFromLab(byDefault, k).Translation).Norm).IsLessThan(1e-12);
+			await Assert.That(slowCamFromLab.Rotation.AngularDistance(CamFromLab(byDefault, k).Rotation)).IsLessThan(1e-12);
+		}
+
+		await Assert.That(slow.CamFromWorld[4]).IsNotEqualTo(byDefault.CamFromWorld[4]);
+		await Assert.That(slow.CamFromWorld[0]).IsEqualTo(byDefault.CamFromWorld[0]);
+	}
+
 	private static string Hash(Bitmap bitmap) => Convert.ToHexString(SHA256.HashData(bitmap.RowMajorData));
 
 	// Frame k's camera pose in the lab: its pose in the object-fixed world with the object's

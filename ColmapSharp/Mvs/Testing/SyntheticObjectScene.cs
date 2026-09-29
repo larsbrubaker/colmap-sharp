@@ -17,7 +17,9 @@
 //
 // The rig, shared by all three: the object turns about a near-vertical axis through its center
 // on a twisting pendulum, theta(t) = A sin(w t) e^(-lambda t) + drift t over t in [0, 1], so its
-// speed varies and it reverses direction. The camera is fixed, slightly below the object and
+// speed varies and it reverses direction. The frames sample t evenly over [0, motionDuration]
+// (1 by default, the whole capture); a shorter duration records less of the swing with the same
+// frame count, so the object turns less between frames. The camera is fixed, slightly below the object and
 // looking up at it (so the underside shows), with small seeded jitter per frame (hand shake).
 // A fixed light gives Lambertian shading plus ambient; the wall is unlit (its value is a faint
 // gradient around 0.5) and nothing casts shadows. Frames are 3x3 supersampled, get Gaussian
@@ -145,7 +147,8 @@ public sealed partial class SyntheticObjectScene
 	/// Renders <paramref name="numFrames"/> frames of <paramref name="kind"/> at
 	/// <paramref name="width"/> x <paramref name="height"/>. <paramref name="seed"/> drives the
 	/// camera jitter and the sensor noise. <paramref name="sensorNoiseSigma"/> is the noise's
-	/// standard deviation in 8-bit levels.
+	/// standard deviation in 8-bit levels. <paramref name="motionDuration"/> in (0, 1] is how much
+	/// of the pendulum's motion the frames span (see the file header); 1 is the whole capture.
 	/// </summary>
 	public static SyntheticObjectScene Generate(
 		SyntheticObjectKind kind,
@@ -154,11 +157,13 @@ public sealed partial class SyntheticObjectScene
 		int height,
 		uint seed,
 		double sensorNoiseSigma = 1.5,
+		double motionDuration = 1.0,
 		CancellationToken cancellationToken = default)
 	{
 		Check.That(numFrames > 0);
 		Check.That(width > 0 && height > 0);
 		Check.That(sensorNoiseSigma >= 0);
+		Check.That(motionDuration > 0 && motionDuration <= 1);
 
 		ObjectShape shape = ObjectShape.Create(kind);
 		double focal = FocalScale * Math.Max(width, height);
@@ -170,7 +175,7 @@ public sealed partial class SyntheticObjectScene
 		for (int k = 0; k < numFrames; ++k)
 		{
 			camFromLab[k] = JitteredCamFromLab(jitter);
-			camFromWorld[k] = camFromLab[k] * LabFromObject(FrameTime(k, numFrames));
+			camFromWorld[k] = camFromLab[k] * LabFromObject(FrameTime(k, numFrames, motionDuration));
 		}
 
 		var frames = new Bitmap[numFrames];
@@ -189,8 +194,13 @@ public sealed partial class SyntheticObjectScene
 		return new SyntheticObjectScene(kind, camera, frames, camFromWorld, masks, shape.Vertices, shape.Triangles);
 	}
 
-	/// <summary>Time t in [0, 1] of frame <paramref name="k"/> of <paramref name="numFrames"/>.</summary>
-	internal static double FrameTime(int k, int numFrames) => numFrames == 1 ? 0 : k / (double)(numFrames - 1);
+	/// <summary>
+	/// Time t in [0, <paramref name="motionDuration"/>] of frame <paramref name="k"/> of
+	/// <paramref name="numFrames"/>. Multiplying by the default 1.0 is exact, so the default
+	/// poses are the same as before the duration existed.
+	/// </summary>
+	internal static double FrameTime(int k, int numFrames, double motionDuration = 1.0) =>
+		numFrames == 1 ? 0 : k / (double)(numFrames - 1) * motionDuration;
 
 	// How many frames render at once: each holds a z-buffer band and its outputs, and all of
 	// them together stay within ParallelMemoryBudget (at least one frame, at most one per core).

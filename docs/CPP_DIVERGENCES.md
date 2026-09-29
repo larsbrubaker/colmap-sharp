@@ -31,7 +31,7 @@ Like every file in the repo, a module file stays within 800 lines; one that woul
 it is split by topic and the table updated. When merging branches, merge entries one by one
 rather than by text hunks, in both the module file and this table.
 
-**Next free number: 141.**
+**Next free number: 142.**
 
 ## Entries
 
@@ -164,3 +164,4 @@ rather than by text hunks, in both the module file and this table.
 | 138 | AutomaticReconstructionController runs the sparse mapper from a fresh PRNG | [Controllers](divergences/Controllers.md) |
 | 139 | ViewGraphCalibration re-estimates each relative pose from a fresh PRNG | [Estimators](divergences/Estimators.md) |
 | 140 | AutomaticReconstructionController builds dense/<i> from sparse/<i> | [Controllers](divergences/Controllers.md) |
+| 141 | AutomaticReconstructionOptions can keep bundle adjustment off a known camera | [Controllers](divergences/Controllers.md) |

@@ -4,7 +4,9 @@
 // way" queries. It replaces the CGAL AABB_tree that COLMAP's texture mapping
 // (colmap/mvs/texture_mapping.cc, OcclusionTester) uses for occlusion tests; CGAL is GPL and
 // excluded (docs/LICENSE_AUDIT.md), and no CGAL code was read. TextureMapping.Views.cs is
-// the only user. Differences from CGAL's answers are divergence 90.
+// the only user of the segment queries. Differences from CGAL's answers are divergence 90.
+// TriangleBvh.ClosestPoint.cs adds a C#-only closest-point query over the same tree, for the
+// reconstruction benchmark's point-to-mesh distances.
 //
 // Written for colmap-sharp from the published algorithms:
 // - Binned surface area heuristic build: I. Wald, "On fast Construction of SAH-based
@@ -35,7 +37,7 @@ namespace ColmapSharp.Mvs;
 /// Replacement for CGAL::AABB_tree in COLMAP's texture mapping (written from the published
 /// algorithms, not from CGAL).
 /// </summary>
-public sealed class TriangleBvh
+public sealed partial class TriangleBvh
 {
 	private const int BinCount = 16;
 	private const int MaxLeafSize = 4;

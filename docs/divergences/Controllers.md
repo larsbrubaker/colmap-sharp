@@ -471,3 +471,21 @@ dense product (depth and normal maps, fused.ply, fused.ply.vis, the mesh and its
 byte-identical between the two runs. `CSharpOnly_ResumeReadsSparseModelsInNumericOrder`
 (C#-only) reads 11 models back; before the fix they came in the order
 `0, 1, 10, 2, ..., 9`.
+
+## 141. AutomaticReconstructionOptions can keep bundle adjustment off a known camera
+
+**What differs.** COLMAP's `AutomaticReconstructionController::Options` has no way to stop the
+mapper refining the focal length or the extra parameters; the mapper always runs with
+`ba_refine_focal_length = ba_refine_extra_params = true` there. The port adds
+`AutomaticReconstructionOptions.BaRefineFocalLength` and `BaRefineExtraParams` (both default
+true, so the default run is COLMAP's) and copies them onto the mapper's options after the presets.
+
+**Why.** The reconstruction benchmark (`Mvs/Testing/Benchmark`) found that on a small object in
+a narrow view (about 70 px across, a 14 degree field of view) bundle adjustment trades focal
+length against depth: the focal collapsed from 288 to 120 and relative rotations came out 20-30%
+low, and pycolmap 4.2.0 does the same (focal 96.6). With the true focal given in `CameraParams`
+and refinement off, the rotations match the truth. A phone's EXIF focal or a calibrated camera
+(MatterCAD's planned calibration target) is that case.
+
+**Evidence.** `AutomaticReconstructionTests.CSharpOnly_BaRefineOptionsReachTheMapper`; the
+benchmark's known-intrinsics case in `benchmarks/baseline.json`.

@@ -19,6 +19,9 @@
 //   separate mesh_texturer step to the dense stages (divergence 135).
 // - ComputeDevice is C#-only: the host's GPU for PatchMatch stereo (divergence 136),
 // in place of use_gpu / gpu_index.
+// - BaRefineFocalLength / BaRefineExtraParams are C#-only: they reach the mapper's options of
+//   the same names, so a host that knows its camera (CameraParams from a calibration or EXIF)
+//   can keep bundle adjustment from refining it (divergence 141).
 // - `int /= 1.5` in ModifyForMediumQuality converts to double and truncates back, as C++
 //   does; the casts below reproduce that.
 
@@ -135,6 +138,20 @@ public sealed class AutomaticReconstructionOptions
 
 	/// <summary>Initial camera params for all images.</summary>
 	public string CameraParams { get; set; } = "";
+
+	/// <summary>
+	/// Whether bundle adjustment refines the focal length. C#-only (divergence 141):
+	/// COLMAP's automatic reconstruction always refines it. Turn it off, with the true
+	/// focal in <see cref="CameraParams"/>, for a calibrated camera: on a small object in a
+	/// narrow view, refinement trades focal length against depth and can collapse the focal.
+	/// </summary>
+	public bool BaRefineFocalLength { get; set; } = true;
+
+	/// <summary>
+	/// Whether bundle adjustment refines the camera model's extra (distortion) parameters.
+	/// C#-only, like <see cref="BaRefineFocalLength"/>.
+	/// </summary>
+	public bool BaRefineExtraParams { get; set; } = true;
 
 	/// <summary>Whether to perform feature extraction.</summary>
 	public bool Extraction { get; set; } = true;

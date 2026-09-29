@@ -1,0 +1,1121 @@
+{
+  "config": {
+    "kinds": [
+      "DarkObject",
+      "TexturedSphere",
+      "TexturelessBox"
+    ],
+    "fast_kinds": [
+      "TexturedSphere"
+    ],
+    "known_kinds": [
+      "TexturedSphere",
+      "DarkObject"
+    ],
+    "frames": 40,
+    "motion_duration": 0.27,
+    "width": 480,
+    "height": 360,
+    "quality": "Low",
+    "data": "Individual",
+    "scene_seeds": [
+      1
+    ],
+    "mapper_seeds": [
+      1,
+      2,
+      3
+    ],
+    "camera_model": "SIMPLE_PINHOLE",
+    "tau_fraction": 0.01,
+    "true_masks": false
+  },
+  "cases": [
+    {
+      "case": "realistic",
+      "scene": "DarkObject",
+      "scene_seed": 1,
+      "motion_duration": 0.27,
+      "known_intrinsics": false,
+      "summary": {
+        "registered_fraction": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "num_models": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "focal_log_error": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "rotation_error_median_deg": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "rotation_error_max_deg": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "position_error_median_pct": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "position_error_max_pct": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "accuracy_pct": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "completeness_pct": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "precision": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "recall": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "f_score": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "excluded_fraction": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "silhouette_iou_mean": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "silhouette_iou_min": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "total_seconds": {
+          "mean": 3.1978293,
+          "worst": 3.6912816,
+          "failed": 0
+        }
+      },
+      "runs": [
+        {
+          "mapper_seed": 1,
+          "surface_source": "none",
+          "metrics": {
+            "focal_ratio": null,
+            "registered_fraction": 0,
+            "num_models": 0,
+            "focal_log_error": null,
+            "rotation_error_median_deg": null,
+            "rotation_error_max_deg": null,
+            "position_error_median_pct": null,
+            "position_error_max_pct": null,
+            "accuracy_pct": null,
+            "completeness_pct": null,
+            "precision": 0,
+            "recall": 0,
+            "f_score": 0,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": null,
+            "silhouette_iou_min": null
+          },
+          "stage_seconds": {
+            "Feature extraction": 3.623,
+            "Feature matching": 0.048,
+            "Sparse reconstruction": 0.017,
+            "Dense reconstruction": 0
+          },
+          "total_seconds": 3.691
+        },
+        {
+          "mapper_seed": 2,
+          "surface_source": "none",
+          "metrics": {
+            "focal_ratio": null,
+            "registered_fraction": 0,
+            "num_models": 0,
+            "focal_log_error": null,
+            "rotation_error_median_deg": null,
+            "rotation_error_max_deg": null,
+            "position_error_median_pct": null,
+            "position_error_max_pct": null,
+            "accuracy_pct": null,
+            "completeness_pct": null,
+            "precision": 0,
+            "recall": 0,
+            "f_score": 0,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": null,
+            "silhouette_iou_min": null
+          },
+          "stage_seconds": {
+            "Feature extraction": 2.896,
+            "Feature matching": 0.012,
+            "Sparse reconstruction": 0.001,
+            "Dense reconstruction": 0
+          },
+          "total_seconds": 2.909
+        },
+        {
+          "mapper_seed": 3,
+          "surface_source": "none",
+          "metrics": {
+            "focal_ratio": null,
+            "registered_fraction": 0,
+            "num_models": 0,
+            "focal_log_error": null,
+            "rotation_error_median_deg": null,
+            "rotation_error_max_deg": null,
+            "position_error_median_pct": null,
+            "position_error_max_pct": null,
+            "accuracy_pct": null,
+            "completeness_pct": null,
+            "precision": 0,
+            "recall": 0,
+            "f_score": 0,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": null,
+            "silhouette_iou_min": null
+          },
+          "stage_seconds": {
+            "Feature extraction": 2.975,
+            "Feature matching": 0.018,
+            "Sparse reconstruction": 0,
+            "Dense reconstruction": 0
+          },
+          "total_seconds": 2.993
+        }
+      ]
+    },
+    {
+      "case": "realistic",
+      "scene": "TexturedSphere",
+      "scene_seed": 1,
+      "motion_duration": 0.27,
+      "known_intrinsics": false,
+      "summary": {
+        "registered_fraction": {
+          "mean": 0.85,
+          "worst": 0.85,
+          "failed": 0
+        },
+        "num_models": {
+          "mean": 1,
+          "worst": 1,
+          "failed": 0
+        },
+        "focal_log_error": {
+          "mean": 0.29815355856234044,
+          "worst": 0.31585623926855005,
+          "failed": 0
+        },
+        "rotation_error_median_deg": {
+          "mean": 1.347034631774062,
+          "worst": 1.5678867917550146,
+          "failed": 0
+        },
+        "rotation_error_max_deg": {
+          "mean": 3.2034499205072096,
+          "worst": 3.6309604796304105,
+          "failed": 0
+        },
+        "position_error_median_pct": {
+          "mean": 1.0818674172016236,
+          "worst": 1.5574762637608548,
+          "failed": 0
+        },
+        "position_error_max_pct": {
+          "mean": 5.3233201779923585,
+          "worst": 7.219882898920177,
+          "failed": 0
+        },
+        "accuracy_pct": {
+          "mean": 9.077208363633007,
+          "worst": 9.872618699222773,
+          "failed": 0
+        },
+        "completeness_pct": {
+          "mean": 10.171225455295955,
+          "worst": 10.480599915948602,
+          "failed": 0
+        },
+        "precision": {
+          "mean": 0.0067,
+          "worst": 0.0012,
+          "failed": 0
+        },
+        "recall": {
+          "mean": 0.012216666666666667,
+          "worst": 0.00325,
+          "failed": 0
+        },
+        "f_score": {
+          "mean": 0.008595415229334666,
+          "worst": 0.0017528089887640446,
+          "failed": 0
+        },
+        "excluded_fraction": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "silhouette_iou_mean": {
+          "mean": 0.9094877758731306,
+          "worst": 0.8986649605818555,
+          "failed": 0
+        },
+        "silhouette_iou_min": {
+          "mean": 0.8798451797852099,
+          "worst": 0.8665722880906034,
+          "failed": 0
+        },
+        "total_seconds": {
+          "mean": 305.9553485,
+          "worst": 312.8050918,
+          "failed": 0
+        }
+      },
+      "runs": [
+        {
+          "mapper_seed": 1,
+          "surface_source": "mesh",
+          "metrics": {
+            "focal_ratio": 0.7291642678216012,
+            "registered_fraction": 0.85,
+            "num_models": 1,
+            "focal_log_error": 0.31585623926855005,
+            "rotation_error_median_deg": 1.5232125859480357,
+            "rotation_error_max_deg": 3.0870964703078196,
+            "position_error_median_pct": 1.5574762637608548,
+            "position_error_max_pct": 5.215190323222507,
+            "accuracy_pct": 9.872618699222773,
+            "completeness_pct": 10.424216570754083,
+            "precision": 0.0012,
+            "recall": 0.00325,
+            "f_score": 0.0017528089887640446,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": 0.9047567426563728,
+            "silhouette_iou_min": 0.8668251169209538
+          },
+          "stage_seconds": {
+            "Feature extraction": 2.978,
+            "Feature matching": 1.555,
+            "Sparse reconstruction": 2.591,
+            "Dense reconstruction": 250.5,
+            "Stereo fusion": 1.247,
+            "Surface meshing": 33.591
+          },
+          "total_seconds": 292.462
+        },
+        {
+          "mapper_seed": 2,
+          "surface_source": "mesh",
+          "metrics": {
+            "focal_ratio": 0.7669957494408146,
+            "registered_fraction": 0.85,
+            "num_models": 1,
+            "focal_log_error": 0.26527401942839235,
+            "rotation_error_median_deg": 0.9500045176191358,
+            "rotation_error_max_deg": 2.892292811583399,
+            "position_error_median_pct": 0.6610105358689835,
+            "position_error_max_pct": 3.5348873118343915,
+            "accuracy_pct": 7.749809608588636,
+            "completeness_pct": 9.60885987918518,
+            "precision": 0.0028,
+            "recall": 0.00345,
+            "f_score": 0.0030911999999999997,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": 0.8986649605818555,
+            "silhouette_iou_min": 0.8665722880906034
+          },
+          "stage_seconds": {
+            "Feature extraction": 3.414,
+            "Feature matching": 0.786,
+            "Sparse reconstruction": 0.975,
+            "Dense reconstruction": 279.644,
+            "Stereo fusion": 1.066,
+            "Surface meshing": 26.713
+          },
+          "total_seconds": 312.599
+        },
+        {
+          "mapper_seed": 3,
+          "surface_source": "mesh",
+          "metrics": {
+            "focal_ratio": 0.7310083350866258,
+            "registered_fraction": 0.85,
+            "num_models": 1,
+            "focal_log_error": 0.31333041699007874,
+            "rotation_error_median_deg": 1.5678867917550146,
+            "rotation_error_max_deg": 3.6309604796304105,
+            "position_error_median_pct": 1.0271154519750323,
+            "position_error_max_pct": 7.219882898920177,
+            "accuracy_pct": 9.609196783087611,
+            "completeness_pct": 10.480599915948602,
+            "precision": 0.0161,
+            "recall": 0.02995,
+            "f_score": 0.020942236699239957,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": 0.9250416243811632,
+            "silhouette_iou_min": 0.9061381343440724
+          },
+          "stage_seconds": {
+            "Feature extraction": 2.464,
+            "Feature matching": 0.619,
+            "Sparse reconstruction": 0.667,
+            "Dense reconstruction": 272.194,
+            "Stereo fusion": 1.183,
+            "Surface meshing": 35.679
+          },
+          "total_seconds": 312.805
+        }
+      ]
+    },
+    {
+      "case": "realistic",
+      "scene": "TexturelessBox",
+      "scene_seed": 1,
+      "motion_duration": 0.27,
+      "known_intrinsics": false,
+      "summary": {
+        "registered_fraction": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "num_models": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "focal_log_error": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "rotation_error_median_deg": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "rotation_error_max_deg": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "position_error_median_pct": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "position_error_max_pct": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "accuracy_pct": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "completeness_pct": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "precision": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "recall": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "f_score": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "excluded_fraction": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "silhouette_iou_mean": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "silhouette_iou_min": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "total_seconds": {
+          "mean": 2.907842033333333,
+          "worst": 3.6064296,
+          "failed": 0
+        }
+      },
+      "runs": [
+        {
+          "mapper_seed": 1,
+          "surface_source": "none",
+          "metrics": {
+            "focal_ratio": null,
+            "registered_fraction": 0,
+            "num_models": 0,
+            "focal_log_error": null,
+            "rotation_error_median_deg": null,
+            "rotation_error_max_deg": null,
+            "position_error_median_pct": null,
+            "position_error_max_pct": null,
+            "accuracy_pct": null,
+            "completeness_pct": null,
+            "precision": 0,
+            "recall": 0,
+            "f_score": 0,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": null,
+            "silhouette_iou_min": null
+          },
+          "stage_seconds": {
+            "Feature extraction": 2.56,
+            "Feature matching": 0.021,
+            "Sparse reconstruction": 0.001,
+            "Dense reconstruction": 0
+          },
+          "total_seconds": 2.582
+        },
+        {
+          "mapper_seed": 2,
+          "surface_source": "none",
+          "metrics": {
+            "focal_ratio": null,
+            "registered_fraction": 0,
+            "num_models": 0,
+            "focal_log_error": null,
+            "rotation_error_median_deg": null,
+            "rotation_error_max_deg": null,
+            "position_error_median_pct": null,
+            "position_error_max_pct": null,
+            "accuracy_pct": null,
+            "completeness_pct": null,
+            "precision": 0,
+            "recall": 0,
+            "f_score": 0,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": null,
+            "silhouette_iou_min": null
+          },
+          "stage_seconds": {
+            "Feature extraction": 3.583,
+            "Feature matching": 0.022,
+            "Sparse reconstruction": 0.001,
+            "Dense reconstruction": 0
+          },
+          "total_seconds": 3.606
+        },
+        {
+          "mapper_seed": 3,
+          "surface_source": "none",
+          "metrics": {
+            "focal_ratio": null,
+            "registered_fraction": 0,
+            "num_models": 0,
+            "focal_log_error": null,
+            "rotation_error_median_deg": null,
+            "rotation_error_max_deg": null,
+            "position_error_median_pct": null,
+            "position_error_max_pct": null,
+            "accuracy_pct": null,
+            "completeness_pct": null,
+            "precision": 0,
+            "recall": 0,
+            "f_score": 0,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": null,
+            "silhouette_iou_min": null
+          },
+          "stage_seconds": {
+            "Feature extraction": 2.521,
+            "Feature matching": 0.013,
+            "Sparse reconstruction": 0,
+            "Dense reconstruction": 0
+          },
+          "total_seconds": 2.535
+        }
+      ]
+    },
+    {
+      "case": "fast",
+      "scene": "TexturedSphere",
+      "scene_seed": 1,
+      "motion_duration": 1,
+      "known_intrinsics": false,
+      "summary": {
+        "registered_fraction": {
+          "mean": 0.6,
+          "worst": 0.6,
+          "failed": 0
+        },
+        "num_models": {
+          "mean": 1,
+          "worst": 1,
+          "failed": 0
+        },
+        "focal_log_error": {
+          "mean": 0.3124393549997457,
+          "worst": 0.36064478580974463,
+          "failed": 0
+        },
+        "rotation_error_median_deg": {
+          "mean": 1.6282767039860246,
+          "worst": 1.8027333505674252,
+          "failed": 0
+        },
+        "rotation_error_max_deg": {
+          "mean": 3.3590483444288637,
+          "worst": 3.910109558649777,
+          "failed": 0
+        },
+        "position_error_median_pct": {
+          "mean": 2.1289596082554474,
+          "worst": 2.4506747229265553,
+          "failed": 0
+        },
+        "position_error_max_pct": {
+          "mean": 5.032429076839706,
+          "worst": 5.468781525525824,
+          "failed": 0
+        },
+        "accuracy_pct": {
+          "mean": 8.579452348598638,
+          "worst": 10.057564538842367,
+          "failed": 0
+        },
+        "completeness_pct": {
+          "mean": 11.727544117224676,
+          "worst": 13.360915113958285,
+          "failed": 0
+        },
+        "precision": {
+          "mean": 0.015116666666666667,
+          "worst": 0.0006,
+          "failed": 0
+        },
+        "recall": {
+          "mean": 0.018883333333333332,
+          "worst": 0.00115,
+          "failed": 0
+        },
+        "f_score": {
+          "mean": 0.016761228541922912,
+          "worst": 0.0007885714285714286,
+          "failed": 0
+        },
+        "excluded_fraction": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "silhouette_iou_mean": {
+          "mean": 0.9458975822525995,
+          "worst": 0.9410589235888923,
+          "failed": 0
+        },
+        "silhouette_iou_min": {
+          "mean": 0.9250067740224517,
+          "worst": 0.9205475545415657,
+          "failed": 0
+        },
+        "total_seconds": {
+          "mean": 169.8187976,
+          "worst": 252.4846524,
+          "failed": 0
+        }
+      },
+      "runs": [
+        {
+          "mapper_seed": 1,
+          "surface_source": "mesh",
+          "metrics": {
+            "focal_ratio": 0.7699296371505201,
+            "registered_fraction": 0.6,
+            "num_models": 1,
+            "focal_log_error": 0.2614561486338436,
+            "rotation_error_median_deg": 1.554517020614257,
+            "rotation_error_max_deg": 2.823156214464732,
+            "position_error_median_pct": 1.5962982827239385,
+            "position_error_max_pct": 4.280381736910192,
+            "accuracy_pct": 7.1627444281524735,
+            "completeness_pct": 9.72395644857211,
+            "precision": 0.04375,
+            "recall": 0.05365,
+            "f_score": 0.04819686858316222,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": 0.954742734809316,
+            "silhouette_iou_min": 0.9310473030944346
+          },
+          "stage_seconds": {
+            "Feature extraction": 2.807,
+            "Feature matching": 0.826,
+            "Sparse reconstruction": 2.675,
+            "Dense reconstruction": 231.06,
+            "Stereo fusion": 0.309,
+            "Surface meshing": 14.807
+          },
+          "total_seconds": 252.485
+        },
+        {
+          "mapper_seed": 2,
+          "surface_source": "mesh",
+          "metrics": {
+            "focal_ratio": 0.7296304320072311,
+            "registered_fraction": 0.6,
+            "num_models": 1,
+            "focal_log_error": 0.3152171305556488,
+            "rotation_error_median_deg": 1.5275797407763916,
+            "rotation_error_max_deg": 3.343879260172082,
+            "position_error_median_pct": 2.4506747229265553,
+            "position_error_max_pct": 5.348123968083104,
+            "accuracy_pct": 8.518048078801074,
+            "completeness_pct": 12.097760789143637,
+            "precision": 0.0006,
+            "recall": 0.00115,
+            "f_score": 0.0007885714285714286,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": 0.9410589235888923,
+            "silhouette_iou_min": 0.9205475545415657
+          },
+          "stage_seconds": {
+            "Feature extraction": 2.699,
+            "Feature matching": 0.294,
+            "Sparse reconstruction": 2.444,
+            "Dense reconstruction": 92.2,
+            "Stereo fusion": 0.271,
+            "Surface meshing": 18.528
+          },
+          "total_seconds": 116.435
+        },
+        {
+          "mapper_seed": 3,
+          "surface_source": "mesh",
+          "metrics": {
+            "focal_ratio": 0.6972266192740467,
+            "registered_fraction": 0.6,
+            "num_models": 1,
+            "focal_log_error": 0.36064478580974463,
+            "rotation_error_median_deg": 1.8027333505674252,
+            "rotation_error_max_deg": 3.910109558649777,
+            "position_error_median_pct": 2.339905819115848,
+            "position_error_max_pct": 5.468781525525824,
+            "accuracy_pct": 10.057564538842367,
+            "completeness_pct": 13.360915113958285,
+            "precision": 0.001,
+            "recall": 0.00185,
+            "f_score": 0.0012982456140350877,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": 0.94189108835959,
+            "silhouette_iou_min": 0.9234254644313548
+          },
+          "stage_seconds": {
+            "Feature extraction": 2.602,
+            "Feature matching": 0.368,
+            "Sparse reconstruction": 3.005,
+            "Dense reconstruction": 119.754,
+            "Stereo fusion": 0.256,
+            "Surface meshing": 14.552
+          },
+          "total_seconds": 140.536
+        }
+      ]
+    },
+    {
+      "case": "known",
+      "scene": "TexturedSphere",
+      "scene_seed": 1,
+      "motion_duration": 0.27,
+      "known_intrinsics": true,
+      "summary": {
+        "registered_fraction": {
+          "mean": 0.85,
+          "worst": 0.85,
+          "failed": 0
+        },
+        "num_models": {
+          "mean": 1,
+          "worst": 1,
+          "failed": 0
+        },
+        "focal_log_error": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "rotation_error_median_deg": {
+          "mean": 0.37733998135392394,
+          "worst": 0.3916008848667585,
+          "failed": 0
+        },
+        "rotation_error_max_deg": {
+          "mean": 0.9149679079345666,
+          "worst": 0.9861329292921415,
+          "failed": 0
+        },
+        "position_error_median_pct": {
+          "mean": 0.7254488263233968,
+          "worst": 0.7446036255349602,
+          "failed": 0
+        },
+        "position_error_max_pct": {
+          "mean": 2.5453243479662997,
+          "worst": 2.560260030869912,
+          "failed": 0
+        },
+        "accuracy_pct": {
+          "mean": 1.2209440125531925,
+          "worst": 1.233104060314425,
+          "failed": 0
+        },
+        "completeness_pct": {
+          "mean": 5.999582839570633,
+          "worst": 6.1967811956877865,
+          "failed": 0
+        },
+        "precision": {
+          "mean": 0.5368273916816877,
+          "worst": 0.5229821750450631,
+          "failed": 0
+        },
+        "recall": {
+          "mean": 0.4073833333333334,
+          "worst": 0.3949,
+          "failed": 0
+        },
+        "f_score": {
+          "mean": 0.4632140446335347,
+          "worst": 0.45000473163160865,
+          "failed": 0
+        },
+        "excluded_fraction": {
+          "mean": 0.00046666666666666666,
+          "worst": 0.0014,
+          "failed": 0
+        },
+        "silhouette_iou_mean": {
+          "mean": 0.8972380112911855,
+          "worst": 0.892247866285473,
+          "failed": 0
+        },
+        "silhouette_iou_min": {
+          "mean": 0.868774135827589,
+          "worst": 0.8619831594822169,
+          "failed": 0
+        },
+        "total_seconds": {
+          "mean": 172.90731423333332,
+          "worst": 197.947773,
+          "failed": 0
+        }
+      },
+      "runs": [
+        {
+          "mapper_seed": 1,
+          "surface_source": "mesh",
+          "metrics": {
+            "focal_ratio": 1,
+            "registered_fraction": 0.85,
+            "num_models": 1,
+            "focal_log_error": 0,
+            "rotation_error_median_deg": 0.3916008848667585,
+            "rotation_error_max_deg": 0.9861329292921415,
+            "position_error_median_pct": 0.7446036255349602,
+            "position_error_max_pct": 2.560260030869912,
+            "accuracy_pct": 1.233104060314425,
+            "completeness_pct": 5.959209284211116,
+            "precision": 0.5229821750450631,
+            "recall": 0.3949,
+            "f_score": 0.45000473163160865,
+            "excluded_fraction": 0.0014,
+            "silhouette_iou_mean": 0.8981205446162729,
+            "silhouette_iou_min": 0.8722477064220183
+          },
+          "stage_seconds": {
+            "Feature extraction": 1.471,
+            "Feature matching": 0.349,
+            "Sparse reconstruction": 0.229,
+            "Dense reconstruction": 145.508,
+            "Stereo fusion": 0.539,
+            "Surface meshing": 10.589
+          },
+          "total_seconds": 158.684
+        },
+        {
+          "mapper_seed": 2,
+          "surface_source": "mesh",
+          "metrics": {
+            "focal_ratio": 1,
+            "registered_fraction": 0.85,
+            "num_models": 1,
+            "focal_log_error": 0,
+            "rotation_error_median_deg": 0.3563559516339406,
+            "rotation_error_max_deg": 0.8809510632770962,
+            "position_error_median_pct": 0.696913621298746,
+            "position_error_max_pct": 2.5589957695989125,
+            "accuracy_pct": 1.2161138390796906,
+            "completeness_pct": 5.8427580388129945,
+            "precision": 0.54015,
+            "recall": 0.41705,
+            "f_score": 0.4706844076473046,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": 0.9013456229718109,
+            "silhouette_iou_min": 0.8720915415785315
+          },
+          "stage_seconds": {
+            "Feature extraction": 1.404,
+            "Feature matching": 0.221,
+            "Sparse reconstruction": 0.257,
+            "Dense reconstruction": 146.529,
+            "Stereo fusion": 1.179,
+            "Surface meshing": 12.5
+          },
+          "total_seconds": 162.09
+        },
+        {
+          "mapper_seed": 3,
+          "surface_source": "mesh",
+          "metrics": {
+            "focal_ratio": 1,
+            "registered_fraction": 0.85,
+            "num_models": 1,
+            "focal_log_error": 0,
+            "rotation_error_median_deg": 0.38406310756107265,
+            "rotation_error_max_deg": 0.8778197312344626,
+            "position_error_median_pct": 0.7348292321364842,
+            "position_error_max_pct": 2.5167172434300737,
+            "accuracy_pct": 1.2136141382654622,
+            "completeness_pct": 6.1967811956877865,
+            "precision": 0.54735,
+            "recall": 0.4102,
+            "f_score": 0.4689529946216908,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": 0.892247866285473,
+            "silhouette_iou_min": 0.8619831594822169
+          },
+          "stage_seconds": {
+            "Feature extraction": 1.412,
+            "Feature matching": 0.26,
+            "Sparse reconstruction": 0.278,
+            "Dense reconstruction": 181.217,
+            "Stereo fusion": 0.62,
+            "Surface meshing": 14.16
+          },
+          "total_seconds": 197.948
+        }
+      ]
+    },
+    {
+      "case": "known",
+      "scene": "DarkObject",
+      "scene_seed": 1,
+      "motion_duration": 0.27,
+      "known_intrinsics": true,
+      "summary": {
+        "registered_fraction": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "num_models": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "focal_log_error": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "rotation_error_median_deg": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "rotation_error_max_deg": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "position_error_median_pct": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "position_error_max_pct": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "accuracy_pct": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "completeness_pct": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "precision": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "recall": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "f_score": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "excluded_fraction": {
+          "mean": 0,
+          "worst": 0,
+          "failed": 0
+        },
+        "silhouette_iou_mean": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "silhouette_iou_min": {
+          "mean": null,
+          "worst": null,
+          "failed": 3
+        },
+        "total_seconds": {
+          "mean": 1.5014576999999998,
+          "worst": 1.6390192,
+          "failed": 0
+        }
+      },
+      "runs": [
+        {
+          "mapper_seed": 1,
+          "surface_source": "none",
+          "metrics": {
+            "focal_ratio": null,
+            "registered_fraction": 0,
+            "num_models": 0,
+            "focal_log_error": null,
+            "rotation_error_median_deg": null,
+            "rotation_error_max_deg": null,
+            "position_error_median_pct": null,
+            "position_error_max_pct": null,
+            "accuracy_pct": null,
+            "completeness_pct": null,
+            "precision": 0,
+            "recall": 0,
+            "f_score": 0,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": null,
+            "silhouette_iou_min": null
+          },
+          "stage_seconds": {
+            "Feature extraction": 1.294,
+            "Feature matching": 0.005,
+            "Sparse reconstruction": 0,
+            "Dense reconstruction": 0
+          },
+          "total_seconds": 1.299
+        },
+        {
+          "mapper_seed": 2,
+          "surface_source": "none",
+          "metrics": {
+            "focal_ratio": null,
+            "registered_fraction": 0,
+            "num_models": 0,
+            "focal_log_error": null,
+            "rotation_error_median_deg": null,
+            "rotation_error_max_deg": null,
+            "position_error_median_pct": null,
+            "position_error_max_pct": null,
+            "accuracy_pct": null,
+            "completeness_pct": null,
+            "precision": 0,
+            "recall": 0,
+            "f_score": 0,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": null,
+            "silhouette_iou_min": null
+          },
+          "stage_seconds": {
+            "Feature extraction": 1.559,
+            "Feature matching": 0.007,
+            "Sparse reconstruction": 0,
+            "Dense reconstruction": 0
+          },
+          "total_seconds": 1.566
+        },
+        {
+          "mapper_seed": 3,
+          "surface_source": "none",
+          "metrics": {
+            "focal_ratio": null,
+            "registered_fraction": 0,
+            "num_models": 0,
+            "focal_log_error": null,
+            "rotation_error_median_deg": null,
+            "rotation_error_max_deg": null,
+            "position_error_median_pct": null,
+            "position_error_max_pct": null,
+            "accuracy_pct": null,
+            "completeness_pct": null,
+            "precision": 0,
+            "recall": 0,
+            "f_score": 0,
+            "excluded_fraction": 0,
+            "silhouette_iou_mean": null,
+            "silhouette_iou_min": null
+          },
+          "stage_seconds": {
+            "Feature extraction": 1.632,
+            "Feature matching": 0.006,
+            "Sparse reconstruction": 0,
+            "Dense reconstruction": 0
+          },
+          "total_seconds": 1.639
+        }
+      ]
+    }
+  ]
+}

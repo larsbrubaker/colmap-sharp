@@ -160,6 +160,11 @@ public sealed partial class AutomaticReconstructionController : BaseController
 		poisson.Color = options.PoissonMeshing.Color;
 		poisson.Trim = options.PoissonMeshing.Trim;
 
+		// C#-only (divergence 141): the host may keep bundle adjustment off a known camera. No
+		// preset sets these, so they apply under every quality and data type.
+		optionManager.Mapper.BaRefineFocalLength = options.BaRefineFocalLength;
+		optionManager.Mapper.BaRefineExtraParams = options.BaRefineExtraParams;
+
 		optionManager.FeatureExtraction.NumThreads = options.NumThreads;
 		optionManager.FeatureMatching.NumThreads = options.NumThreads;
 		// sequential_pairing / vocab_tree_pairing num_threads only feed the vocabulary tree,
@@ -210,6 +215,9 @@ public sealed partial class AutomaticReconstructionController : BaseController
 	/// Done/Total count the units of the sub-stage reporting, so they restart when it changes.
 	/// </summary>
 	public IProgress<ControllerProgress>? Progress { get; set; }
+
+	/// <summary>The mapper options the sparse step runs with (for tests).</summary>
+	internal IncrementalPipelineOptions EffectiveMapper => optionManager.Mapper;
 
 	/// <summary>The Poisson options the meshing step runs with (for tests).</summary>
 	internal PoissonMeshingOptions EffectivePoissonMeshing => optionManager.PoissonMeshing;
