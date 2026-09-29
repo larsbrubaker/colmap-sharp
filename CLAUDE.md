@@ -1,9 +1,12 @@
 # colmap-sharp — agent guidelines
 
-A **pure C#** port of [COLMAP](https://github.com/colmap/colmap) (Structure-from-Motion and
-Multi-View Stereo), for use inside MatterCAD. It turns a set of photos into camera poses, a
-sparse point cloud, dense depth, and a mesh. Reference version: `REFERENCE` (COLMAP 4.2.0).
-Remaining work and the phase order are in `PORTING_PLAN.md`.
+A **pure C#** photos/video → mesh reconstructor for MatterCAD. It turns photos into camera
+poses, a sparse point cloud, dense depth, and a textured mesh. It started as a port of
+[COLMAP](https://github.com/colmap/colmap) 4.2.0 (`REFERENCE`) and that port is its base, but
+**the goal is the best reconstruction we can build, not COLMAP parity** (Lars, 2026-09-28).
+Change any behavior, default or algorithm when a measurement shows it makes results better;
+pull in upstream COLMAP changes only when they help. Remaining port work is in
+`PORTING_PLAN.md`.
 
 ## The contract (non-negotiable)
 
@@ -18,22 +21,25 @@ Remaining work and the phase order are in `PORTING_PLAN.md`.
    `THIRD_PARTY_NOTICES.md` in the same change.
 3. **No stubs.** No `NotImplementedException`, no placeholders, no partial implementations.
    If a dependency isn't ported yet, port it first (dependency order, below).
-4. **COLMAP's tests are the specification, 1:1.** Every `*_test.cc` becomes a C# test file
-   with the same test names and the same expected values and tolerances. A test that
-   exercises an excluded feature (CUDA, ONNX, LSD, GUI, SQLite files) is listed as skipped
-   with the reason in `PORTING_PLAN.md`, never silently dropped. C#-only tests are labeled as
-   such and never stand in for a ported one.
+4. **Quality is measured, not asserted.** The yardstick is reconstruction quality on a
+   benchmark set (synthetic scenes with known geometry plus real captures): images placed,
+   pose error, mesh-to-truth distance, runtime. An improvement lands with the benchmark
+   numbers that justify it, and a regression on the benchmark is a bug.
 5. **Never weaken a test to make it pass.** Every failure is a real bug, found by
-   instrumentation and root-cause analysis. For a ported test, COLMAP's expected value is
-   the spec and the C# output is the bug.
-6. **Deliberate divergence is documented.** Anything that behaves differently from COLMAP on
-   purpose (a real upstream bug, a replaced dependency) gets a numbered entry in
-   `docs/CPP_DIVERGENCES.md`: what differs, why, and the evidence. Convenience is not a reason.
+   instrumentation and root-cause analysis. COLMAP's ported tests (one file per `*_test.cc`,
+   same names) stay as the regression net for the base port. When an intended improvement
+   changes one of their expected values, update it in the same change, stating the new
+   behavior and the benchmark evidence; an unexplained change is still a bug.
+6. **Differences from COLMAP are recorded, not avoided.** Anything that behaves differently
+   from COLMAP gets a numbered entry in `docs/CPP_DIVERGENCES.md` (what differs, why, the
+   evidence), so a later upstream merge knows what was changed on purpose.
 
-## How closely must results match?
+## How closely must the base port match COLMAP?
 
-Bit-exactness with COLMAP is not achievable everywhere, because COLMAP's numbers run through
-Eigen and Ceres, which we replace rather than port. The bar depends on the code:
+These tiers apply to code that is still a straight port. Code we have deliberately improved
+is held to the benchmark instead. Bit-exactness with COLMAP is not achievable everywhere,
+because COLMAP's numbers run through Eigen and Ceres, which we replace rather than port. The
+bar depends on the code:
 
 | Tier | Code | Bar |
 |---|---|---|
