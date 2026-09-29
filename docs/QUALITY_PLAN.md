@@ -78,8 +78,9 @@ blocks (the top and side sweeps), and the split model shares no images with the 
 3. **Silhouette-carved surface.**
    - 3a is in (`Mvs/Silhouette/VisualHull`; DarkObject F 0.934; mouse IoU 0.945 k=0 / 0.966 k=1).
      Open: default k from the benchmark; centroid fans make meshes ~1.8x larger.
-   - 3b: hull samples fill the gaps in the fused cloud before Poisson; faces projecting outside
-     the silhouettes are removed, which replaces trim guessing.
+   - 3b is in (`Subject = Object`): TexturedSphere, known intrinsics, segmented masks: 16/20,
+     F 0.411, closed mesh, vs Scene 0.274. Open: Object-mode benchmark cases; the real mouse
+     run; demo default for videos.
    - 3c: per-pixel hull depth bounds for PatchMatch, CPU and WGSL.
    - Accept: silhouette IoU > 0.95 and a closed mesh on the mouse; completeness F-score +30 on 0a.
 4. **Silhouette pose for the frames that are still unplaced.**
