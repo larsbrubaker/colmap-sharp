@@ -19,6 +19,12 @@ Built for [MatterCAD](https://github.com/MatterHackers/MatterCAD).
 **Run the demo on a Mac:** double-click [run_mac.command](run_mac.command) in Finder (or run it
 from a terminal). It builds and starts the native photos-to-mesh demo app, `demo/ColmapDemo.Mac`.
 
+**Run the demo from an IDE** (Rider, or VS Code with C# Dev Kit): open
+[demo/ColmapDemo.sln](demo/ColmapDemo.sln), not the root `ColmapSharp.sln` (that is the library
+alone), and set `ColmapDemo.Mac` (or `ColmapDemo.Windows` on Windows) as the startup project.
+Fetch the agg-sharp submodule first with `git submodule update --init --recursive demo/agg-sharp`;
+run_mac.command does that for you.
+
 ## License
 
 MIT (see [LICENSE](LICENSE)). The notices required by upstream projects are in
