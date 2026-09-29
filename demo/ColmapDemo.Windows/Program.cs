@@ -21,12 +21,8 @@ namespace ColmapDemo
 		{
 			// No provider setup: AggContext's per-OS defaults pick the WinForms host on Windows, and this
 			// project references PlatformWin32 so that host is in the output folder to be found.
-			// Per-monitor DPI aware (V2, as MatterCAD's HostStartup.Windows.ConfigureHighDpi), before anything
-			// reads AggContext.OsInformation or opens a window: Windows fixes the mode at the first window, and
-			// an unaware process is told 96 DPI and shown a blurry bitmap-scaled window. The managed call
-			// rather than MatterCAD's P/Invoke, since WinForms already wraps it.
-			System.Windows.Forms.Application.SetHighDpiMode(System.Windows.Forms.HighDpiMode.PerMonitorV2);
-
+			// No DPI-awareness call either: the WinForms host opts into per-monitor V2 itself before its
+			// information provider reads the DPI (agg's WindowsDpiAwareness).
 			// Widgets at the display's scale (1.5 at 150%) and a window sized to match; see DemoDisplayScale.
 			SystemWindow systemWindow = DemoDisplayScale.CreateWindow("ColmapSharp — photos to mesh");
 			// PatchMatch runs on the GPU when wgpu gives us a device; otherwise on the CPU, and the
@@ -47,6 +43,9 @@ namespace ColmapDemo
 			// each carrying MouseEventArgs.DragFiles, the same contract as the AppKit host.
 			var app = new ColmapDemoApp(fileDropSupported: true, gpu, computeNote);
 			systemWindow.AddChild(app);
+
+			// Dragged to a monitor with another scale, the app is rebuilt there (between runs).
+			DemoDisplayScale.Follow(systemWindow, app);
 			DevAutoRun.Attach(systemWindow, app);
 			systemWindow.ShowAsSystemWindow();
 		}

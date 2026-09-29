@@ -93,6 +93,10 @@ namespace ColmapDemo
 					ComputeCheckPending = true,
 				};
 				systemWindow.AddChild(app);
+
+				// Browser zoom and a move to another monitor change devicePixelRatio; the app is rebuilt at
+				// the new ratio (between runs), keeping its photos and settings.
+				DemoDisplayScale.Follow(systemWindow, app);
 				systemWindow.ShowAsSystemWindow();
 
 				Report(string.Empty);

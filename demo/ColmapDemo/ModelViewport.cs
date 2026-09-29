@@ -31,7 +31,7 @@ namespace ColmapDemo
 
 		private readonly LightingData lighting = new LightingData();
 
-		private readonly TextWidget hint;
+		private TextWidget hint;
 
 		private PosColorVertex[] pointVertices = Array.Empty<PosColorVertex>();
 
@@ -56,13 +56,29 @@ namespace ColmapDemo
 			};
 			this.AddChild(trackball);
 
-			this.hint = new TextWidget("No model yet", pointSize: 14, textColor: new Color("#b0b0b0"))
+			this.hint = NewHint("No model yet");
+			this.AddChild(this.hint);
+		}
+
+		/// <summary>
+		/// Rebuilds the one thing in here sized at build time, the hint's font, at the current
+		/// <see cref="GuiWidget.DeviceScale"/>; the model, its fit and the trackball's view are kept.
+		/// ColmapDemoApp.RebuildUi calls it when the display scale changes.
+		/// </summary>
+		public void RebuildForScale()
+		{
+			string text = this.hint.Text;
+			this.hint.Close();
+			this.hint = NewHint(text);
+			this.AddChild(this.hint);
+		}
+
+		private static TextWidget NewHint(string text) =>
+			new TextWidget(text, pointSize: 14, textColor: new Color("#b0b0b0"))
 			{
 				HAnchor = HAnchor.Center,
 				VAnchor = VAnchor.Center,
 			};
-			this.AddChild(this.hint);
-		}
 
 		/// <summary>Whether a mesh (rather than only points, or nothing) is showing.</summary>
 		public bool ShowsMesh => this.mesh != null;

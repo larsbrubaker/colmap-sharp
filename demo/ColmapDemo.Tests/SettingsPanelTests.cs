@@ -263,6 +263,28 @@ public class SettingsPanelTests
 	}
 
 	[Test]
+	public async Task TheSegmentedChoicesAreThemeStripsSharingTheWidth()
+	{
+		ColmapDemoApp app = NewApp();
+		var window = new SystemWindow(1200, 800);
+		window.AddChild(app);
+		app.SettingsOpen = true;
+		window.PerformLayout();
+
+		foreach (string name in new[] { "Fast Setting", "Full mesh Setting" })
+		{
+			var control = Find<SegmentedControl>(app, name);
+			double[] widths = control.Segments.Select(s => s.Width).ToArray();
+
+			await Assert.That(control.Style).IsEqualTo(SegmentedStyle.Strip).Because("the default theme draws segmented choices as a strip");
+			await Assert.That(widths.Sum()).IsEqualTo(control.Width).Within(0.5).Because($"{name} stretches across the settings column");
+			await Assert.That(widths.Max() - widths.Min()).IsLessThanOrEqualTo(1.0).Because($"{name}'s segments share its width equally");
+		}
+
+		window.Close();
+	}
+
+	[Test]
 	public async Task ARunLocksTheSettingsAndShowsWhatItUses()
 	{
 		ColmapDemoApp app = NewApp();

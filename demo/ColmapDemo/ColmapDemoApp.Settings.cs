@@ -138,7 +138,7 @@ namespace ColmapDemo
 					this.runSummary.AddChild(row);
 				}
 
-				this.runSummary.AddChild(Hint(LockNotice, AmberColor));
+				this.runSummary.AddChild(Hint(LockNotice, WarningColor));
 			}
 
 			this.runSummary.Visible = locked;
@@ -172,7 +172,7 @@ namespace ColmapDemo
 			this.UpdateConditionalControls();
 		}
 
-		// Built once, hidden; the left panel's Settings button shows and hides it.
+		// Built hidden with the rest of the UI (again on a rescale); the left panel's Settings button shows and hides it.
 		private GuiWidget BuildSettingsColumn(ThemeConfig theme)
 		{
 			var scroll = new ScrollableWidget(autoScroll: true)
@@ -181,7 +181,7 @@ namespace ColmapDemo
 				HAnchor = HAnchor.Absolute,
 				Width = 440 * DeviceScale,
 				VAnchor = VAnchor.Stretch,
-				BackgroundColor = PanelColor,
+				BackgroundColor = SettingsPanelColor,
 				Visible = false,
 			};
 			scroll.ScrollArea.HAnchor = HAnchor.Stretch;
@@ -206,31 +206,51 @@ namespace ColmapDemo
 			var editors = new FlowLayoutWidget(FlowDirection.TopToBottom) { HAnchor = HAnchor.Stretch };
 			this.settingsEditors = editors;
 			column.AddChild(editors);
-			this.AddCaptureSettings(Section(editors, "What are you capturing?", null, theme));
+			this.AddCaptureSettings(Section(editors, "What are you capturing?", null, theme), theme);
 			this.AddQualitySettings(Section(editors, "Quality", null, theme), theme);
 			this.AddCameraSettings(Section(editors, "Camera", null, theme), theme);
 			this.AddVideoSettings(Section(editors, "Video", null, theme), theme);
 			this.AddResultSettings(Section(editors, "Result", null, theme), theme);
-			this.AddAdvancedSettings(Section(editors, "Advanced", "for testing and comparisons", theme, expanded: false), theme);
+			this.AddAdvancedSettings(Section(editors, "Advanced", "for testing and comparisons", theme, collapsible: true), theme);
 			return scroll;
 		}
 
-		private static GuiWidget Section(GuiWidget column, string title, string subtitle, ThemeConfig theme, bool expanded = true)
+		/// <summary>
+		/// A titled group of settings: the theme's small-caps section header over the controls, or, for
+		/// what most users never need (<paramref name="collapsible"/>), a <see cref="CollapsingHeader"/>
+		/// that starts closed. Returns where the controls go.
+		/// </summary>
+		private static GuiWidget Section(GuiWidget column, string title, string subtitle, ThemeConfig theme, bool collapsible = false)
 		{
-			var header = new CollapsingHeader(title, theme, expanded) { Name = title + " Section", Margin = new BorderDouble(0, 0, 0, 12) };
-			column.AddChild(header);
-			if (subtitle != null)
+			GuiWidget body;
+			if (collapsible)
 			{
-				header.Body.AddChild(Hint(subtitle));
+				var header = new CollapsingHeader(title, theme, expanded: false) { Name = title + " Section", Margin = new BorderDouble(0, 0, 0, 16) };
+				column.AddChild(header);
+				body = header.Body;
+			}
+			else
+			{
+				body = new FlowLayoutWidget(FlowDirection.TopToBottom) { Name = title + " Section", HAnchor = HAnchor.Stretch, Margin = new BorderDouble(0, 0, 0, 16) };
+				TextWidget header = theme.CreateSectionHeader(title);
+				header.HAnchor = HAnchor.Left;
+				body.AddChild(header);
+				column.AddChild(body);
 			}
 
-			return header.Body;
+			if (subtitle != null)
+			{
+				body.AddChild(Hint(subtitle));
+			}
+
+			return body;
 		}
 
-		private void AddCaptureSettings(GuiWidget section)
+		private void AddCaptureSettings(GuiWidget section, ThemeConfig theme)
 		{
 			this.AddCards(
 				section,
+				theme,
 				new[]
 				{
 					("One object", "On a plain background. Closed, printable shape.", SubjectType.Object),
@@ -242,7 +262,7 @@ namespace ColmapDemo
 					this.settings.Subject = v;
 					this.settings.SubjectPickedForVideo = false;
 				});
-			WrappedTextWidget videoNote = Hint("A video was dropped, so “One object” was picked for you.", ActiveStageColor);
+			WrappedTextWidget videoNote = Hint("A video was dropped, so “One object” was picked for you.", theme.PrimaryAccentColor);
 			section.AddChild(videoNote);
 			this.settingsRefreshers.Add(() => videoNote.Visible = this.settings.SubjectPickedForVideo);
 		}
@@ -263,9 +283,12 @@ namespace ColmapDemo
 			this.AddCheck(section, "All photos are from the same camera", () => this.settings.SameCamera || this.settings.KnowFocalLength, v => this.settings.SameCamera = v, () => !this.settings.KnowFocalLength);
 			this.AddCheck(section, "I know this camera's focal length", () => this.settings.KnowFocalLength, v => this.settings.KnowFocalLength = v);
 
-			var box = new FlowLayoutWidget(FlowDirection.LeftToRight) { Name = "Focal Length Box", HAnchor = HAnchor.Stretch, Padding = 8, Margin = new BorderDouble(0, 4, 0, 0), BackgroundColor = CardSelectedColor };
-			this.AddNumber(box, null, theme, 0.1, 100000, true, () => this.settings.FocalLength, v => this.settings.FocalLength = v).Margin = new BorderDouble(0, 0, 8, 0);
-			this.AddChoice(box, null, theme, new[] { ("mm, 35 mm equivalent", FocalUnit.Millimetres35), ("pixels at the chosen photo size", FocalUnit.Pixels) },
+			// The focal and its unit read as one value, so they sit together in the theme's tinted box.
+			var box = new InfoBox(theme) { Name = "Focal Length Box", Margin = new BorderDouble(0, 4, 0, 0) };
+			var focalRow = new FlowLayoutWidget(FlowDirection.LeftToRight) { HAnchor = HAnchor.Stretch };
+			box.AddChild(focalRow);
+			this.AddNumber(focalRow, null, theme, 0.1, 100000, true, () => this.settings.FocalLength, v => this.settings.FocalLength = v).Margin = new BorderDouble(0, 0, 8, 0);
+			this.AddChoice(focalRow, null, theme, new[] { ("mm, 35 mm equivalent", FocalUnit.Millimetres35), ("pixels at the chosen photo size", FocalUnit.Pixels) },
 				() => this.settings.FocalUnit, v => this.settings.FocalUnit = v).VAnchor = VAnchor.Center;
 			section.AddChild(box);
 			WrappedTextWidget pixelsHint = Hint("Pixels at the chosen photo size (Largest photo size above), not at the camera's full size.");
@@ -286,10 +309,10 @@ namespace ColmapDemo
 			// frames, or recording-order matching); outline placement needs that and One object.
 			Func<bool> timeOrdered = () => this.settings.TimeOrdered(this.RunUsesSingleCamera);
 			this.AddCheck(section, "Follow points from frame to frame", () => this.settings.VideoTracking, v => this.settings.VideoTracking = v, timeOrdered);
-			WrappedTextWidget trackingHint = Hint(string.Empty, AmberColor);
+			WrappedTextWidget trackingHint = Hint(string.Empty, WarningColor);
 			section.AddChild(trackingHint);
 			this.AddCheck(section, "Place missed frames from their outlines", () => this.settings.SilhouettePlacement, v => this.settings.SilhouettePlacement = v, () => timeOrdered() && this.settings.IsObject);
-			WrappedTextWidget outlineHint = Hint(string.Empty, AmberColor);
+			WrappedTextWidget outlineHint = Hint(string.Empty, WarningColor);
 			section.AddChild(outlineHint);
 			section.AddChild(Hint("Experimental: can misplace frames on round or symmetric objects."));
 			this.settingsRefreshers.Add(() =>

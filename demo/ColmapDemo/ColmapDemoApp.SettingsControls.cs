@@ -15,13 +15,8 @@ namespace ColmapDemo
 {
 	public partial class ColmapDemoApp
 	{
-		private static readonly Color CardColor = Color.White;
-
-		private static readonly Color CardSelectedColor = new Color("#e3eefb");
-
-		private static readonly Color CardBorderColor = new Color("#c8c8c8");
-
-		private static readonly Color AmberColor = new Color("#a86400");
+		/// <summary>A hint that needs acting on ("only for frames taken from a video"), in the theme's warning ink.</summary>
+		private static Color WarningColor => ThemeConfig.Current.WarningTextColor;
 
 		private static WrappedTextWidget Hint(string text, Color? color = null) =>
 			new WrappedTextWidget(text, pointSize: 9, textColor: color ?? HintColor) { HAnchor = HAnchor.Stretch, Margin = new BorderDouble(0, 4, 0, 0) };
@@ -36,47 +31,66 @@ namespace ColmapDemo
 			this.settingsControls.Add(control);
 		}
 
-		/// <summary>Large side-by-side cards, one per choice, each a title and a line under it.</summary>
-		private void AddCards<T>(GuiWidget section, (string Title, string Line, T Value)[] items, Func<T> get, Action<T> set)
+		/// <summary>
+		/// Large side-by-side cards, one per choice, each a title and a line under it: agg's
+		/// <see cref="SelectableCard"/>s (named "&lt;title&gt; Card"), kept to one pick by a
+		/// <see cref="SelectableCardGroup"/>, which also moves the pick with the arrow keys.
+		/// </summary>
+		private void AddCards<T>(GuiWidget section, ThemeConfig theme, (string Title, string Line, T Value)[] items, Func<T> get, Action<T> set)
 		{
 			var row = new FlowLayoutWidget(FlowDirection.LeftToRight) { HAnchor = HAnchor.Stretch, Margin = new BorderDouble(0, 4, 0, 0) };
-			var cards = new List<GuiWidget>();
-			foreach ((string title, string line, T value) in items)
+			var group = new SelectableCardGroup();
+			foreach ((string title, string line, T _) in items)
 			{
-				var card = new FlowLayoutWidget(FlowDirection.TopToBottom)
+				int index = group.Cards.Count;
+				var card = new SelectableCard(title, line, theme)
 				{
-					Name = title + " Card",
-					HAnchor = HAnchor.Stretch,
-					Padding = 8,
-					Margin = new BorderDouble(cards.Count == 0 ? 0 : 4, 0, cards.Count == items.Length - 1 ? 0 : 4, 0),
-					Border = 1,
-					BorderColor = CardBorderColor,
-					Cursor = Cursors.Hand,
+					Margin = new BorderDouble(index == 0 ? 0 : 4, 0, index == items.Length - 1 ? 0 : 4, 0),
 				};
-				card.AddChild(new TextWidget(title, pointSize: 11, bold: true) { HAnchor = HAnchor.Left, Selectable = false });
-				card.AddChild(new WrappedTextWidget(line, pointSize: 9, textColor: HintColor) { HAnchor = HAnchor.Stretch, Selectable = false });
-				card.Click += (sender, e) =>
-				{
-					if (card.Enabled)
-					{
-						set(value);
-						this.RefreshSettingsControls();
-					}
-				};
-				cards.Add(card);
+				group.Add(card);
 				row.AddChild(card);
 			}
+
+			bool refreshing = false;
+			group.SelectionChanged += (sender, e) =>
+			{
+				// A refresh from the model is not a pick; a click on the card already picked raises nothing.
+				int picked = group.SelectedCard == null ? -1 : IndexOf(group.Cards, group.SelectedCard);
+				if (!refreshing && picked >= 0)
+				{
+					set(items[picked].Value);
+					this.RefreshSettingsControls();
+				}
+			};
 
 			section.AddChild(row);
 			this.Register(row, () =>
 			{
-				for (int i = 0; i < cards.Count; i++)
+				refreshing = true;
+				int selected = Array.FindIndex(items, i => EqualityComparer<T>.Default.Equals(i.Value, get()));
+				if (selected >= 0)
 				{
-					bool selected = EqualityComparer<T>.Default.Equals(items[i].Value, get());
-					cards[i].BackgroundColor = selected ? CardSelectedColor : CardColor;
-					cards[i].BorderColor = selected ? ActiveStageColor : CardBorderColor;
+					group.Cards[selected].Selected = true;
 				}
+
+				refreshing = false;
 			});
+
+			// Each card is locked during a run too: a card takes clicks and keys itself, not through the row.
+			this.settingsControls.AddRange(group.Cards);
+		}
+
+		private static int IndexOf(IReadOnlyList<SelectableCard> cards, SelectableCard card)
+		{
+			for (int i = 0; i < cards.Count; i++)
+			{
+				if (cards[i] == card)
+				{
+					return i;
+				}
+			}
+
+			return -1;
 		}
 
 		private SegmentedControl AddSegmented<T>(GuiWidget section, string label, ThemeConfig theme, (string Label, T Value)[] items, Func<T> get, Action<T> set)

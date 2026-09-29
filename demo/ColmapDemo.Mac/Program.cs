@@ -37,6 +37,9 @@ namespace ColmapDemo
 			// The AppKit host delivers dropped files (agg's FileDropDispatcher) and reads video (AVFoundation, AggContext's default reader on a Mac).
 			var app = new ColmapDemoApp(fileDropSupported: true, gpu, computeNote);
 			systemWindow.AddChild(app);
+
+			// Dragged to a display with another scale, the app is rebuilt there (between runs).
+			DemoDisplayScale.Follow(systemWindow, app);
 			DevAutoRun.Attach(systemWindow, app);
 			systemWindow.ShowAsSystemWindow();
 		}
