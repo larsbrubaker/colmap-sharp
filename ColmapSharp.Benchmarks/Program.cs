@@ -58,6 +58,7 @@ foreach ((string caseName, SyntheticObjectKind kind, double motion, bool knownIn
 				Data = config.Data,
 				MapperSeed = mapperSeed,
 				UseTrueMasks = config.UseTrueMasks,
+				VideoTracking = config.VideoTracking,
 				KnownIntrinsics = knownIntrinsics,
 				Dense = config.Dense,
 			};

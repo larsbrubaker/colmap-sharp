@@ -333,7 +333,11 @@ public sealed partial class AutomaticReconstructionController : BaseController
 
 		if (options.Matching)
 		{
+			// C#-only video tracking (AutomaticReconstruction.VideoTracking.cs) wraps the
+			// descriptor matching: track keypoints before it, track matches after it.
+			VideoTrackFeatures? trackFeatures = AddVideoTrackFeatures();
 			RunFeatureMatching();
+			MergeVideoTrackMatches(trackFeatures);
 			yield return null;
 		}
 

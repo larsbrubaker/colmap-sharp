@@ -51,6 +51,17 @@ public sealed class FeatureTrack
 	public int Length => Observations.Count;
 }
 
+/// <summary>
+/// Why the tracks that reached a frame ended there, one count per reason (the KLT statuses,
+/// plus tracks that landed outside the frame's eroded mask). Diagnostics only.
+/// </summary>
+public readonly record struct TrackEndCounts(
+	int ForwardBackwardFailed, int LowTexture, int HighResidual, int OutOfImage, int LeftMask)
+{
+	/// <summary>All tracks that ended at this frame.</summary>
+	public int Total => ForwardBackwardFailed + LowTexture + HighResidual + OutOfImage + LeftMask;
+}
+
 /// <summary>Options for <see cref="SequenceTracker"/>.</summary>
 public sealed class SequenceTrackerOptions
 {
@@ -87,6 +98,7 @@ public sealed class SequenceTracker
 {
 	private readonly SequenceTrackerOptions options;
 	private readonly List<FeatureTrack> tracks = [];
+	private readonly List<TrackEndCounts> endCounts = [];
 	private List<FeatureTrack> live = [];
 	private ImagePyramid? previous;
 	private int frameCount;
@@ -101,6 +113,9 @@ public sealed class SequenceTracker
 
 	/// <summary>Every track started so far, in id order (ended and live).</summary>
 	public IReadOnlyList<FeatureTrack> Tracks => tracks;
+
+	/// <summary>Per added frame, why tracks ended on reaching it (all zero for the first frame).</summary>
+	public IReadOnlyList<TrackEndCounts> EndCounts => endCounts;
 
 	/// <summary>How many tracks are still being followed.</summary>
 	public int LiveCount => live.Count;
@@ -162,6 +177,7 @@ public sealed class SequenceTracker
 		}
 
 		int frameIndex = frameCount++;
+		int fb = 0, low = 0, residual = 0, outside = 0, leftMask = 0;
 		if (previous != null && live.Count > 0)
 		{
 			var points = new Vector2d[live.Count];
@@ -176,8 +192,17 @@ public sealed class SequenceTracker
 			for (int i = 0; i < live.Count; ++i)
 			{
 				KltResult r = results[i];
-				if (!r.IsTracked || (options.EndTracksLeavingMask && mask != null && !InsideMask(mask, r.Position)))
+				switch (r.Status)
 				{
+					case KltStatus.ForwardBackwardFailed: fb++; continue;
+					case KltStatus.LowTexture: low++; continue;
+					case KltStatus.HighResidual: residual++; continue;
+					case KltStatus.OutOfImage: outside++; continue;
+				}
+
+				if (options.EndTracksLeavingMask && mask != null && !InsideMask(mask, r.Position))
+				{
+					leftMask++;
 					continue;
 				}
 
@@ -187,6 +212,8 @@ public sealed class SequenceTracker
 
 			live = survivors;
 		}
+
+		endCounts.Add(new TrackEndCounts(fb, low, residual, outside, leftMask));
 
 		if (live.Count < options.ReplenishFraction * options.TargetCount)
 		{

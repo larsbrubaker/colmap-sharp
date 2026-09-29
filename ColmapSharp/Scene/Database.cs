@@ -258,6 +258,12 @@ public abstract partial class Database : IDisposable
 	/// <summary>Updates an existing image's keypoint blob.</summary>
 	public abstract void UpdateKeypoints(uint imageId, RowMajorMatrix<float> blob);
 
+	/// <summary>
+	/// C#-only (COLMAP has no descriptor update): replaces an existing image's descriptors, so
+	/// the video-tracking intake can append to one image without rewriting the others.
+	/// </summary>
+	public abstract void UpdateDescriptors(uint imageId, FeatureDescriptors descriptors);
+
 	/// <summary>Replaces an existing two-view geometry; does nothing if there is none.</summary>
 	public abstract void UpdateTwoViewGeometry(uint imageId1, uint imageId2, TwoViewGeometry twoViewGeometry);
 

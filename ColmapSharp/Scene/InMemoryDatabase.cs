@@ -652,6 +652,19 @@ public sealed partial class InMemoryDatabase : Database
 	}
 
 	/// <inheritdoc/>
+	public override void UpdateDescriptors(uint imageId, FeatureDescriptors descriptors)
+	{
+		lock (sync)
+		{
+			EnsureOpen();
+			if (this.descriptors.ContainsKey(imageId))
+			{
+				this.descriptors[imageId] = descriptors.Clone();
+			}
+		}
+	}
+
+	/// <inheritdoc/>
 	public override void DeleteMatches(uint imageId1, uint imageId2)
 	{
 		lock (sync)

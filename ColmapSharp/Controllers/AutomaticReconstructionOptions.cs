@@ -227,6 +227,17 @@ public sealed class AutomaticReconstructionOptions
 	/// </summary>
 	public IComputeDevice? ComputeDevice { get; set; }
 
+	/// <summary>
+	/// C#-only (divergence 143): for <see cref="DataType.Video"/>, also follow points through
+	/// the frames with a KLT tracker and add the tracks as keypoints and matches between
+	/// keyframes (Controllers/VideoTrackMatching.cs), next to the descriptor matches. Helps
+	/// frames that SIFT alone cannot place. Ignored for other data types.
+	/// </summary>
+	public bool VideoTracking { get; set; }
+
+	/// <summary>How <see cref="VideoTracking"/> tracks and picks keyframes.</summary>
+	public Feature.Tracking.VideoTrackingOptions VideoTrackingOptions { get; set; } = new();
+
 	/// <summary>The number of threads to use in all stages.</summary>
 	public int NumThreads { get; set; } = -1;
 

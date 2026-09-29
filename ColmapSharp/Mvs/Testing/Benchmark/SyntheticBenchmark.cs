@@ -13,6 +13,7 @@ using System.Diagnostics;
 using System.Globalization;
 
 using ColmapSharp.Controllers;
+using ColmapSharp.Geometry;
 using ColmapSharp.LinearAlgebra;
 using ColmapSharp.Scene;
 using ColmapSharp.Util;
@@ -56,6 +57,12 @@ public sealed class SyntheticBenchmarkOptions
 	/// <summary>Whether to hand the scene's true masks to the reconstruction (features and fusion).</summary>
 	public bool UseTrueMasks { get; set; }
 
+	/// <summary>Whether to add KLT video tracks to the matches (AutomaticReconstructionOptions.VideoTracking; video data only).</summary>
+	public bool VideoTracking { get; set; }
+
+	/// <summary>How <see cref="VideoTracking"/> tracks (null: the defaults).</summary>
+	public Feature.Tracking.VideoTrackingOptions? VideoTrackingOptions { get; set; }
+
 	/// <summary>Threads for every stage (-1: all).</summary>
 	public int NumThreads { get; set; } = -1;
 
@@ -67,7 +74,14 @@ public sealed class SyntheticBenchmarkOptions
 public sealed record SyntheticBenchmarkResult(
 	BenchmarkMetrics Metrics,
 	IReadOnlyList<(string Stage, double Seconds)> StageSeconds,
-	double TotalSeconds);
+	double TotalSeconds)
+{
+	/// <summary>
+	/// The scored model's registered cameras (CamFromWorld) by frame index, so two runs can be
+	/// compared on the frames both placed (PoseMetrics.Compute on the common subset).
+	/// </summary>
+	public IReadOnlyDictionary<int, Rigid3d> RegisteredPoses { get; init; } = new Dictionary<int, Rigid3d>();
+}
 
 /// <summary>Reconstructs a synthetic scene with the full controller and scores it.</summary>
 public static class SyntheticBenchmark
@@ -103,6 +117,7 @@ public static class SyntheticBenchmark
 				Images = images,
 				Masks = options.UseTrueMasks ? masks : null,
 				Data = options.Data,
+				VideoTracking = options.VideoTracking,
 				Quality = options.Quality,
 				SingleCamera = options.SingleCamera,
 				// SIMPLE_PINHOLE, one focal length: the scenes' camera has fx = fy, and with PINHOLE's
@@ -119,6 +134,11 @@ public static class SyntheticBenchmark
 				NumThreads = options.NumThreads,
 				RandomSeed = options.MapperSeed,
 			};
+			if (options.VideoTrackingOptions is not null)
+			{
+				reconOptions.VideoTrackingOptions = options.VideoTrackingOptions;
+			}
+
 			reconOptions.PoissonMeshing.Depth = options.PoissonDepth;
 			reconOptions.PoissonMeshing.Trim = options.PoissonTrim;
 
@@ -139,7 +159,21 @@ public static class SyntheticBenchmark
 			int modelIdx = BenchmarkEvaluator.SelectModel(reconstructions);
 			(BenchmarkMesh? mesh, List<Vector3d>? points) = modelIdx < 0 ? (null, null) : ReadSurface(workspace, modelIdx, options.Mesher);
 			BenchmarkMetrics metrics = BenchmarkEvaluator.Evaluate(scene, frameNames, reconstructions, mesh, points, options.Surface);
-			return new SyntheticBenchmarkResult(metrics, stages, total);
+			var poses = new Dictionary<int, Rigid3d>();
+			if (modelIdx >= 0)
+			{
+				Reconstruction model = reconstructions[modelIdx];
+				foreach (uint imageId in model.RegImageIds())
+				{
+					int k = Array.IndexOf(frameNames, model.Image(imageId).Name);
+					if (k >= 0)
+					{
+						poses[k] = model.Image(imageId).CamFromWorld();
+					}
+				}
+			}
+
+			return new SyntheticBenchmarkResult(metrics, stages, total) { RegisteredPoses = poses };
 		}
 		finally
 		{

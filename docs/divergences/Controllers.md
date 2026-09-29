@@ -498,3 +498,35 @@ needs today.
 **Evidence.** `AutomaticReconstructionTests.CSharpOnly_BaRefineOptionsReachTheMapper` and
 `CSharpOnly_BaRefineOffIsRefusedUnderGlobalMapper`; the benchmark's known-intrinsics case in
 `benchmarks/baseline.json`.
+
+## 143. Video data can add KLT tracks as keypoints and matches
+
+**What differs.** COLMAP has no video tracker. With `AutomaticReconstructionOptions.VideoTracking`
+on (off by default, so the default run is COLMAP's) and video data with SIFT, the matching stage
+runs `SequenceTracker` over the frames in name order, picks keyframes by parallax
+(`Feature/Tracking/TrackMatcher.cs`), appends each keyframe's track keypoints with fixed-scale
+SIFT descriptors after its own SIFT features, runs the usual sequential matching, then adds
+each keyframe pair's track matches to the pair's descriptor matches and re-runs two-view
+verification on the union (`Controllers/VideoTrackMatching.cs`).
+
+**Why.** Frames SIFT cannot place (dark or low-texture views) still carry trackable corners.
+
+**Evidence** (`ColmapSharp.Benchmarks --quick`, 40 frames 480x360, mapper seeds 1 and 2, video
+data; mean over the seeds). With the true masks (`--masks`): realistic TexturedSphere registers
+34/40 without tracks and 40/40 with them, median rotation error 1.31 -> 1.05 degrees, position
+1.63% -> 0.90%; with known intrinsics 34 -> 40 frames but rotation 0.38 -> 0.92 degrees (the
+median now includes the six frames SIFT could not place). DarkObject stays at 0/40. Without masks
+the tracker also follows the still wall: the sphere's rotation error rises from 1.25 to 6.8
+degrees and the focal collapses (|ln f/f0| 0.27 -> 0.99), and DarkObject "registers" 26-27/40
+frames that cannot be aligned to the truth (wall-only geometry). So it is off by default, and
+meant for use with object masks.
+
+**Pose error on the frames both runs place** (true masks, seeds 1 and 2, the 34 frames SIFT
+alone registers): self-calibrating, the tracks help (median rotation 1.16/1.47 -> 0.83/0.83
+degrees); with known intrinsics they hurt (0.33/0.42 -> 0.61/0.60). The cause is KLT drift: a
+track's position against the ray-cast truth is off by a median 0.75 px after 1-2 frames and
+2.2 px after 6-8. None of the knobs tried restores the known-intrinsics case: skipping pairs
+with many SIFT inliers (MaxSiftInliers 15-100) 0.56-0.61, all-zero track descriptors
+(DescribeTracks off) 0.55, capping pair spans (MaxPairFrameGap 8) no change, cutting tracks
+into 7-frame pieces (MaxTrackLength) 0.49/0.51 with descriptors, 0.66 without. All stay off by
+default.

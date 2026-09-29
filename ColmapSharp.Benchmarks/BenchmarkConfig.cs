@@ -59,6 +59,8 @@ internal sealed class BenchmarkConfig
 		  --mapper-seeds <list>  mapper seeds, comma separated (default 1,2,3)
 		  --tau <fraction>       F-score threshold as a fraction of the object's diagonal (default 0.01)
 		  --masks                give the reconstruction the true masks
+		  --video-tracking       video data with KLT tracks added to the matches (implies --data Video);
+		                         compare with a --data Video run of the same cases
 		  --out <path>           write the JSON report here
 		  --compare <path>       compare with an earlier JSON report; exit 1 on a regression
 		  --tolerance <t>        allowed relative worsening of an error metric's mean,
@@ -100,6 +102,9 @@ internal sealed class BenchmarkConfig
 	public double TauFraction { get; private set; } = new SurfaceMetricOptions().TauFraction;
 
 	public bool UseTrueMasks { get; private set; }
+
+	/// <summary>Whether the reconstruction adds KLT video tracks to its matches (--video-tracking).</summary>
+	public bool VideoTracking { get; private set; }
 
 	public string? OutputPath { get; private set; }
 
@@ -164,6 +169,10 @@ internal sealed class BenchmarkConfig
 					break;
 				case "--tau":
 					config.TauFraction = double.Parse(Next(), CultureInfo.InvariantCulture);
+					break;
+				case "--video-tracking":
+					config.VideoTracking = true;
+					config.Data = AutomaticReconstructionOptions.DataType.Video;
 					break;
 				case "--masks":
 					config.UseTrueMasks = true;
