@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<!-- The Windows head: a window around ColmapDemoApp, nothing else, the twin of ColmapDemo.Mac.
+	     agg-sharp's WinForms host needs net10.0-windows. Exe rather than WinExe keeps the console,
+	     where the COLMAP_DEMO_* and AGG_SMOKE_* runs print their results. The library itself stays
+	     pure managed; only this head reaches native code, through agg-sharp's platform project. -->
+
+	<PropertyGroup>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<OutputType>Exe</OutputType>
+		<Nullable>disable</Nullable>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<RootNamespace>ColmapDemo</RootNamespace>
+		<Company>Lars Brubaker</Company>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\ColmapDemo\ColmapDemo.csproj" />
+		<ProjectReference Include="..\agg-sharp\PlatformWin32\PlatformWin32.csproj" />
+	</ItemGroup>
+
+</Project>

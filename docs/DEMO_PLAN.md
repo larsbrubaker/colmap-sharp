@@ -1,7 +1,7 @@
 # ColmapSharp demo app — plan
 
 Open work only; history lives in git. An AGG (agg-sharp) app that turns photos, a video or a
-webcam capture into a downloadable mesh, running natively on macOS and as WASM on GitHub Pages
+webcam capture into a downloadable mesh, running natively on macOS and Windows and as WASM on GitHub Pages
 (`https://larsbrubaker.github.io/colmap-sharp/`). It is the end-to-end test bed beyond the unit
 tests. Precedents: agg-sharp's `examples/AggSharpDemo` (three-project shape, Pages workflow) and
 `rust-apps/colmap-rust` (same app idea in Rust, live on Pages).
@@ -10,8 +10,9 @@ tests. Precedents: agg-sharp's `examples/AggSharpDemo` (three-project shape, Pag
 
 - Lives in this repo under `demo/`, with agg-sharp as a git submodule at `demo/agg-sharp`. The
   library (`ColmapSharp/`) never references agg-sharp; only the demo does.
-- Three projects, copying AggSharpDemo: `demo/ColmapDemo` (shared app, no platform references),
-  `demo/ColmapDemo.Mac` (Exe + PlatformMac), `demo/ColmapDemo.Browser` (Blazor WASM + PlatformBrowser,
+- Projects copying AggSharpDemo's shape: `demo/ColmapDemo` (shared app, no platform references),
+  `demo/ColmapDemo.Mac` (Exe + PlatformMac), `demo/ColmapDemo.Windows` (Exe + PlatformWin32,
+  `net10.0-windows`), `demo/ColmapDemo.Browser` (Blazor WASM + PlatformBrowser,
   both agg `.targets` imports, `index.html` with `<base href="./">`).
 - Generic platform capabilities go to agg-sharp (MatterCAD's litmus test: would a DemoRunner in the
   browser need it?): browser file drop, video frame extraction (browser `<video>`/canvas, Mac
@@ -19,7 +20,7 @@ tests. Precedents: agg-sharp's `examples/AggSharpDemo` (three-project shape, Pag
   stays in the demo or the library.
 - GPU: the `IComputeDevice` adapter over agg-sharp's `WebGpuRenderDevice` (today in MatterCAD's
   `Tests/ColmapGpuTests/WebGpuComputeDevice.cs`) moves into the demo's shared project; dense
-  PatchMatch runs on the GPU in both heads, CPU fallback with the planner's reason shown.
+  PatchMatch runs on the GPU in every head, CPU fallback with the planner's reason shown.
 - Browser runs .NET interpreted and single-threaded (AOT crashes on .NET 10.0.11), so the app
   defaults to small inputs (low max image size, few images) and the library's `RunAsync` yields
   between units of work so the page stays responsive.

@@ -1,8 +1,10 @@
 // Copyright (c) 2026, Lars Brubaker. MIT licensed (see LICENSE).
 //
-// DevAutoRun: a developer hook for unattended runs of the mac head, driven by environment
-// variables, so a live run (the real window, the real GPU, the real UI-thread marshalling) can
-// be checked and screenshotted without a person clicking. Unset, it does nothing.
+// DevAutoRun: a developer hook for unattended runs of the desktop heads (ColmapDemo.Mac and
+// ColmapDemo.Windows each call Attach from their Program.cs), driven by environment variables, so
+// a live run (the real window, the real GPU, the real UI-thread marshalling) can be checked and
+// screenshotted without a person clicking. Unset, it does nothing. The browser head does not call
+// it: a page has no environment variables to read.
 //
 //   COLMAP_DEMO_PHOTOS=<dir>              preload the photos in <dir> (sorted by name)
 //   COLMAP_DEMO_AUTORUN=1                 press Run once the window is up
@@ -19,7 +21,7 @@ using MatterHackers.Agg.UI;
 
 namespace ColmapDemo
 {
-	internal static class DevAutoRun
+	public static class DevAutoRun
 	{
 		/// <summary>Wires the hook to <paramref name="app"/> in <paramref name="window"/>, if asked for.</summary>
 		public static void Attach(SystemWindow window, ColmapDemoApp app)

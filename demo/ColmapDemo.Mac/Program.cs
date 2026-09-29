@@ -4,7 +4,7 @@
 // ColmapDemo.Browser/Program.cs and the shape of agg-sharp's AggSharpDemo.Mac/Program.cs.
 // agg's AGG_SMOKE_FRAMES / AGG_SMOKE_SCREENSHOT environment variables work here unchanged
 // (the AppKit host reads them), so a smoke run can render a few frames, save a PNG and exit.
-// DevAutoRun.cs adds COLMAP_DEMO_* variables that preload photos, run, and screenshot the result.
+// DevAutoRun (in the shared project) adds COLMAP_DEMO_* variables that preload photos, run, and screenshot the result.
 
 using System;
 using ColmapDemo.Compute;
