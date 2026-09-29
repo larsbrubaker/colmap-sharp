@@ -116,6 +116,28 @@ blocks (the top and side sweeps), and the split model shares no images with the 
 10. **GPU kernels** through `IComputeDevice`: carving, KLT, the background median. Each has a CPU
     twin, following the `ReferenceComputeDevice` pattern.
 
+## Robustness to unskilled captures (standing goal)
+
+Users will film shaky, fast, unstructured videos they believe are good. The pipeline should
+still do its best with them and tell the user plainly what went wrong. Capture tips and
+training help, but they are not the fix.
+- **Benchmark:** a "bad capture" category.
+  - The real clips come from Lars's deliberately poor videos.
+  - The synthetic ones come from 0a with degradations added: motion blur, auto-exposure
+    swings, zoom and focus changes, rolling shutter, fast turns, standing still, pure
+    rotation with no parallax, and clutter.
+- **Frame selection:**
+  - drop blurred and duplicate frames (a sharpness score);
+  - choose keyframes by parallax rather than a fixed rate;
+  - detect stretches of pure rotation with no parallax.
+- **Photometric:** normalize exposure between frames before matching and texturing.
+- **Camera:** handle intrinsics that change within a clip (zoom or focus breathing). Group
+  frames by focal length instead of forcing one camera. Model rolling shutter later.
+- **Feedback in the demo and MatterCAD:**
+  - say which parts of the object were never seen;
+  - say which parts of the clip were blurred or had no parallax;
+  - eventually, live coverage guidance while capturing.
+
 ## Licenses
 
 - **Excluded:**
