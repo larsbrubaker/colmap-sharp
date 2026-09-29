@@ -69,8 +69,11 @@ blocks (the top and side sweeps), and the split model shares no images with the 
      age 6, so known-intrinsics poses get worse (0.60 vs 0.33°; `MaxTrackLength` 7 halves it);
      on the mouse, top/side tracks live ~1 frame at f40/f120 whatever the thresholds
      (forward-backward failure from large motion), so tracking adds nothing until 2c.
-   - 2c: sequential and loop matching over keyframes, shared bounded intrinsics, and full-rate
-     small decoding in the demo.
+   - 2c measured, not built: at the full 30 fps (259 frames) the mouse's top/side sweep (full-rate
+     081–131) still places 0 frames with or without tracking, and the clip splits into 3 models.
+     The object has only 16–60 corners per frame and moves 16–26 px/frame during the flip with
+     almost no texture (mean intensity change 3.5–5), so tracks fail forward-backward. The lever
+     for those frames is stage 4 (silhouette pose), not sampling rate.
    - Accept: > 90% of keyframes placed on the mouse with no split models; < 1° pose error on 0a.
 3. **Silhouette-carved surface.**
    - 3a is in (`Mvs/Silhouette/VisualHull`; DarkObject F 0.934; mouse IoU 0.945 k=0 / 0.966 k=1).
