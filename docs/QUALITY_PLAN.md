@@ -73,7 +73,8 @@ blocks (the top and side sweeps), and the split model shares no images with the 
      small decoding in the demo.
    - Accept: > 90% of keyframes placed on the mouse with no split models; < 1° pose error on 0a.
 3. **Silhouette-carved surface.**
-   - 3a: an octree visual hull (k-disagreement tolerant) with marching cubes.
+   - 3a is in (`Mvs/Silhouette/VisualHull`; DarkObject F 0.934; mouse IoU 0.945 k=0 / 0.966 k=1).
+     Open: default k from the benchmark; centroid fans make meshes ~1.8x larger.
    - 3b: hull samples fill the gaps in the fused cloud before Poisson; faces projecting outside
      the silhouettes are removed, which replaces trim guessing.
    - 3c: per-pixel hull depth bounds for PatchMatch, CPU and WGSL.
