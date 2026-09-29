@@ -16,6 +16,9 @@ Status: **in progress**. See [PORTING_PLAN.md](PORTING_PLAN.md). Reference versi
 
 Built for [MatterCAD](https://github.com/MatterHackers/MatterCAD).
 
+**Run the demo on a Mac:** double-click [run_mac.command](run_mac.command) in Finder (or run it
+from a terminal). It builds and starts the native photos-to-mesh demo app, `demo/ColmapDemo.Mac`.
+
 ## License
 
 MIT (see [LICENSE](LICENSE)). The notices required by upstream projects are in
