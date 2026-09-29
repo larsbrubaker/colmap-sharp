@@ -106,6 +106,36 @@ public sealed class SegmentationOptions
 	/// </summary>
 	public bool FillHoles { get; set; } = true;
 
+	/// <summary>
+	/// Temporal consistency for video (TemporalConsistency): the number of frames on each side
+	/// that a frame's mask is compared with and, when it is an outlier, repaired from. Frames are
+	/// taken as time-ordered in the order given (SegmentToMaskSource: ordinal name order). 0 = off,
+	/// every frame on its own. 2 or 3 suits a video sampled a few degrees of turn apart.
+	/// </summary>
+	public int TemporalWindow { get; set; }
+
+	/// <summary>
+	/// A frame is an outlier (and repaired) when its median contour distance to its aligned
+	/// neighbours, in squared working pixels, is above this and above
+	/// <see cref="TemporalOutlierRatio"/> times its neighbours' median.
+	/// </summary>
+	public double TemporalMinOutlierDistance { get; set; } = 2.0;
+
+	/// <summary>See <see cref="TemporalMinOutlierDistance"/>.</summary>
+	public double TemporalOutlierRatio { get; set; } = 2.0;
+
+	/// <summary>The weight of a repaired frame's own mask against its neighbours' consensus.</summary>
+	public double TemporalOwnWeight { get; set; } = 0.3;
+
+	/// <summary>Fused foreground probability at or above which a pixel is foreground.</summary>
+	public double TemporalHighThreshold { get; set; } = 0.55;
+
+	/// <summary>
+	/// Fused foreground probability at or above which a pixel is foreground when it connects to
+	/// one above <see cref="TemporalHighThreshold"/> (hysteresis).
+	/// </summary>
+	public double TemporalLowThreshold { get; set; } = 0.45;
+
 	/// <summary>Throws (Check failed) when an option is out of range.</summary>
 	public void Validate()
 	{
@@ -126,6 +156,12 @@ public sealed class SegmentationOptions
 		Check.Ge(Smoothness, 0.0);
 		Check.Ge(OpeningFraction, 0.0);
 		Check.Ge(CloseFraction, 0.0);
+		Check.Ge(TemporalWindow, 0);
+		Check.Ge(TemporalMinOutlierDistance, 0.0);
+		Check.Ge(TemporalOutlierRatio, 0.0);
+		Check.Ge(TemporalOwnWeight, 0.0);
+		Check.Le(TemporalOwnWeight, 1.0);
+		Check.Le(TemporalLowThreshold, TemporalHighThreshold);
 		Check.That(MaxDegreeOfParallelism == -1 || MaxDegreeOfParallelism >= 1, "MaxDegreeOfParallelism must be -1 or at least 1");
 	}
 }

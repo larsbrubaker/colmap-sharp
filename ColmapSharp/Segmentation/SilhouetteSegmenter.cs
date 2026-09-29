@@ -22,7 +22,9 @@
 // Masks are upsampled with the downsampling factor to each frame's size: grey, 255 = keep,
 // 0 = drop, named "<image name>.png" - the convention ImageReader (mask lookup),
 // FeatureExtraction.MaskFeatures and StereoFusion (MaskPath) share. Frames are independent after
-// the background model, so they run in parallel, each writing only its own slot.
+// the background model, so they run in parallel, each writing only its own slot. With
+// SegmentationOptions.TemporalWindow above 0, TemporalConsistency then repairs single-frame
+// errors of a video from the frames around each one (stage 1a+).
 
 using ColmapSharp.Controllers;
 using ColmapSharp.Sensor;
@@ -191,15 +193,48 @@ public static class SilhouetteSegmenter
 			CancellationToken = cancellationToken,
 			MaxDegreeOfParallelism = options.MaxDegreeOfParallelism,
 		};
+		if (options.TemporalWindow == 0)
+		{
+			// Frames are independent: each is segmented and stored (upsampled) by its own worker.
+			Parallel.For(0, count, parallelOptions, i =>
+			{
+				if (load(i) is { } frame)
+				{
+					store(i, WorkingMask.Of(frame, SegmentFrame(frame, median, options, cancellationToken)));
+				}
+
+				progress?.Report(Interlocked.Increment(ref done));
+			});
+
+			return kind;
+		}
+
+		// Temporal consistency needs every frame's mask first. The last frame's progress step is
+		// held back until the temporal pass and the stores are done, so 100% means finished.
+		var masks = new WorkingMask?[count];
 		Parallel.For(0, count, parallelOptions, i =>
 		{
 			if (load(i) is { } frame)
 			{
-				store(i, WorkingMask.Of(frame, SegmentFrame(frame, median, options, cancellationToken)));
+				masks[i] = WorkingMask.Of(frame, SegmentFrame(frame, median, options, cancellationToken));
 			}
 
-			progress?.Report(Interlocked.Increment(ref done));
+			int finished = Interlocked.Increment(ref done);
+			if (finished < count)
+			{
+				progress?.Report(finished);
+			}
 		});
+
+		TemporalConsistency.Apply(masks, options, cancellationToken);
+		Parallel.For(0, count, parallelOptions, i =>
+		{
+			if (masks[i] is { } mask)
+			{
+				store(i, mask);
+			}
+		});
+		progress?.Report(count);
 
 		return kind;
 	}
@@ -218,7 +253,15 @@ public static class SilhouetteSegmenter
 
 		(byte[] trimap, bool[] backgroundModelAllowed) = BuildTrimap(initial, sure, width, height, options);
 		bool[] mask = GrabCutRefiner.Refine(frame, trimap, initial, backgroundModelAllowed, options, cancellationToken);
+		return Cleanup(mask, width, height, options);
+	}
 
+	/// <summary>
+	/// The cleanup after GrabCut (and after temporal fusion): opening sized to the object, the
+	/// largest component, closing, hole filling. Null when nothing is left.
+	/// </summary>
+	internal static bool[]? Cleanup(bool[] mask, int width, int height, SegmentationOptions options)
+	{
 		mask = BinaryMorphology.Open(mask, width, height, ObjectRadius(mask, width, height, options.OpeningFraction));
 		if (options.KeepLargestComponent)
 		{
