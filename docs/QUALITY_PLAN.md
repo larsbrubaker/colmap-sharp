@@ -62,22 +62,11 @@ blocks (the top and side sweeps), and the split model shares no images with the 
      already ported), Individual vs Video, single camera, CLAHE. Results go in
      `docs/BENCHMARK.md`, and the demo's defaults may change from them.
 1. **Silhouettes.**
-   - 1a is in (`Segmentation/SilhouetteSegmenter`). Open: check IoU ≥ 0.97 against the 0a
-     true masks; on the mouse, frames 096–099 (f120) still lose a notch where the lit underside
-     matches the wall. A close-up object filling the frame is reported as not found (unmasked).
-     GPU twin for stage 10: `BackgroundModel.Build`.
-   - 1a+: temporal consistency for video (Lars's idea). A single-frame error — a bite where the
-     lit underside matches the wall, a channel cut by label text — rarely repeats in the
-     neighbouring frames.
-     - Score each mask against its time neighbours with a shape distance: mean squared distance
-       between the contours after aligning the centroid and scale.
-     - Replace outlier regions with the neighbours' consensus: a per-pixel foreground
-       probability, averaged over a small time window and thresholded with hysteresis (a high
-       threshold to add a pixel, a low one to drop it), so a one-frame dropout doesn't flip a
-       pixel.
-     - The object turns between samples, so align the neighbours first: a similarity transform
-       from contour moments, or KLT flow once stage 2a lands. The denser the sampling, the more
-       this works.
+   - 1a and 1a+ are in (`Segmentation/SilhouetteSegmenter`, `TemporalConsistency`; masks meet
+     IoU ≥ 0.975 on the 0a DarkObject). Open: turn `TemporalWindow = 2` on for video once the
+     benchmark confirms it; moment alignment is weak on thin side views (f120 007), so switch
+     it to KLT flow after 2a; the smaller f120 096 notch remains; a close-up object filling the
+     frame is reported as not found. GPU twin for stage 10: `BackgroundModel.Build`.
    - 1b: drop keypoints on specular highlights; CLAHE only inside the mask. Accept: the inlier
      ratio rises and the registered count doesn't fall.
 2. **Video tracking.**
