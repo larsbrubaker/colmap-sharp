@@ -64,11 +64,11 @@ blocks (the top and side sweeps), and the split model shares no images with the 
    - 1b: drop keypoints on specular highlights; CLAHE only inside the mask. Accept: the inlier
      ratio rises and the registered count doesn't fall.
 2. **Video tracking.**
-   - 2a is in (`Feature/Tracking`; gain/offset compensation; sphere reprojection 0.50 px). Open:
-     on the mouse's top/side views (f120 038–058) masked tracks mostly end after 1–2 frames and
-     mask erosion is not the main cause; count why tracks end before 2b builds on them.
-   - 2b: keyframes chosen by parallax; tracked points get SIFT descriptors; matches go into the
-     database, then verification and mapping.
+   - 2a and 2b are in (`Feature/Tracking`, `AutomaticReconstructionOptions.VideoTracking`, off by
+     default; needs object masks). Sphere: 40/40 vs 34 SIFT-only. Open: tracks drift ~2 px by
+     age 6, so known-intrinsics poses get worse (0.60 vs 0.33°; `MaxTrackLength` 7 halves it);
+     on the mouse, top/side tracks live ~1 frame at f40/f120 whatever the thresholds
+     (forward-backward failure from large motion), so tracking adds nothing until 2c.
    - 2c: sequential and loop matching over keyframes, shared bounded intrinsics, and full-rate
      small decoding in the demo.
    - Accept: > 90% of keyframes placed on the mouse with no split models; < 1° pose error on 0a.
